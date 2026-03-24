@@ -13,9 +13,12 @@ Solo-first, network-ready architecture. Full Lua scripting (sol2 + LuaJIT) for m
 | Phase | Artifact | Path |
 |-------|----------|------|
 | Analysis | Product Brief | `_bmad-output/planning-artifacts/product-brief.md` |
+| Analysis | Technical Research | `_bmad-output/planning-artifacts/technical-research.md` |
 | Planning | PRD | `_bmad-output/planning-artifacts/PRD.md` |
+| Planning | UX Spec | `_bmad-output/planning-artifacts/ux-spec.md` |
 | Solutioning | Architecture + ADRs | `_bmad-output/planning-artifacts/architecture.md` |
 | Solutioning | Epics & Stories | `_bmad-output/planning-artifacts/epics/` |
+| Solutioning | Readiness Check | `_bmad-output/planning-artifacts/implementation-readiness-check.md` |
 | Implementation | Sprint Status | `_bmad-output/implementation-artifacts/sprint-status.yaml` |
 | Context | Project Context | `_bmad-output/project-context.md` |
 
