@@ -5,7 +5,7 @@
 project: VoxelForge
 methodology: BMAD v6 + Game Dev Studio
 created: 2026-03-24
-last_updated: 2026-03-24T21:30:00Z
+last_updated: 2026-03-24T23:59:00Z
 
 # Status values: backlog | ready | in-progress | review | done | blocked
 
@@ -33,8 +33,8 @@ epics:
         assigned_to: dev-agent
       - id: "1.3"
         title: "Core Types, Assert, and Result"
-        status: ready-for-dev
-        assigned_to: null
+        status: done
+        assigned_to: dev-agent
       - id: "1.4"
         title: "Logging via spdlog"
         status: backlog
@@ -304,8 +304,8 @@ summary:
     P2: 4
   by_status:
     backlog: 49
-    ready: 1
+    ready: 0
     in_progress: 0
     review: 0
-    done: 2
+    done: 3
     blocked: 0

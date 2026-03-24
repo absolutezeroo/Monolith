@@ -1,7 +1,7 @@
 # engine/CMakeLists.txt — VoxelEngine static library
 
 add_library(VoxelEngine STATIC
-    src/Placeholder.cpp
+src/core/CoreModule.cpp
 )
 
 target_include_directories(VoxelEngine
@@ -32,6 +32,7 @@ target_precompile_headers(VoxelEngine PRIVATE
     <string>
     <memory>
     <cstdint>
+    <expected>
     <glm/glm.hpp>
     <spdlog/spdlog.h>
     <entt/entt.hpp>

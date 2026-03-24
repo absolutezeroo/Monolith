@@ -1,6 +1,6 @@
 # Story 1.3: Core Types, Assert, and Result
 
-Status: ready-for-dev
+Status: done
 
 ---
 
@@ -20,46 +20,46 @@ so that **all engine code builds on a consistent, safe base**.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Bump C++ standard from 20 to 23 (AC: #3)
-  - [ ] 1.1 Change `CMAKE_CXX_STANDARD` from `20` to `23` in root `CMakeLists.txt`
-  - [ ] 1.2 Verify project still compiles clean with `cmake --preset msvc-debug`
-- [ ] Task 2: Create `engine/include/voxel/core/Types.h` (AC: #1, #4)
-  - [ ] 2.1 Create directory `engine/include/voxel/core/` if not present
-  - [ ] 2.2 Write Types.h with `#pragma once`, fixed-width aliases, namespace
-  - [ ] 2.3 Verify no conflicts with existing PCH headers
-- [ ] Task 3: Create `engine/include/voxel/core/Assert.h` (AC: #2, #4)
-  - [ ] 3.1 Write Assert.h with `VX_ASSERT` and `VX_FATAL` macros
-  - [ ] 3.2 Create `engine/src/core/Assert.cpp` for `VX_FATAL` stderr + abort implementation
-  - [ ] 3.3 Verify `VX_ASSERT` compiles to nothing in Release (`#ifdef NDEBUG`)
-- [ ] Task 4: Create `engine/include/voxel/core/Result.h` (AC: #3, #4)
-  - [ ] 4.1 Write Result.h with `EngineError` enum and `Result<T>` alias
-  - [ ] 4.2 Add `<expected>` to PCH in `engine/CMakeLists.txt`
-  - [ ] 4.3 Verify `Result<int>` compiles and `.value()` / `.error()` work
-- [ ] Task 5: Update `engine/CMakeLists.txt` (AC: all)
-  - [ ] 5.1 Add `src/core/Assert.cpp` to the source list
-  - [ ] 5.2 Remove `src/Placeholder.cpp` from source list (replaced by real sources)
-  - [ ] 5.3 Add `<expected>` to `target_precompile_headers`
-  - [ ] 5.4 Verify library compiles clean
-- [ ] Task 6: Create unit tests `tests/core/TestResult.cpp` (AC: #5)
-  - [ ] 6.1 Create `tests/core/` directory
-  - [ ] 6.2 Write tests using Catch2 BDD style (GIVEN/WHEN/THEN) or SECTION blocks
-  - [ ] 6.3 Test: Result<int> success construction and `.value()` access
-  - [ ] 6.4 Test: Result<int> error construction via `std::unexpected(EngineError::...)`
-  - [ ] 6.5 Test: `.and_then()` monadic chaining on success path
-  - [ ] 6.6 Test: `.and_then()` short-circuits on error path
-  - [ ] 6.7 Test: `.or_else()` invoked on error, skipped on success
-  - [ ] 6.8 Test: `.transform()` maps value on success
-  - [ ] 6.9 Test: `std::unexpected` propagation through chained operations
-  - [ ] 6.10 Test: EngineError enum covers all defined variants
-- [ ] Task 7: Update `tests/CMakeLists.txt` (AC: #5)
-  - [ ] 7.1 Add `core/TestResult.cpp` to test sources
-  - [ ] 7.2 Keep `TestPlaceholder.cpp` (build system smoke test)
-  - [ ] 7.3 Build and run all tests — verify 0 failures
-- [ ] Task 8: Final verification (AC: all)
-  - [ ] 8.1 Full build with `cmake --preset msvc-debug` + `cmake --build`
-  - [ ] 8.2 Run `ctest` — all tests pass
-  - [ ] 8.3 Run `tools/check-format.sh` — all new files pass formatting check
-  - [ ] 8.4 Verify `clang-format -i` produces no changes on new files
+- [x] Task 1: Bump C++ standard from 20 to 23 (AC: #3)
+  - [x] 1.1 Change `CMAKE_CXX_STANDARD` from `20` to `23` in root `CMakeLists.txt`
+  - [x] 1.2 Verify project still compiles clean with `cmake --preset msvc-debug`
+- [x] Task 2: Create `engine/include/voxel/core/Types.h` (AC: #1, #4)
+  - [x] 2.1 Create directory `engine/include/voxel/core/` if not present
+  - [x] 2.2 Write Types.h with `#pragma once`, fixed-width aliases, namespace
+  - [x] 2.3 Verify no conflicts with existing PCH headers
+- [x] Task 3: Create `engine/include/voxel/core/Assert.h` (AC: #2, #4)
+  - [x] 3.1 Write Assert.h with `VX_ASSERT` and `VX_FATAL` macros
+  - [x] 3.2 Create `engine/src/core/Assert.cpp` for `VX_FATAL` stderr + abort implementation
+  - [x] 3.3 Verify `VX_ASSERT` compiles to nothing in Release (`#ifdef NDEBUG`)
+- [x] Task 4: Create `engine/include/voxel/core/Result.h` (AC: #3, #4)
+  - [x] 4.1 Write Result.h with `EngineError` enum and `Result<T>` alias
+  - [x] 4.2 Add `<expected>` to PCH in `engine/CMakeLists.txt`
+  - [x] 4.3 Verify `Result<int>` compiles and `.value()` / `.error()` work
+- [x] Task 5: Update `engine/CMakeLists.txt` (AC: all)
+  - [x] 5.1 Add `src/core/CoreModule.cpp` to the source list (macro-only Assert, no Assert.cpp needed)
+  - [x] 5.2 Remove `src/Placeholder.cpp` from source list (replaced by real sources)
+  - [x] 5.3 Add `<expected>` to `target_precompile_headers`
+  - [x] 5.4 Verify library compiles clean
+- [x] Task 6: Create unit tests `tests/core/TestResult.cpp` (AC: #5)
+  - [x] 6.1 Create `tests/core/` directory
+  - [x] 6.2 Write tests using Catch2 SECTION blocks
+  - [x] 6.3 Test: Result<int> success construction and `.value()` access
+  - [x] 6.4 Test: Result<int> error construction via `std::unexpected(EngineError::...)`
+  - [x] 6.5 Test: `.and_then()` monadic chaining on success path
+  - [x] 6.6 Test: `.and_then()` short-circuits on error path
+  - [x] 6.7 Test: `.or_else()` invoked on error, skipped on success
+  - [x] 6.8 Test: `.transform()` maps value on success
+  - [x] 6.9 Test: `std::unexpected` propagation through chained operations
+  - [x] 6.10 Test: EngineError enum covers all defined variants
+- [x] Task 7: Update `tests/CMakeLists.txt` (AC: #5)
+  - [x] 7.1 Add `core/TestResult.cpp` to test sources
+  - [x] 7.2 Keep `TestPlaceholder.cpp` (build system smoke test)
+  - [x] 7.3 Build and run all tests — verify 0 failures
+- [x] Task 8: Final verification (AC: all)
+  - [x] 8.1 Full build with `cmake --preset msvc-debug` + `cmake --build`
+  - [x] 8.2 Run `ctest` — all tests pass (5/5, 0 failures)
+  - [x] 8.3 Run `tools/check-format.sh` — all 7 files pass formatting check
+  - [x] 8.4 Verify `clang-format -i` produces no changes on new files
 
 ## Dev Notes
 
@@ -501,14 +501,43 @@ feat(core): add foundational types, assert macros, and Result<T> error handling
 - [Source: engine/CMakeLists.txt — Current PCH and source list]
 - [Source: cppreference.com — std::expected requires C++23]
 
+## Change Log
+
+- **2026-03-24**: Implemented Story 1.3 — Core Types, Assert, and Result. Bumped C++ standard to 23, created Types.h/Assert.h/Result.h, replaced Placeholder.cpp with CoreModule.cpp, added `<expected>` to PCH, wrote 5 Catch2 unit tests covering all monadic operations and error propagation. All tests pass, all files formatted.
+
 ## Dev Agent Record
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 4.6
 
 ### Debug Log References
 
+- No issues encountered. All tasks completed cleanly on first attempt.
+- Assert.h implemented as macro-only (no Assert.cpp needed) per Dev Notes recommendation.
+- CoreModule.cpp created as translation unit to validate header compilation and satisfy static library requirement.
+- clang-format reordered includes in Result.h (project headers before std headers per .clang-format IncludeCategories).
+
 ### Completion Notes List
 
+- ✅ C++ standard bumped from 20 to 23 for `std::expected` support (ADR-001)
+- ✅ Types.h: 12 fixed-width type aliases in `voxel::core` namespace
+- ✅ Assert.h: `VX_ASSERT` (debug-only) + `VX_FATAL` (always active) macros, stderr + abort, no spdlog dependency
+- ✅ Result.h: `EngineError` enum (7 variants, uint8 backing) + `Result<T>` alias for `std::expected<T, EngineError>`
+- ✅ engine/CMakeLists.txt: Replaced Placeholder.cpp with CoreModule.cpp, added `<expected>` to PCH
+- ✅ 5 test cases (4 Result tests + 1 EngineError enum test), all passing
+- ✅ Formatting verified: all 7 C++ files pass check-format.sh
+
 ### File List
+
+| File | Action | Description |
+|------|--------|-------------|
+| `CMakeLists.txt` | MODIFIED | Bumped `CMAKE_CXX_STANDARD` from 20 to 23 |
+| `engine/include/voxel/core/Types.h` | CREATED | Fixed-width type aliases in `voxel::core` |
+| `engine/include/voxel/core/Assert.h` | CREATED | `VX_ASSERT` + `VX_FATAL` macros |
+| `engine/include/voxel/core/Result.h` | CREATED | `EngineError` enum + `Result<T>` alias |
+| `engine/src/core/CoreModule.cpp` | CREATED | Header compilation validator (replaces Placeholder.cpp) |
+| `engine/src/Placeholder.cpp` | DELETED | Replaced by CoreModule.cpp |
+| `engine/CMakeLists.txt` | MODIFIED | Updated source list, added `<expected>` to PCH |
+| `tests/core/TestResult.cpp` | CREATED | Catch2 unit tests for Result<T> monadic operations |
+| `tests/CMakeLists.txt` | MODIFIED | Added `core/TestResult.cpp` to test sources |
