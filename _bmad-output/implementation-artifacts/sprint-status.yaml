@@ -41,11 +41,11 @@ epics:
         assigned_to: dev-agent
       - id: "1.5"
         title: "Math Types and Coordinate Utilities"
-        status: backlog
-        assigned_to: null
+        status: review
+        assigned_to: dev-agent
       - id: "1.6"
         title: "CI Pipeline (GitHub Actions)"
-        status: backlog
+        status: ready-for-dev
         assigned_to: null
 
   - id: 2
@@ -303,9 +303,9 @@ summary:
     P1: 14
     P2: 4
   by_status:
-    backlog: 49
-    ready: 0
+    backlog: 47
+    ready: 1
     in_progress: 0
-    review: 0
+    review: 1
     done: 4
     blocked: 0
