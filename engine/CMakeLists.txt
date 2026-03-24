@@ -29,6 +29,15 @@ target_link_libraries(VoxelEngine
 # spdlog: disable exceptions (project uses -fno-exceptions)
 target_compile_definitions(VoxelEngine PUBLIC SPDLOG_NO_EXCEPTIONS)
 
+# GLM: Vulkan depth range [0,1] and left-handed coordinate system
+target_compile_definitions(VoxelEngine PUBLIC
+    GLM_FORCE_DEPTH_ZERO_TO_ONE
+    GLM_FORCE_LEFT_HANDED
+)
+
+# Windows: prevent <windows.h> from defining min/max macros
+target_compile_definitions(VoxelEngine PUBLIC NOMINMAX)
+
 # spdlog compile-time log level filtering
 target_compile_definitions(VoxelEngine PUBLIC
     $<$<CONFIG:Debug>:SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE>
