@@ -43,6 +43,10 @@ epics:
         title: "Math Types and Coordinate Utilities"
         status: backlog
         assigned_to: null
+      - id: "1.6"
+        title: "CI Pipeline (GitHub Actions)"
+        status: backlog
+        assigned_to: null
 
   - id: 2
     name: "Vulkan Bootstrap"
@@ -293,13 +297,13 @@ epics:
 
 summary:
   total_epics: 10
-  total_stories: 51
+  total_stories: 52
   by_priority:
-    P0: 33
+    P0: 34
     P1: 14
     P2: 4
   by_status:
-    backlog: 51
+    backlog: 52
     ready: 0
     in_progress: 0
     review: 0

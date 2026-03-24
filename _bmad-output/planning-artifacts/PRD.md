@@ -249,7 +249,7 @@ Renderer
 
 | # | Epic | Stories | Priority | Dependencies | Description |
 |---|------|---------|----------|-------------|-------------|
-| 1 | Foundation | 5 | P0 | None | Core layer, CMake, vcpkg, logging, math types, Catch2 tests |
+| 1 | Foundation | 6 | P0 | None | Core layer, CMake, vcpkg, logging, math types, Catch2 tests, CI |
 | 2 | Vulkan Bootstrap | 6 | P0 | Epic 1 | GLFW window, Vulkan init (volk+vk-bootstrap+VMA), triangle, gigabuffer, staging, camera |
 | 3 | Voxel World Core | 6 | P0 | Epic 1 | ChunkSection, ChunkColumn, ChunkManager, BlockRegistry, palette compression, coordinate system |
 | 4 | Terrain Generation | 5 | P0 | Epic 3 | FastNoiseLite, heightmap terrain, spline remapping, biomes, caves, tree placement |

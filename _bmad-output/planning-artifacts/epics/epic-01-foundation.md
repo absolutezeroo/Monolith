@@ -2,7 +2,7 @@
 
 **Priority**: P0
 **Dependencies**: None
-**Goal**: Project skeleton compiles on Windows and Linux, core types are tested, logging works. Every subsequent epic builds on this.
+**Goal**: Project skeleton compiles on Windows and Linux, core types are tested, logging works, CI runs on push. Every subsequent epic builds on this.
 
 ---
 
@@ -88,3 +88,21 @@
 - `voxel/math/CoordUtils.h` — free functions: `worldToChunk(dvec3) → ivec2`, `worldToLocal(dvec3) → ivec3`, `localToWorld(ivec2 chunk, ivec3 local) → dvec3`, `blockToIndex(int x, int y, int z) → int32_t`, `indexToBlock(int32_t) → ivec3`
 - All in `namespace voxel::math`
 - Unit tests: AABB intersection/contains, coordinate roundtrips (world→chunk→local→world identity), `blockToIndex`/`indexToBlock` inverse, boundary values (0,0,0 and 15,15,15)
+
+---
+
+## Story 1.6: CI Pipeline (GitHub Actions)
+
+**As a** developer,
+**I want** automated builds and tests on every push,
+**so that** regressions are caught immediately on both Windows and Linux.
+
+**Acceptance Criteria:**
+- GitHub Actions workflow: `.github/workflows/ci.yml`
+- Matrix build: Windows (MSVC 2022) + Ubuntu (GCC 13)
+- Steps: checkout → vcpkg cache → cmake configure → build → ctest
+- Build both Debug and Release configurations
+- Test results reported in CI output
+- Build badge in README.md
+- Fail on any compiler warning (warnings are errors)
+- Cache vcpkg packages between runs for speed

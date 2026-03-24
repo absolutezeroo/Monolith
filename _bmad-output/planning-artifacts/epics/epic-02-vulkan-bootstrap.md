@@ -112,3 +112,6 @@
 - Dear ImGui initialized with Vulkan backend
 - F3 toggles overlay: FPS, camera position (x,y,z), yaw/pitch, memory usage (gigabuffer used/free)
 - Mouse capture toggle (Escape to release cursor, click to recapture)
+- Wireframe rendering toggle (F4) — switches polygon mode to LINE for all chunk draws
+- Chunk boundary visualization toggle (F5) — renders translucent wireframe cubes at chunk borders
+- Chunk state color coding in ImGui: loaded (green), meshing (yellow), dirty (orange), unloaded (gray)
