@@ -1,0 +1,37 @@
+Language: Cpp
+BasedOnStyle: Microsoft
+Standard: c++20
+ColumnLimit: 120
+IndentWidth: 4
+UseTab: Never
+BreakBeforeBraces: Allman
+PointerAlignment: Left
+DerivePointerAlignment: false
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortLambdasOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortBlocksOnASingleLine: Empty
+NamespaceIndentation: None
+CompactNamespaces: false
+FixNamespaceComments: true
+SortIncludes: CaseSensitive
+IncludeBlocks: Regroup
+IncludeCategories:
+  - Regex: '^"voxel/'
+    Priority: 1
+  - Regex: '^<(entt|sol|glm|vulkan|VkBootstrap|vk_mem_alloc|volk|glfw|spdlog|fmt|imgui|enkiTS|FastNoiseLite|catch2|lz4)'
+    Priority: 2
+  - Regex: '^<'
+    Priority: 3
+BinPackArguments: false
+BinPackParameters: false
+AlignAfterOpenBracket: AlwaysBreak
+BreakConstructorInitializers: BeforeComma
+PackConstructorInitializers: NextLine
+Cpp11BracedListStyle: true
+SpaceAfterCStyleCast: false
+SpaceBeforeParens: ControlStatements
+EmptyLineAfterAccessModifier: Never
+EmptyLineBeforeAccessModifier: LogicalBlock
+SeparateDefinitionBlocks: Leave

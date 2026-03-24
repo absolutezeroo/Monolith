@@ -29,8 +29,8 @@ epics:
         assigned_to: dev-agent
       - id: "1.2"
         title: ".clang-format + .clang-tidy + .editorconfig"
-        status: backlog
-        assigned_to: null
+        status: done
+        assigned_to: dev-agent
       - id: "1.3"
         title: "Core Types, Assert, and Result"
         status: backlog
@@ -303,9 +303,9 @@ summary:
     P1: 14
     P2: 4
   by_status:
-    backlog: 51
+    backlog: 50
     ready: 0
     in_progress: 0
     review: 0
-    done: 1
+    done: 2
     blocked: 0
