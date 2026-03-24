@@ -1,6 +1,6 @@
 # Story 1.4: Logging via spdlog
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -19,30 +19,30 @@ so that I can trace execution and debug effectively.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Create `engine/include/voxel/core/Log.h` (AC: 1, 3)
-  - [ ] 1.1 Define `Log` class with `static init()`, `static shutdown()`, `static setLevel()`, `static getLogger()`
-  - [ ] 1.2 Define `VX_LOG_TRACE` through `VX_LOG_CRITICAL` macros using `SPDLOG_LOGGER_*` variants
-- [ ] Task 2: Create `engine/src/core/Log.cpp` (AC: 2, 5)
-  - [ ] 2.1 Implement `Log::init()` with stdout color sink + rotating file sink
-  - [ ] 2.2 Set spdlog pattern to `[%H:%M:%S.%e] [%l] [%s:%#] %v`
-  - [ ] 2.3 Set default level to `trace` in Debug, `info` in Release
-  - [ ] 2.4 Register logger as spdlog default
-- [ ] Task 3: Update `engine/include/voxel/core/Assert.h` (AC: 4)
-  - [ ] 3.1 Add `#include "voxel/core/Log.h"` to Assert.h
-  - [ ] 3.2 Change `VX_FATAL` to call `VX_LOG_CRITICAL(msg)` before `std::abort()`
-  - [ ] 3.3 Update `VX_ASSERT` failure path to also route through `VX_LOG_CRITICAL` for log file capture
-- [ ] Task 4: Update `engine/CMakeLists.txt` (AC: 6)
-  - [ ] 4.1 Add `src/core/Log.cpp` to source list
-  - [ ] 4.2 Add `SPDLOG_ACTIVE_LEVEL` compile definitions per configuration (PUBLIC scope)
-  - [ ] 4.3 Add `SPDLOG_NO_EXCEPTIONS` compile definition (required — project uses `-fno-exceptions`)
-- [ ] Task 5: Create `tests/core/TestLog.cpp` (all ACs)
-  - [ ] 5.1 Test `Log::init()` succeeds without crash
-  - [ ] 5.2 Test all log level macros execute without crash
-  - [ ] 5.3 Test `Log::setLevel()` filters messages correctly
-  - [ ] 5.4 Test rotating file sink creates log file
-  - [ ] 5.5 Test that calling `Log::init()` twice does not leak or corrupt (reinit guard)
-- [ ] Task 6: Update `tests/CMakeLists.txt`
-  - [ ] 6.1 Add `core/TestLog.cpp` to VoxelTests sources
+- [x] Task 1: Create `engine/include/voxel/core/Log.h` (AC: 1, 3)
+  - [x] 1.1 Define `Log` class with `static init()`, `static shutdown()`, `static setLevel()`, `static getLogger()`
+  - [x] 1.2 Define `VX_LOG_TRACE` through `VX_LOG_CRITICAL` macros using `SPDLOG_LOGGER_*` variants
+- [x] Task 2: Create `engine/src/core/Log.cpp` (AC: 2, 5)
+  - [x] 2.1 Implement `Log::init()` with stdout color sink + rotating file sink
+  - [x] 2.2 Set spdlog pattern to `[%H:%M:%S.%e] [%l] [%s:%#] %v`
+  - [x] 2.3 Set default level to `trace` in Debug, `info` in Release
+  - [x] 2.4 Register logger as spdlog default
+- [x] Task 3: Update `engine/include/voxel/core/Assert.h` (AC: 4)
+  - [x] 3.1 Add `#include "voxel/core/Log.h"` to Assert.h
+  - [x] 3.2 Change `VX_FATAL` to call `VX_LOG_CRITICAL(msg)` before `std::abort()`
+  - [x] 3.3 Update `VX_ASSERT` failure path to also route through `VX_LOG_CRITICAL` for log file capture
+- [x] Task 4: Update `engine/CMakeLists.txt` (AC: 6)
+  - [x] 4.1 Add `src/core/Log.cpp` to source list
+  - [x] 4.2 Add `SPDLOG_ACTIVE_LEVEL` compile definitions per configuration (PUBLIC scope)
+  - [x] 4.3 Add `SPDLOG_NO_EXCEPTIONS` compile definition (required — project uses `-fno-exceptions`)
+- [x] Task 5: Create `tests/core/TestLog.cpp` (all ACs)
+  - [x] 5.1 Test `Log::init()` succeeds without crash
+  - [x] 5.2 Test all log level macros execute without crash
+  - [x] 5.3 Test `Log::setLevel()` filters messages correctly
+  - [x] 5.4 Test rotating file sink creates log file
+  - [x] 5.5 Test that calling `Log::init()` twice does not leak or corrupt (reinit guard)
+- [x] Task 6: Update `tests/CMakeLists.txt`
+  - [x] 6.1 Add `core/TestLog.cpp` to VoxelTests sources
 
 ## Dev Notes
 
@@ -293,8 +293,38 @@ For file output tests: call `Log::init()`, write a log message, call `Log::shutd
 
 ### Agent Model Used
 
+Claude Opus 4.6
+
 ### Debug Log References
+
+No issues encountered. Clean build and all 9/9 tests passed (4 new log tests + 5 existing tests).
 
 ### Completion Notes List
 
+- Created `Log` class with `init()`, `shutdown()`, `setLevel()`, `getLogger()` static methods
+- All 6 `VX_LOG_*` macros wrap `SPDLOG_LOGGER_*` variants for source location capture (`[source:line]`)
+- `Log::init()` creates stdout color sink + rotating file sink (`logs/voxelforge.log`, 5MB max, 3 rotated)
+- Pattern: `[%H:%M:%S.%e] [%l] [%s:%#] %v` as specified
+- Debug defaults to trace level; Release defaults to info level
+- Reinit guard in `Log::init()` prevents double-init corruption
+- `Log::shutdown()` resets `s_logger` before calling `spdlog::shutdown()` for clean teardown
+- Null-guard in `setLevel()` prevents crash if called before init
+- Updated `VX_FATAL` and `VX_ASSERT` to route through `VX_LOG_CRITICAL` for log file capture, with stderr fallback if logger not initialized
+- Re-added `<cstdio>` to `Assert.h` for pre-init fallback path
+- Added `SPDLOG_NO_EXCEPTIONS` (required for `-fno-exceptions` project)
+- Added `SPDLOG_ACTIVE_LEVEL` per-config: TRACE(Debug), INFO(Release), DEBUG(RelWithDebInfo)
+- 4 test cases covering: init, all macros, level filtering, file output, and reinit guard
+
+### Change Log
+
+- 2026-03-24: Implemented Story 1.4 — Logging via spdlog. Created Log.h/Log.cpp, updated Assert.h for spdlog integration, added CMake compile definitions, and wrote comprehensive Catch2 tests.
+- 2026-03-24: Code review — Added stderr fallback to VX_FATAL/VX_ASSERT for pre-init safety, removed unused include from TestLog.cpp.
+
 ### File List
+
+- `engine/include/voxel/core/Log.h` — NEW
+- `engine/src/core/Log.cpp` — NEW
+- `engine/include/voxel/core/Assert.h` — MODIFIED (VX_FATAL/VX_ASSERT now use VX_LOG_CRITICAL)
+- `engine/CMakeLists.txt` — MODIFIED (added Log.cpp, SPDLOG_NO_EXCEPTIONS, SPDLOG_ACTIVE_LEVEL)
+- `tests/core/TestLog.cpp` — NEW
+- `tests/CMakeLists.txt` — MODIFIED (added core/TestLog.cpp)

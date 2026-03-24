@@ -5,6 +5,7 @@ find_package(Catch2 3 REQUIRED)
 add_executable(VoxelTests
     TestPlaceholder.cpp
     core/TestResult.cpp
+    core/TestLog.cpp
 )
 
 target_link_libraries(VoxelTests

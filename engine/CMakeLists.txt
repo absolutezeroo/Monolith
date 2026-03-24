@@ -1,7 +1,8 @@
 # engine/CMakeLists.txt — VoxelEngine static library
 
 add_library(VoxelEngine STATIC
-src/core/CoreModule.cpp
+    src/core/CoreModule.cpp
+    src/core/Log.cpp
 )
 
 target_include_directories(VoxelEngine
@@ -23,6 +24,16 @@ target_link_libraries(VoxelEngine
     PUBLIC  glm::glm
     PUBLIC  spdlog::spdlog
     PUBLIC  EnTT::EnTT
+)
+
+# spdlog: disable exceptions (project uses -fno-exceptions)
+target_compile_definitions(VoxelEngine PUBLIC SPDLOG_NO_EXCEPTIONS)
+
+# spdlog compile-time log level filtering
+target_compile_definitions(VoxelEngine PUBLIC
+    $<$<CONFIG:Debug>:SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE>
+    $<$<CONFIG:Release>:SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_INFO>
+    $<$<CONFIG:RelWithDebInfo>:SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_DEBUG>
 )
 
 # Precompiled headers (PRIVATE — not forced on consumers)

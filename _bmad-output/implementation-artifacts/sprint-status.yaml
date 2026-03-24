@@ -37,8 +37,8 @@ epics:
         assigned_to: dev-agent
       - id: "1.4"
         title: "Logging via spdlog"
-        status: ready-for-dev
-        assigned_to: null
+        status: done
+        assigned_to: dev-agent
       - id: "1.5"
         title: "Math Types and Coordinate Utilities"
         status: backlog
@@ -307,5 +307,5 @@ summary:
     ready: 0
     in_progress: 0
     review: 0
-    done: 3
+    done: 4
     blocked: 0
