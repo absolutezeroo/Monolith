@@ -1,0 +1,19 @@
+{
+  "name": "voxelforge",
+  "version-string": "0.1.0",
+  "dependencies": [
+    "vulkan-memory-allocator",
+    "vk-bootstrap",
+    "volk",
+    "glfw3",
+    "glm",
+    "spdlog",
+    "entt",
+    "imgui",
+    "catch2",
+    "stb",
+    "lz4",
+    "sol2",
+    "luajit"
+  ]
+}

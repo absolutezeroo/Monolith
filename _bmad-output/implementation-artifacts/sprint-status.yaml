@@ -5,7 +5,7 @@
 project: VoxelForge
 methodology: BMAD v6 + Game Dev Studio
 created: 2026-03-24
-last_updated: 2026-03-24T17:30:00
+last_updated: 2026-03-24
 
 # Status values: backlog | ready | in-progress | review | done | blocked
 
@@ -25,8 +25,8 @@ epics:
     stories:
       - id: "1.1"
         title: "CMake + vcpkg + Presets Setup"
-        status: ready
-        assigned_to: null
+        status: done
+        assigned_to: dev-agent
       - id: "1.2"
         title: ".clang-format + .clang-tidy + .editorconfig"
         status: backlog
@@ -304,8 +304,8 @@ summary:
     P2: 4
   by_status:
     backlog: 51
-    ready: 1
+    ready: 0
     in_progress: 0
     review: 0
-    done: 0
+    done: 1
     blocked: 0

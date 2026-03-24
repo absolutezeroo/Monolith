@@ -1,6 +1,36 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Monolith", "Monolith\Monolith.vcxproj", "{DBB3FEB7-4436-4D42-BA8F-6FE5C4B48CC2}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
+	ProjectSection(SolutionItems) = preProject
+		CMakeLists.txt = CMakeLists.txt
+		CMakePresets.json = CMakePresets.json
+		vcpkg.json = vcpkg.json
+		CLAUDE.md = CLAUDE.md
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "cmake", "cmake", "{B2C3D4E5-F6A7-8901-BCDE-F12345678901}"
+	ProjectSection(SolutionItems) = preProject
+		cmake\CompilerWarnings.cmake = cmake\CompilerWarnings.cmake
+		cmake\Sanitizers.cmake = cmake\Sanitizers.cmake
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "engine", "engine", "{C3D4E5F6-A7B8-9012-CDEF-123456789012}"
+	ProjectSection(SolutionItems) = preProject
+		engine\CMakeLists.txt = engine\CMakeLists.txt
+		engine\src\Placeholder.cpp = engine\src\Placeholder.cpp
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "game", "game", "{D4E5F6A7-B8C9-0123-DEFA-234567890123}"
+	ProjectSection(SolutionItems) = preProject
+		game\CMakeLists.txt = game\CMakeLists.txt
+		game\src\main.cpp = game\src\main.cpp
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{E5F6A7B8-C9D0-1234-EFAB-345678901234}"
+	ProjectSection(SolutionItems) = preProject
+		tests\CMakeLists.txt = tests\CMakeLists.txt
+		tests\TestPlaceholder.cpp = tests\TestPlaceholder.cpp
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -10,13 +40,7 @@ Global
 		Release|x64 = Release|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{DBB3FEB7-4436-4D42-BA8F-6FE5C4B48CC2}.Debug|Win32.ActiveCfg = Debug|Win32
-		{DBB3FEB7-4436-4D42-BA8F-6FE5C4B48CC2}.Debug|Win32.Build.0 = Debug|Win32
-		{DBB3FEB7-4436-4D42-BA8F-6FE5C4B48CC2}.Debug|x64.ActiveCfg = Debug|x64
-		{DBB3FEB7-4436-4D42-BA8F-6FE5C4B48CC2}.Debug|x64.Build.0 = Debug|x64
-		{DBB3FEB7-4436-4D42-BA8F-6FE5C4B48CC2}.Release|Win32.ActiveCfg = Release|Win32
-		{DBB3FEB7-4436-4D42-BA8F-6FE5C4B48CC2}.Release|Win32.Build.0 = Release|Win32
-		{DBB3FEB7-4436-4D42-BA8F-6FE5C4B48CC2}.Release|x64.ActiveCfg = Release|x64
-		{DBB3FEB7-4436-4D42-BA8F-6FE5C4B48CC2}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
 	EndGlobalSection
 EndGlobal
