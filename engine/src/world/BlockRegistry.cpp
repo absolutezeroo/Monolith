@@ -39,6 +39,7 @@ core::Result<uint16_t> BlockRegistry::registerBlock(BlockDefinition def)
         return std::unexpected(core::EngineError::InvalidArgument);
     }
 
+    VX_ASSERT(m_blocks.size() < UINT16_MAX, "Block registry capacity exceeded (max 65535)");
     auto id = static_cast<uint16_t>(m_blocks.size());
     def.numericId = id;
 
@@ -111,7 +112,10 @@ core::Result<uint16_t> BlockRegistry::loadFromJson(const std::filesystem::path& 
             const auto& texArr = entry["textureIndices"];
             for (size_t i = 0; i < 6 && i < texArr.size(); ++i)
             {
-                def.textureIndices[i] = texArr[i].get<uint16_t>();
+                if (texArr[i].is_number_unsigned())
+                {
+                    def.textureIndices[i] = texArr[i].get<uint16_t>();
+                }
             }
         }
 

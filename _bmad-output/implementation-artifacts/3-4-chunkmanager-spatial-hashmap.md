@@ -210,9 +210,28 @@ Use `[world][chunkmanager]` tags. Do **not** test out-of-bounds Y (VX_ASSERT abo
 ## Dev Agent Record
 
 ### Agent Model Used
+Claude Opus 4.6
 
 ### Debug Log References
+N/A — no build/runtime issues encountered.
 
 ### Completion Notes List
+- Implemented `ChunkCoordHash` using architecture-mandated XOR-shift with golden ratio constant `0x9e3779b9`
+- Implemented branchless `floorDiv` and `euclideanMod` coordinate helpers as inline free functions in `voxel::world` namespace
+- `worldToChunkCoord` correctly maps X/Z via floor division; Y is passed through to ChunkColumn
+- `setBlock` silently no-ops on unloaded chunks with `VX_ASSERT` for debug detection, per Dev Notes decision
+- `loadChunk` uses `try_emplace` for idempotent insertion without replacing existing columns
+- `dirtyChunkCount` iterates all columns — acceptable for debug/ImGui overlay at current scale
+- Const overloads provided for `getChunk` and all query methods
+- Tests cover all 7 Dev Notes coordinate translation cases, hash distribution sanity, lifecycle, boundaries, dirty tracking, negative coords, and multi-chunk scenarios
+- All code follows project patterns: `#pragma once`, `namespace voxel::world`, `[[nodiscard]]`, `m_` prefix, include order
 
 ### File List
+- `engine/include/voxel/world/ChunkManager.h` (new) — ChunkCoordHash, coordinate helpers, ChunkManager class
+- `engine/src/world/ChunkManager.cpp` (new) — ChunkManager implementation
+- `tests/world/TestChunkManager.cpp` (new) — 14 TEST_CASEs covering all ACs
+- `engine/CMakeLists.txt` (modified) — added ChunkManager.cpp to sources
+- `tests/CMakeLists.txt` (modified) — added TestChunkManager.cpp to test sources
+
+### Change Log
+- 2026-03-25: Story 3.4 implemented — ChunkManager with spatial hash map, coordinate translation, and comprehensive unit tests

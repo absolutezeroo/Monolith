@@ -5,7 +5,7 @@
 project: VoxelForge
 methodology: BMAD v6 + Game Dev Studio
 created: 2026-03-24
-last_updated: 2026-03-25  # Story 3.4 in-progress
+last_updated: 2026-03-25  # Story 3.3 code review passed
 
 # Status values: backlog | ready | in-progress | review | done | blocked
 
@@ -95,11 +95,11 @@ epics:
         assigned_to: dev-agent
       - id: "3.3"
         title: "BlockRegistry + JSON Loading"
-        status: review
+        status: done
         assigned_to: dev-agent
       - id: "3.4"
         title: "ChunkManager + Spatial HashMap"
-        status: in-progress
+        status: review
         assigned_to: dev-agent
       - id: "3.5"
         title: "Palette Compression Codec"

@@ -1,6 +1,6 @@
 # Story 3.3: BlockRegistry + JSON Loading
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -633,6 +633,7 @@ Claude Opus 4.6
 
 ### Change Log
 - 2026-03-25: Initial implementation of BlockRegistry + JSON Loading (all 9 tasks completed)
+- 2026-03-25: Code review — fixed textureIndices type guard (M1) and registerBlock overflow guard (L1). Status → done.
 
 ### File List
 - `engine/include/voxel/world/Block.h` (new)
