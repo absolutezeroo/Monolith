@@ -7,6 +7,7 @@
 #include <array>
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace voxel::game
 {
@@ -19,7 +20,7 @@ namespace voxel::renderer
 class VulkanContext;
 
 /// Maximum number of frames that can be in flight simultaneously.
-static constexpr uint32_t FRAMES_IN_FLIGHT = 2;
+inline constexpr uint32_t FRAMES_IN_FLIGHT = 2;
 
 /**
  * @brief Per-frame synchronization and command recording resources.
@@ -29,7 +30,6 @@ struct FrameData
     VkCommandPool commandPool = VK_NULL_HANDLE;
     VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
     VkSemaphore imageAvailableSemaphore = VK_NULL_HANDLE;
-    VkSemaphore renderFinishedSemaphore = VK_NULL_HANDLE;
     VkFence renderFence = VK_NULL_HANDLE;
 };
 
@@ -79,6 +79,7 @@ private:
     VulkanContext& m_vulkanContext;
 
     std::array<FrameData, FRAMES_IN_FLIGHT> m_frames{};
+    std::vector<VkSemaphore> m_renderFinishedSemaphores; // one per swapchain image
     uint32_t m_frameIndex = 0;
 
     VkPipelineLayout m_pipelineLayout = VK_NULL_HANDLE;

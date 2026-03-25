@@ -1,7 +1,10 @@
 #pragma once
 
+#include "voxel/core/Result.h"
 #include "voxel/game/GameLoop.h"
 #include "voxel/renderer/Renderer.h"
+
+#include <string>
 
 namespace voxel::game
 {

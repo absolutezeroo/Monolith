@@ -87,7 +87,7 @@ core::Result<void> Renderer::createFrameResources()
             return std::unexpected(core::EngineError::VulkanError);
         }
 
-        // Semaphores — imageAvailable + renderFinished
+        // Semaphore — imageAvailable (per-frame)
         VkSemaphoreCreateInfo semInfo{};
         semInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
@@ -97,16 +97,27 @@ core::Result<void> Renderer::createFrameResources()
             VX_LOG_ERROR("Failed to create imageAvailable semaphore for frame {}: {}", i, static_cast<int>(result));
             return std::unexpected(core::EngineError::VulkanError);
         }
+    }
 
-        result = vkCreateSemaphore(device, &semInfo, nullptr, &frame.renderFinishedSemaphore);
+    // renderFinished semaphores — one per swapchain image to avoid presentation reuse conflicts
+    uint32_t swapchainImageCount = static_cast<uint32_t>(m_vulkanContext.getSwapchainImages().size());
+    m_renderFinishedSemaphores.resize(swapchainImageCount, VK_NULL_HANDLE);
+
+    VkSemaphoreCreateInfo semInfo{};
+    semInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+    for (uint32_t i = 0; i < swapchainImageCount; ++i)
+    {
+        VkResult result = vkCreateSemaphore(device, &semInfo, nullptr, &m_renderFinishedSemaphores[i]);
         if (result != VK_SUCCESS)
         {
-            VX_LOG_ERROR("Failed to create renderFinished semaphore for frame {}: {}", i, static_cast<int>(result));
+            VX_LOG_ERROR("Failed to create renderFinished semaphore for image {}: {}", i, static_cast<int>(result));
             return std::unexpected(core::EngineError::VulkanError);
         }
     }
 
-    VX_LOG_DEBUG("Created per-frame resources for {} frames", FRAMES_IN_FLIGHT);
+    VX_LOG_DEBUG("Created per-frame resources for {} frames, {} render-finished semaphores",
+        FRAMES_IN_FLIGHT, swapchainImageCount);
     return {};
 }
 
@@ -325,6 +336,12 @@ void Renderer::transitionImage(
         barrier.dstStageMask = VK_PIPELINE_STAGE_2_NONE;
         barrier.dstAccessMask = VK_ACCESS_2_NONE;
     }
+    else
+    {
+        VX_LOG_ERROR("Unhandled image layout transition: {} -> {}",
+            static_cast<int>(oldLayout), static_cast<int>(newLayout));
+        VX_ASSERT(false, "Unhandled image layout transition");
+    }
 
     VkDependencyInfo depInfo{};
     depInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
@@ -358,7 +375,6 @@ void Renderer::draw(game::Window& window)
 
     // CPU-GPU sync: wait for this frame's previous work to complete
     vkWaitForFences(device, 1, &frame.renderFence, VK_TRUE, UINT64_MAX);
-    vkResetFences(device, 1, &frame.renderFence);
 
     // Acquire swapchain image
     uint32_t imageIndex = 0;
@@ -385,6 +401,9 @@ void Renderer::draw(game::Window& window)
         VX_LOG_ERROR("Failed to acquire swapchain image: {}", static_cast<int>(acquireResult));
         return;
     }
+
+    // Reset fence only after successful acquire — avoids deadlock if acquire triggers swapchain recreation
+    vkResetFences(device, 1, &frame.renderFence);
 
     // Reset and begin command buffer
     VkCommandBuffer cmd = frame.commandBuffer;
@@ -458,7 +477,7 @@ void Renderer::draw(game::Window& window)
 
     VkSemaphoreSubmitInfo signalInfo{};
     signalInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-    signalInfo.semaphore = frame.renderFinishedSemaphore;
+    signalInfo.semaphore = m_renderFinishedSemaphores[imageIndex];
     signalInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
 
     VkSubmitInfo2 submitInfo{};
@@ -487,7 +506,7 @@ void Renderer::draw(game::Window& window)
     VkPresentInfoKHR presentInfo{};
     presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
     presentInfo.waitSemaphoreCount = 1;
-    presentInfo.pWaitSemaphores = &frame.renderFinishedSemaphore;
+    presentInfo.pWaitSemaphores = &m_renderFinishedSemaphores[imageIndex];
     presentInfo.swapchainCount = 1;
     presentInfo.pSwapchains = &swapchain;
     presentInfo.pImageIndices = &imageIndex;
@@ -530,17 +549,23 @@ void Renderer::shutdown()
         m_pipelineLayout = VK_NULL_HANDLE;
     }
 
+    // Destroy per-swapchain-image renderFinished semaphores
+    for (auto& sem : m_renderFinishedSemaphores)
+    {
+        if (sem != VK_NULL_HANDLE)
+        {
+            vkDestroySemaphore(device, sem, nullptr);
+            sem = VK_NULL_HANDLE;
+        }
+    }
+    m_renderFinishedSemaphores.clear();
+
     for (auto& frame : m_frames)
     {
         if (frame.renderFence != VK_NULL_HANDLE)
         {
             vkDestroyFence(device, frame.renderFence, nullptr);
             frame.renderFence = VK_NULL_HANDLE;
-        }
-        if (frame.renderFinishedSemaphore != VK_NULL_HANDLE)
-        {
-            vkDestroySemaphore(device, frame.renderFinishedSemaphore, nullptr);
-            frame.renderFinishedSemaphore = VK_NULL_HANDLE;
         }
         if (frame.imageAvailableSemaphore != VK_NULL_HANDLE)
         {
