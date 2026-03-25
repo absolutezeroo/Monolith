@@ -110,13 +110,6 @@ core::Result<std::unique_ptr<VulkanContext>> VulkanContext::create(game::Window&
     if (surfaceResult != VK_SUCCESS)
     {
         VX_LOG_ERROR("Failed to create window surface: {}", static_cast<int>(surfaceResult));
-        // Cleanup instance before returning
-        if (ctx->m_debugMessenger != VK_NULL_HANDLE)
-        {
-            vkb::destroy_debug_utils_messenger(ctx->m_instance, ctx->m_debugMessenger);
-        }
-        vkDestroyInstance(ctx->m_instance, nullptr);
-        ctx->m_instance = VK_NULL_HANDLE;
         return std::unexpected(core::EngineError::VulkanError);
     }
 
@@ -143,13 +136,6 @@ core::Result<std::unique_ptr<VulkanContext>> VulkanContext::create(game::Window&
     if (!physResult)
     {
         VX_LOG_ERROR("Failed to select physical device: {}", physResult.error().message());
-        vkDestroySurfaceKHR(ctx->m_instance, ctx->m_surface, nullptr);
-        if (ctx->m_debugMessenger != VK_NULL_HANDLE)
-        {
-            vkb::destroy_debug_utils_messenger(ctx->m_instance, ctx->m_debugMessenger);
-        }
-        vkDestroyInstance(ctx->m_instance, nullptr);
-        ctx->m_instance = VK_NULL_HANDLE;
         return std::unexpected(core::EngineError::VulkanError);
     }
 
@@ -162,13 +148,6 @@ core::Result<std::unique_ptr<VulkanContext>> VulkanContext::create(game::Window&
     if (!deviceResult)
     {
         VX_LOG_ERROR("Failed to create logical device: {}", deviceResult.error().message());
-        vkDestroySurfaceKHR(ctx->m_instance, ctx->m_surface, nullptr);
-        if (ctx->m_debugMessenger != VK_NULL_HANDLE)
-        {
-            vkb::destroy_debug_utils_messenger(ctx->m_instance, ctx->m_debugMessenger);
-        }
-        vkDestroyInstance(ctx->m_instance, nullptr);
-        ctx->m_instance = VK_NULL_HANDLE;
         return std::unexpected(core::EngineError::VulkanError);
     }
 
@@ -184,14 +163,6 @@ core::Result<std::unique_ptr<VulkanContext>> VulkanContext::create(game::Window&
     if (!graphicsQueue.has_value() || !graphicsIndex.has_value())
     {
         VX_LOG_ERROR("Failed to get graphics queue");
-        vkDestroyDevice(ctx->m_device, nullptr);
-        vkDestroySurfaceKHR(ctx->m_instance, ctx->m_surface, nullptr);
-        if (ctx->m_debugMessenger != VK_NULL_HANDLE)
-        {
-            vkb::destroy_debug_utils_messenger(ctx->m_instance, ctx->m_debugMessenger);
-        }
-        vkDestroyInstance(ctx->m_instance, nullptr);
-        ctx->m_instance = VK_NULL_HANDLE;
         return std::unexpected(core::EngineError::VulkanError);
     }
 
@@ -227,14 +198,6 @@ core::Result<std::unique_ptr<VulkanContext>> VulkanContext::create(game::Window&
     if (importResult != VK_SUCCESS)
     {
         VX_LOG_ERROR("Failed to import Vulkan functions from volk for VMA: {}", static_cast<int>(importResult));
-        vkDestroyDevice(ctx->m_device, nullptr);
-        vkDestroySurfaceKHR(ctx->m_instance, ctx->m_surface, nullptr);
-        if (ctx->m_debugMessenger != VK_NULL_HANDLE)
-        {
-            vkb::destroy_debug_utils_messenger(ctx->m_instance, ctx->m_debugMessenger);
-        }
-        vkDestroyInstance(ctx->m_instance, nullptr);
-        ctx->m_instance = VK_NULL_HANDLE;
         return std::unexpected(core::EngineError::VulkanError);
     }
     allocatorInfo.pVulkanFunctions = &vulkanFunctions;
@@ -243,14 +206,6 @@ core::Result<std::unique_ptr<VulkanContext>> VulkanContext::create(game::Window&
     if (vmaResult != VK_SUCCESS)
     {
         VX_LOG_ERROR("Failed to create VMA allocator: {}", static_cast<int>(vmaResult));
-        vkDestroyDevice(ctx->m_device, nullptr);
-        vkDestroySurfaceKHR(ctx->m_instance, ctx->m_surface, nullptr);
-        if (ctx->m_debugMessenger != VK_NULL_HANDLE)
-        {
-            vkb::destroy_debug_utils_messenger(ctx->m_instance, ctx->m_debugMessenger);
-        }
-        vkDestroyInstance(ctx->m_instance, nullptr);
-        ctx->m_instance = VK_NULL_HANDLE;
         return std::unexpected(core::EngineError::VulkanError);
     }
 
@@ -269,15 +224,6 @@ core::Result<std::unique_ptr<VulkanContext>> VulkanContext::create(game::Window&
     if (!swapResult)
     {
         VX_LOG_ERROR("Failed to create swapchain: {}", swapResult.error().message());
-        vmaDestroyAllocator(ctx->m_allocator);
-        vkDestroyDevice(ctx->m_device, nullptr);
-        vkDestroySurfaceKHR(ctx->m_instance, ctx->m_surface, nullptr);
-        if (ctx->m_debugMessenger != VK_NULL_HANDLE)
-        {
-            vkb::destroy_debug_utils_messenger(ctx->m_instance, ctx->m_debugMessenger);
-        }
-        vkDestroyInstance(ctx->m_instance, nullptr);
-        ctx->m_instance = VK_NULL_HANDLE;
         return std::unexpected(core::EngineError::VulkanError);
     }
 
@@ -290,16 +236,6 @@ core::Result<std::unique_ptr<VulkanContext>> VulkanContext::create(game::Window&
     if (!swapImages)
     {
         VX_LOG_ERROR("Failed to get swapchain images: {}", swapImages.error().message());
-        vkDestroySwapchainKHR(ctx->m_device, ctx->m_swapchain, nullptr);
-        vmaDestroyAllocator(ctx->m_allocator);
-        vkDestroyDevice(ctx->m_device, nullptr);
-        vkDestroySurfaceKHR(ctx->m_instance, ctx->m_surface, nullptr);
-        if (ctx->m_debugMessenger != VK_NULL_HANDLE)
-        {
-            vkb::destroy_debug_utils_messenger(ctx->m_instance, ctx->m_debugMessenger);
-        }
-        vkDestroyInstance(ctx->m_instance, nullptr);
-        ctx->m_instance = VK_NULL_HANDLE;
         return std::unexpected(core::EngineError::VulkanError);
     }
     ctx->m_swapchainImages = swapImages.value();
@@ -308,16 +244,6 @@ core::Result<std::unique_ptr<VulkanContext>> VulkanContext::create(game::Window&
     if (!swapImageViews)
     {
         VX_LOG_ERROR("Failed to get swapchain image views: {}", swapImageViews.error().message());
-        vkDestroySwapchainKHR(ctx->m_device, ctx->m_swapchain, nullptr);
-        vmaDestroyAllocator(ctx->m_allocator);
-        vkDestroyDevice(ctx->m_device, nullptr);
-        vkDestroySurfaceKHR(ctx->m_instance, ctx->m_surface, nullptr);
-        if (ctx->m_debugMessenger != VK_NULL_HANDLE)
-        {
-            vkb::destroy_debug_utils_messenger(ctx->m_instance, ctx->m_debugMessenger);
-        }
-        vkDestroyInstance(ctx->m_instance, nullptr);
-        ctx->m_instance = VK_NULL_HANDLE;
         return std::unexpected(core::EngineError::VulkanError);
     }
     ctx->m_swapchainImageViews = swapImageViews.value();

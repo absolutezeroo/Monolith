@@ -5,7 +5,7 @@
 project: VoxelForge
 methodology: BMAD v6 + Game Dev Studio
 created: 2026-03-24
-last_updated: 2026-03-25  # Story 2.2 review
+last_updated: 2026-03-25  # Story 2.2 code review done
 
 # Status values: backlog | ready | in-progress | review | done | blocked
 
@@ -60,12 +60,12 @@ epics:
         assigned_to: dev-agent
       - id: "2.2"
         title: "Vulkan Initialization (volk + vk-bootstrap + VMA)"
-        status: review
+        status: done
         assigned_to: dev-agent
       - id: "2.3"
         title: "Test Triangle with Dynamic Rendering"
-        status: backlog
-        assigned_to: null
+        status: in-progress
+        assigned_to: dev-agent
       - id: "2.4"
         title: "Gigabuffer Allocation + VmaVirtualBlock"
         status: backlog
@@ -303,9 +303,9 @@ summary:
     P1: 14
     P2: 4
   by_status:
-    backlog: 45
+    backlog: 44
     ready-for-dev: 0
-    in_progress: 0
-    review: 2
-    done: 6
+    in_progress: 1
+    review: 1
+    done: 7
     blocked: 0

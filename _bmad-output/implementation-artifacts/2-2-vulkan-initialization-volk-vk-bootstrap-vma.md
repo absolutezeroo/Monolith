@@ -1,6 +1,6 @@
 # Story 2.2: Vulkan Initialization (volk + vk-bootstrap + VMA)
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -615,11 +615,14 @@ Claude Opus 4.6
 ### Change Log
 
 - 2026-03-25: Implemented Story 2.2 — Vulkan Initialization (volk + vk-bootstrap + VMA)
+- 2026-03-25: Code review fix — removed manual cleanup in create() error paths (double-free bug on VkDevice), rely on RAII destructor instead. Removed vestigial find_package(VulkanHeaders).
 
 ### File List
 
-- engine/CMakeLists.txt (modified — added Vulkan deps, compile defs, PCH, source files)
+- engine/CMakeLists.txt (modified — added Vulkan deps, compile defs, PCH, source files; review: removed unused VulkanHeaders find_package)
 - engine/include/voxel/renderer/VulkanContext.h (new — VulkanContext class declaration with getters)
-- engine/src/renderer/VulkanContext.cpp (new — full Vulkan init sequence + RAII destructor)
+- engine/src/renderer/VulkanContext.cpp (new — full Vulkan init sequence + RAII destructor; review: removed duplicated error cleanup)
 - engine/src/renderer/VmaImpl.cpp (new — VMA_IMPLEMENTATION single translation unit)
 - game/src/main.cpp (modified — added VulkanContext creation + proper destruction order)
+- CMakePresets.json (modified — added Vulkan-related preset config)
+- vcpkg-configuration.json (new — vcpkg baseline configuration)
