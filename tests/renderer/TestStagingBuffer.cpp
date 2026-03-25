@@ -202,8 +202,8 @@ TEST_CASE("beginFrame resets state for next frame slot", "[renderer][staging]")
     sim.beginFrame(0);
 
     // Fill up some transfers
-    sim.upload(64, 0);
-    sim.upload(64, 100);
+    (void)sim.upload(64, 0);
+    (void)sim.upload(64, 100);
     REQUIRE(sim.pendingTransfers.size() == 2);
     REQUIRE(sim.usedBytes == 128);
 
@@ -302,31 +302,31 @@ TEST_CASE("Alignment rounds up correctly", "[renderer][staging]")
 
     SECTION("size 1 aligned to 16")
     {
-        sim.upload(1, 0);
+        (void)sim.upload(1, 0);
         REQUIRE(sim.usedBytes == 16);
     }
 
     SECTION("size 15 aligned to 16")
     {
-        sim.upload(15, 0);
+        (void)sim.upload(15, 0);
         REQUIRE(sim.usedBytes == 16);
     }
 
     SECTION("size 16 stays 16")
     {
-        sim.upload(16, 0);
+        (void)sim.upload(16, 0);
         REQUIRE(sim.usedBytes == 16);
     }
 
     SECTION("size 17 aligned to 32")
     {
-        sim.upload(17, 0);
+        (void)sim.upload(17, 0);
         REQUIRE(sim.usedBytes == 32);
     }
 
     SECTION("size 33 aligned to 48")
     {
-        sim.upload(33, 0);
+        (void)sim.upload(33, 0);
         REQUIRE(sim.usedBytes == 48);
     }
 }
