@@ -1,6 +1,6 @@
 # Story 2.4: Gigabuffer Allocation + VmaVirtualBlock
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 

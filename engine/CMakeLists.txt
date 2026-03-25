@@ -8,6 +8,7 @@ add_library(VoxelEngine STATIC
     src/renderer/VmaImpl.cpp
     src/renderer/VulkanContext.cpp
     src/renderer/Renderer.cpp
+    src/renderer/Gigabuffer.cpp
 )
 
 target_include_directories(VoxelEngine

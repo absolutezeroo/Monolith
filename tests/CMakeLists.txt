@@ -8,6 +8,7 @@ add_executable(VoxelTests
     core/TestLog.cpp
     math/TestAABB.cpp
     math/TestCoordUtils.cpp
+    renderer/TestGigabuffer.cpp
 )
 
 target_link_libraries(VoxelTests
