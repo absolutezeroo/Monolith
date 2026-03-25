@@ -9,6 +9,7 @@ add_executable(VoxelTests
     math/TestAABB.cpp
     math/TestCoordUtils.cpp
     renderer/TestGigabuffer.cpp
+    renderer/TestStagingBuffer.cpp
 )
 
 target_link_libraries(VoxelTests

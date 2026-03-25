@@ -34,6 +34,7 @@ public:
     [[nodiscard]] uint32_t getGraphicsQueueFamily() const { return m_graphicsQueueFamily; }
     [[nodiscard]] VkQueue getTransferQueue() const { return m_transferQueue; }
     [[nodiscard]] uint32_t getTransferQueueFamily() const { return m_transferQueueFamily; }
+    [[nodiscard]] bool hasDedicatedTransferQueue() const { return m_transferQueueFamily != m_graphicsQueueFamily; }
     [[nodiscard]] VkSurfaceKHR getSurface() const { return m_surface; }
     [[nodiscard]] VkSwapchainKHR getSwapchain() const { return m_swapchain; }
     [[nodiscard]] VkFormat getSwapchainFormat() const { return m_swapchainFormat; }

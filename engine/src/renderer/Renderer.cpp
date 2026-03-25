@@ -1,6 +1,7 @@
 #include "voxel/renderer/Renderer.h"
 #include "voxel/core/Assert.h"
 #include "voxel/core/Log.h"
+#include "voxel/renderer/StagingBuffer.h"
 #include "voxel/renderer/VulkanContext.h"
 #include "voxel/game/Window.h"
 
@@ -33,6 +34,14 @@ core::Result<void> Renderer::init(const std::string& shaderDir)
     {
         return std::unexpected(pipelineResult.error());
     }
+
+    // Create staging buffer for CPU→GPU uploads
+    auto stagingResult = StagingBuffer::create(m_vulkanContext);
+    if (!stagingResult.has_value())
+    {
+        return std::unexpected(stagingResult.error());
+    }
+    m_stagingBuffer = std::move(stagingResult.value());
 
     m_isInitialized = true;
     VX_LOG_INFO("Renderer initialized — {} frames in flight", FRAMES_IN_FLIGHT);
@@ -418,6 +427,9 @@ void Renderer::draw(game::Window& window)
     // CPU-GPU sync: wait for this frame's previous work to complete
     vkWaitForFences(device, 1, &frame.renderFence, VK_TRUE, UINT64_MAX);
 
+    // Advance staging buffer to this frame's ring-buffer region
+    m_stagingBuffer->beginFrame(m_frameIndex);
+
     // Acquire swapchain image
     uint32_t imageIndex = 0;
     VkResult acquireResult = vkAcquireNextImageKHR(
@@ -511,15 +523,36 @@ void Renderer::draw(game::Window& window)
 
     vkEndCommandBuffer(cmd);
 
+    // Flush any pending staging buffer transfers before graphics submission
+    // (no-op if no uploads were enqueued this frame)
+    auto flushResult = m_stagingBuffer->flushTransfers(VK_NULL_HANDLE);
+    if (!flushResult.has_value())
+    {
+        VX_LOG_ERROR("Failed to flush staging transfers");
+    }
+
     // Submit via vkQueueSubmit2 (sync2)
     VkCommandBufferSubmitInfo cmdSubmitInfo{};
     cmdSubmitInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
     cmdSubmitInfo.commandBuffer = cmd;
 
-    VkSemaphoreSubmitInfo waitInfo{};
-    waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-    waitInfo.semaphore = frame.imageAvailableSemaphore;
-    waitInfo.stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+    // Build wait semaphore list — always wait on imageAvailable,
+    // optionally wait on transfer semaphore if transfers were submitted
+    std::array<VkSemaphoreSubmitInfo, 2> waitInfos{};
+    uint32_t waitCount = 0;
+
+    waitInfos[waitCount].sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+    waitInfos[waitCount].semaphore = frame.imageAvailableSemaphore;
+    waitInfos[waitCount].stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+    ++waitCount;
+
+    if (m_stagingBuffer->hasActiveTransfer())
+    {
+        waitInfos[waitCount].sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+        waitInfos[waitCount].semaphore = m_stagingBuffer->getTransferSemaphore();
+        waitInfos[waitCount].stageMask = VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT;
+        ++waitCount;
+    }
 
     VkSemaphoreSubmitInfo signalInfo{};
     signalInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
@@ -528,8 +561,8 @@ void Renderer::draw(game::Window& window)
 
     VkSubmitInfo2 submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
-    submitInfo.waitSemaphoreInfoCount = 1;
-    submitInfo.pWaitSemaphoreInfos = &waitInfo;
+    submitInfo.waitSemaphoreInfoCount = waitCount;
+    submitInfo.pWaitSemaphoreInfos = waitInfos.data();
     submitInfo.commandBufferInfoCount = 1;
     submitInfo.pCommandBufferInfos = &cmdSubmitInfo;
     submitInfo.signalSemaphoreInfoCount = 1;
@@ -581,6 +614,9 @@ void Renderer::shutdown()
 
     VkDevice device = m_vulkanContext.getDevice();
     vkDeviceWaitIdle(device);
+
+    // Destroy staging buffer first (before VulkanContext resources)
+    m_stagingBuffer.reset();
 
     // Destroy in reverse creation order
     if (m_pipeline != VK_NULL_HANDLE)

@@ -6,6 +6,7 @@
 
 #include <array>
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -17,6 +18,7 @@ class Window;
 namespace voxel::renderer
 {
 
+class StagingBuffer;
 class VulkanContext;
 
 /// Maximum number of frames that can be in flight simultaneously.
@@ -86,6 +88,8 @@ private:
 
     VkPipelineLayout m_pipelineLayout = VK_NULL_HANDLE;
     VkPipeline m_pipeline = VK_NULL_HANDLE;
+
+    std::unique_ptr<StagingBuffer> m_stagingBuffer;
 
     bool m_isInitialized = false;
     bool m_framebufferResized = false;

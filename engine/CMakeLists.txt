@@ -9,6 +9,7 @@ add_library(VoxelEngine STATIC
     src/renderer/VulkanContext.cpp
     src/renderer/Renderer.cpp
     src/renderer/Gigabuffer.cpp
+    src/renderer/StagingBuffer.cpp
 )
 
 target_include_directories(VoxelEngine

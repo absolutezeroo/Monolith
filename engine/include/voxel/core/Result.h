@@ -16,6 +16,7 @@ enum class EngineError : uint8
     VulkanError,
     ChunkNotLoaded,
     OutOfMemory,
+    InvalidArgument,
     ScriptError
 };
 
