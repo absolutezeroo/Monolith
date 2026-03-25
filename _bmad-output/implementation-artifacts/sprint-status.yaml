@@ -5,7 +5,7 @@
 project: VoxelForge
 methodology: BMAD v6 + Game Dev Studio
 created: 2026-03-24
-last_updated: 2026-03-25  # Story 2.3 moved to review
+last_updated: 2026-03-25  # Story 2.4 in-progress
 
 # Status values: backlog | ready | in-progress | review | done | blocked
 
@@ -68,11 +68,11 @@ epics:
         assigned_to: dev-agent
       - id: "2.4"
         title: "Gigabuffer Allocation + VmaVirtualBlock"
-        status: ready-for-dev
-        assigned_to: null
+        status: in-progress
+        assigned_to: dev-agent
       - id: "2.5"
         title: "Staging Buffer + Transfer Queue Upload"
-        status: backlog
+        status: ready-for-dev
         assigned_to: null
       - id: "2.6"
         title: "FPS Camera + Dear ImGui Overlay"
@@ -303,8 +303,8 @@ summary:
     P1: 14
     P2: 4
   by_status:
-    backlog: 43
-    ready-for-dev: 1
+    backlog: 42
+    ready-for-dev: 2
     in_progress: 0
     review: 2
     done: 7
