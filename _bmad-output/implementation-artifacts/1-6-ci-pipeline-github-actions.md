@@ -1,6 +1,6 @@
 # Story 1.6: CI Pipeline (GitHub Actions)
 
-Status: review
+Status: done
 
 ## Story
 
@@ -207,6 +207,7 @@ Claude Opus 4.6
 ### Change Log
 
 - 2026-03-24: Implemented CI pipeline (GitHub Actions), MSVC test presets, README with badge
+- 2026-03-25: Code review — fixed 2 MEDIUM issues: pinned clang-format-18 in CI, added permissions block for security hardening
 
 ### File List
 

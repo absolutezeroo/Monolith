@@ -1,6 +1,6 @@
 # VoxelForge
 
-[![CI](https://github.com/OWNER/REPO/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/REPO/actions/workflows/ci.yml)
+[![CI](https://github.com/absolutezeroo/Monolith/actions/workflows/ci.yml/badge.svg)](https://github.com/absolutezeroo/Monolith/actions/workflows/ci.yml)
 
 A Minecraft-like voxel engine built with C++20/23 and Vulkan 1.3.
 
