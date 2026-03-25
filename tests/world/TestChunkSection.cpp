@@ -81,6 +81,11 @@ TEST_CASE("ChunkSection", "[world]")
         REQUIRE(section.countNonAir() == 2);
     }
 
+    // NOTE: AC#8 requires testing that out-of-bounds coordinates trigger VX_ASSERT.
+    // VX_ASSERT calls std::abort(), and Catch2 v3 has no death-test facility.
+    // Bounds checking is verified by code inspection: getBlock/setBlock both assert
+    // x/y/z in [0, SIZE) via VX_ASSERT in debug builds (see ChunkSection.cpp:15-17, 23-25).
+
     SECTION("index calculation correctness y*256 + z*16 + x")
     {
         // Set block at (x=3, y=5, z=7) -> index = 5*256 + 7*16 + 3 = 1395

@@ -1,6 +1,6 @@
 # Story 3.1: ChunkSection Flat Array Storage
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -21,31 +21,31 @@ so that chunks can store voxel data efficiently.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Create `ChunkSection` header (AC: #1, #2, #3, #4, #5, #6, #7)
-  - [ ] Create `engine/include/voxel/world/ChunkSection.h`
-  - [ ] Define `BLOCK_AIR` constant (constexpr uint16_t = 0)
-  - [ ] Define `ChunkSection` struct with `SIZE = 16`, `VOLUME = 4096`
-  - [ ] Implement `toIndex(int x, int y, int z)` private/static helper: `y * 256 + z * 16 + x`
-  - [ ] Implement `getBlock`, `setBlock`, `fill`, `isEmpty`, `countNonAir`
-  - [ ] Zero-initialize `blocks` array in default constructor
-- [ ] Task 2: Create `ChunkSection` implementation (AC: #1–#7)
-  - [ ] Create `engine/src/world/ChunkSection.cpp`
-  - [ ] Implement all methods (move non-trivial logic out of header)
-  - [ ] Use `std::memset` or `std::fill` for `fill()`
-  - [ ] Use `std::all_of` or loop for `isEmpty()`
-  - [ ] Use `std::count_if` or loop with `std::accumulate` for `countNonAir()`
-- [ ] Task 3: Register in CMake (AC: all)
-  - [ ] Add `src/world/ChunkSection.cpp` to `engine/CMakeLists.txt` source list
-  - [ ] Add `tests/world/TestChunkSection.cpp` to `tests/CMakeLists.txt`
-- [ ] Task 4: Unit tests (AC: #8)
-  - [ ] Create `tests/world/TestChunkSection.cpp`
-  - [ ] Test: default construction → all blocks are AIR
-  - [ ] Test: get/set roundtrip at multiple positions
-  - [ ] Test: boundary corners (0,0,0) and (15,15,15)
-  - [ ] Test: fill sets all blocks to target ID
-  - [ ] Test: isEmpty returns true for fresh section, false after setBlock
-  - [ ] Test: countNonAir accuracy after various operations
-  - [ ] Test: index calculation correctness (y*256 + z*16 + x)
+- [x] Task 1: Create `ChunkSection` header (AC: #1, #2, #3, #4, #5, #6, #7)
+  - [x] Create `engine/include/voxel/world/ChunkSection.h`
+  - [x] Define `BLOCK_AIR` constant (constexpr uint16_t = 0)
+  - [x] Define `ChunkSection` struct with `SIZE = 16`, `VOLUME = 4096`
+  - [x] Implement `toIndex(int x, int y, int z)` private/static helper: `y * 256 + z * 16 + x`
+  - [x] Implement `getBlock`, `setBlock`, `fill`, `isEmpty`, `countNonAir`
+  - [x] Zero-initialize `blocks` array in default constructor
+- [x] Task 2: Create `ChunkSection` implementation (AC: #1–#7)
+  - [x] Create `engine/src/world/ChunkSection.cpp`
+  - [x] Implement all methods (move non-trivial logic out of header)
+  - [x] Use `std::memset` or `std::fill` for `fill()`
+  - [x] Use `std::all_of` or loop for `isEmpty()`
+  - [x] Use `std::count_if` or loop with `std::accumulate` for `countNonAir()`
+- [x] Task 3: Register in CMake (AC: all)
+  - [x] Add `src/world/ChunkSection.cpp` to `engine/CMakeLists.txt` source list
+  - [x] Add `tests/world/TestChunkSection.cpp` to `tests/CMakeLists.txt`
+- [x] Task 4: Unit tests (AC: #8)
+  - [x] Create `tests/world/TestChunkSection.cpp`
+  - [x] Test: default construction → all blocks are AIR
+  - [x] Test: get/set roundtrip at multiple positions
+  - [x] Test: boundary corners (0,0,0) and (15,15,15)
+  - [x] Test: fill sets all blocks to target ID
+  - [x] Test: isEmpty returns true for fresh section, false after setBlock
+  - [x] Test: countNonAir accuracy after various operations
+  - [x] Test: index calculation correctness (y*256 + z*16 + x)
 
 ## Dev Notes
 
@@ -239,8 +239,30 @@ Recent commits show established patterns:
 
 ### Agent Model Used
 
+Claude Opus 4.6
+
 ### Debug Log References
+
+- Fixed pre-existing `[[nodiscard]]` warnings in `tests/renderer/TestStagingBuffer.cpp` (7 calls to `sim.upload()` missing `(void)` cast, causing build failure with `/WX`)
 
 ### Completion Notes List
 
+- Implemented `ChunkSection` struct in `voxel::world` namespace with `uint16_t blocks[4096]` flat array, Y-major indexing (`y*256 + z*16 + x`)
+- All query methods marked `[[nodiscard]]`, `toIndex` is `static constexpr`
+- Bounds checking via `VX_ASSERT` (debug-only, stripped in Release per ADR-008)
+- Constructor zero-initializes with `std::fill`, `fill()` uses `std::fill`, `isEmpty()` uses `std::all_of`, `countNonAir()` uses `std::count_if`
+- 7 Catch2 test sections covering all ACs: default construction, get/set roundtrip, boundary corners, fill, fill-reset, isEmpty/countNonAir, index correctness
+- Established `engine/include/voxel/world/`, `engine/src/world/`, and `tests/world/` directory structure for Epic 3
+
+### Change Log
+
+- 2026-03-25: Implemented Story 3.1 — ChunkSection flat array storage with unit tests
+
 ### File List
+
+- `engine/include/voxel/world/ChunkSection.h` (new)
+- `engine/src/world/ChunkSection.cpp` (new)
+- `tests/world/TestChunkSection.cpp` (new)
+- `engine/CMakeLists.txt` (modified — added ChunkSection.cpp)
+- `tests/CMakeLists.txt` (modified — added TestChunkSection.cpp)
+- `tests/renderer/TestStagingBuffer.cpp` (modified — fixed [[nodiscard]] warnings)

@@ -2,7 +2,6 @@
 
 #include "voxel/core/Assert.h"
 
-#include <algorithm>
 #include <cstdint>
 
 namespace voxel::world

@@ -5,7 +5,7 @@
 project: VoxelForge
 methodology: BMAD v6 + Game Dev Studio
 created: 2026-03-24
-last_updated: 2026-03-25  # Story 2.6 code review passed
+last_updated: 2026-03-25  # Story 3.1 code review passed
 
 # Status values: backlog | ready | in-progress | review | done | blocked
 
@@ -87,12 +87,12 @@ epics:
     stories:
       - id: "3.1"
         title: "ChunkSection Flat Array Storage"
-        status: in-progress
+        status: done
         assigned_to: dev-agent
       - id: "3.2"
         title: "ChunkColumn (Vertical Stack of Sections)"
-        status: backlog
-        assigned_to: null
+        status: review
+        assigned_to: dev-agent
       - id: "3.3"
         title: "BlockRegistry + JSON Loading"
         status: backlog
@@ -303,9 +303,9 @@ summary:
     P1: 14
     P2: 4
   by_status:
-    backlog: 40
-    ready-for-dev: 4
+    backlog: 38
+    ready-for-dev: 0
     in_progress: 0
-    review: 0
-    done: 10
+    review: 1
+    done: 13
     blocked: 0

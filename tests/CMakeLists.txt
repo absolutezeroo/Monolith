@@ -12,6 +12,7 @@ add_executable(VoxelTests
     renderer/TestStagingBuffer.cpp
     renderer/TestCamera.cpp
     world/TestChunkSection.cpp
+    world/TestChunkColumn.cpp
 )
 
 target_link_libraries(VoxelTests
