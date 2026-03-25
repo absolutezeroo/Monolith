@@ -14,6 +14,7 @@ add_library(VoxelEngine STATIC
     src/renderer/ImGuiBackend.cpp
     src/renderer/ImGuiImpl.cpp
     src/renderer/ImGuiImplGlfw.cpp
+    src/world/ChunkSection.cpp
 )
 
 target_include_directories(VoxelEngine

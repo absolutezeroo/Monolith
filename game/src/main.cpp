@@ -25,17 +25,20 @@ int main()
 
     auto& vulkanContext = *vulkanResult.value();
 
-    GameApp app(window, vulkanContext);
-
-    auto initResult = app.init(VX_SHADER_DIR);
-    if (!initResult.has_value())
+    // Scope block ensures GameApp (Renderer, StagingBuffer) is destroyed
+    // before VulkanContext — VMA allocations must be freed before VMA itself.
     {
-        VX_FATAL("Failed to initialize renderer");
+        GameApp app(window, vulkanContext);
+
+        auto initResult = app.init(VX_SHADER_DIR);
+        if (!initResult.has_value())
+        {
+            VX_FATAL("Failed to initialize renderer");
+        }
+
+        app.run();
     }
 
-    app.run();
-
-    // Destruction order: GameApp (Renderer) → VulkanContext → Window → Log
     vulkanResult.value().reset();
     windowResult.value().reset();
 

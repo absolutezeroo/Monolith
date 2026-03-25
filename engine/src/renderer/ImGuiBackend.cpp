@@ -38,6 +38,14 @@ core::Result<std::unique_ptr<ImGuiBackend>> ImGuiBackend::create(VulkanContext& 
     // GLFW backend — install_callbacks=true chains with existing callbacks
     ImGui_ImplGlfw_InitForVulkan(window, true);
 
+    // Load Vulkan functions for ImGui — required when VK_NO_PROTOTYPES is defined.
+    // volk loads Vulkan dynamically, so ImGui needs a loader callback to resolve them.
+    VkInstance instance = context.getInstance();
+    ImGui_ImplVulkan_LoadFunctions(VK_API_VERSION_1_3,
+        [](const char* functionName, void* userData) {
+            return vkGetInstanceProcAddr(static_cast<VkInstance>(userData), functionName);
+        }, instance);
+
     // Vulkan backend — dynamic rendering, no VkRenderPass
     // ImGui 1.92+: MSAASamples and PipelineRenderingCreateInfo moved to PipelineInfoMain.
     VkFormat swapchainFormat = context.getSwapchainFormat();

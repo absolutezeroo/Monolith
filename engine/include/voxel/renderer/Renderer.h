@@ -112,8 +112,8 @@ private:
     bool m_isInitialized = false;
     bool m_framebufferResized = false;
 
-    // FPS tracking
-    double m_lastFrameTime = 0.0;
+    // FPS tracking (initialized to -1 to detect first frame)
+    double m_lastFrameTime = -1.0;
     int m_fpsCount = 0;
     double m_fpsTimer = 0.0;
     int m_displayFps = 0;

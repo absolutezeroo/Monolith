@@ -13,6 +13,9 @@ void Camera::processMouseDelta(float dx, float dy)
     m_yaw += dx * m_sensitivity;
     m_pitch -= dy * m_sensitivity;
     m_pitch = std::clamp(m_pitch, -89.0f, 89.0f);
+
+    // Wrap yaw to [0, 360) to prevent float precision loss at extreme values
+    m_yaw = m_yaw - 360.0f * std::floor(m_yaw / 360.0f);
 }
 
 void Camera::setPitch(float pitch)
@@ -56,7 +59,7 @@ glm::vec3 Camera::getForward() const
 
 glm::vec3 Camera::getRight() const
 {
-    return glm::normalize(glm::cross(getForward(), glm::vec3{0.0f, 1.0f, 0.0f}));
+    return glm::normalize(glm::cross(glm::vec3{0.0f, 1.0f, 0.0f}, getForward()));
 }
 
 glm::vec3 Camera::getUp() const

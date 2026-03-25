@@ -578,6 +578,10 @@ void Renderer::draw(game::Window& window, const Camera& camera, DebugOverlayStat
 
     // FPS tracking
     double now = glfwGetTime();
+    if (m_lastFrameTime < 0.0)
+    {
+        m_lastFrameTime = now; // Skip first-frame delta to avoid startup spike
+    }
     m_fpsTimer += now - m_lastFrameTime;
     m_lastFrameTime = now;
     ++m_fpsCount;

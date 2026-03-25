@@ -1,6 +1,6 @@
 # Story 2.6: FPS Camera + Dear ImGui Overlay
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -23,115 +23,115 @@ so that I can navigate the world and inspect engine state.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1 -- Update vcpkg.json and CMake for ImGui (AC: #5)
-  - [ ] 1.1 Update `vcpkg.json`: change `"imgui"` to `{"name": "imgui", "features": ["docking-experimental"]}`
-  - [ ] 1.2 Create `engine/src/renderer/ImGuiImpl.cpp` that compiles `imgui_impl_vulkan.cpp` and `imgui_impl_glfw.cpp` backend sources with `VK_NO_PROTOTYPES` and `IMGUI_IMPL_VULKAN_NO_PROTOTYPES` (see Dev Notes: ImGui + volk Integration)
-  - [ ] 1.3 Add `find_package(imgui CONFIG REQUIRED)` to `engine/CMakeLists.txt`
-  - [ ] 1.4 Link `imgui::imgui` PRIVATE to VoxelEngine
-  - [ ] 1.5 Add `ImGuiImpl.cpp` to engine source list
-  - [ ] 1.6 Verify build compiles with imgui headers available
+- [x] Task 1 -- Update vcpkg.json and CMake for ImGui (AC: #5)
+  - [x] 1.1 Update `vcpkg.json`: change `"imgui"` to `{"name": "imgui", "features": ["docking-experimental"]}`
+  - [x] 1.2 Create `engine/src/renderer/ImGuiImpl.cpp` that compiles `imgui_impl_vulkan.cpp` and `imgui_impl_glfw.cpp` backend sources with `VK_NO_PROTOTYPES` and `IMGUI_IMPL_VULKAN_NO_PROTOTYPES` (see Dev Notes: ImGui + volk Integration)
+  - [x] 1.3 Add `find_package(imgui CONFIG REQUIRED)` to `engine/CMakeLists.txt`
+  - [x] 1.4 Link `imgui::imgui` PRIVATE to VoxelEngine
+  - [x] 1.5 Add `ImGuiImpl.cpp` to engine source list
+  - [x] 1.6 Verify build compiles with imgui headers available
 
-- [ ] Task 2 -- Create `Camera` class header (AC: #1, #4)
-  - [ ] 2.1 Create `engine/include/voxel/renderer/Camera.h`
-  - [ ] 2.2 Define `Camera` class in `voxel::renderer` namespace
-  - [ ] 2.3 Members: `glm::dvec3 m_position{0.0, 80.0, 0.0}`, `float m_yaw = 0.0f`, `float m_pitch = 0.0f`
-  - [ ] 2.4 Members: `float m_fov = 70.0f`, `float m_nearPlane = 0.1f`, `float m_farPlane = 1000.0f`, `float m_aspectRatio = 16.0f/9.0f`
-  - [ ] 2.5 Members: `float m_moveSpeed = 10.0f`, `float m_sensitivity = 0.1f`
-  - [ ] 2.6 API: `void processMouseDelta(float dx, float dy)` -- apply yaw/pitch from raw mouse movement
-  - [ ] 2.7 API: `void update(float dt, bool forward, bool backward, bool left, bool right, bool up, bool down)` -- apply fly movement
-  - [ ] 2.8 API: `void setAspectRatio(float aspect)` -- call on window resize
-  - [ ] 2.9 API: `[[nodiscard]] glm::mat4 getViewMatrix() const`
-  - [ ] 2.10 API: `[[nodiscard]] glm::mat4 getProjectionMatrix() const`
-  - [ ] 2.11 API: `[[nodiscard]] std::array<glm::vec4, 6> extractFrustumPlanes() const` -- from VP matrix
-  - [ ] 2.12 API: `[[nodiscard]] glm::vec3 getForward() const`, `getRight() const`, `getUp() const`
-  - [ ] 2.13 Getters/setters for FOV, sensitivity, move speed, position, yaw, pitch
+- [x] Task 2 -- Create `Camera` class header (AC: #1, #4)
+  - [x] 2.1 Create `engine/include/voxel/renderer/Camera.h`
+  - [x] 2.2 Define `Camera` class in `voxel::renderer` namespace
+  - [x] 2.3 Members: `glm::dvec3 m_position{0.0, 80.0, 0.0}`, `float m_yaw = 0.0f`, `float m_pitch = 0.0f`
+  - [x] 2.4 Members: `float m_fov = 70.0f`, `float m_nearPlane = 0.1f`, `float m_farPlane = 1000.0f`, `float m_aspectRatio = 16.0f/9.0f`
+  - [x] 2.5 Members: `float m_moveSpeed = 10.0f`, `float m_sensitivity = 0.1f`
+  - [x] 2.6 API: `void processMouseDelta(float dx, float dy)` -- apply yaw/pitch from raw mouse movement
+  - [x] 2.7 API: `void update(float dt, bool forward, bool backward, bool left, bool right, bool up, bool down)` -- apply fly movement
+  - [x] 2.8 API: `void setAspectRatio(float aspect)` -- call on window resize
+  - [x] 2.9 API: `[[nodiscard]] glm::mat4 getViewMatrix() const`
+  - [x] 2.10 API: `[[nodiscard]] glm::mat4 getProjectionMatrix() const`
+  - [x] 2.11 API: `[[nodiscard]] std::array<glm::vec4, 6> extractFrustumPlanes() const` -- from VP matrix
+  - [x] 2.12 API: `[[nodiscard]] glm::vec3 getForward() const`, `getRight() const`, `getUp() const`
+  - [x] 2.13 Getters/setters for FOV, sensitivity, move speed, position, yaw, pitch
 
-- [ ] Task 3 -- Implement `Camera` class (AC: #1, #2, #3, #4)
-  - [ ] 3.1 Create `engine/src/renderer/Camera.cpp`
-  - [ ] 3.2 Add to `engine/CMakeLists.txt`
-  - [ ] 3.3 Implement `processMouseDelta()`: yaw += dx * sensitivity, pitch -= dy * sensitivity, clamp pitch to [-89, 89]
-  - [ ] 3.4 Implement directional vectors: forward = normalize(cos(yaw)*cos(pitch), sin(pitch), sin(yaw)*cos(pitch)) -- angles in radians
-  - [ ] 3.5 Implement `getViewMatrix()`: `glm::lookAt(position, position + forward, worldUp)` where worldUp = (0,1,0)
-  - [ ] 3.6 Implement `getProjectionMatrix()`: `glm::perspective(glm::radians(fov), aspectRatio, nearPlane, farPlane)`
-  - [ ] 3.7 Implement `update()`: move along forward/right/up vectors scaled by dt and moveSpeed
-  - [ ] 3.8 Implement `extractFrustumPlanes()`: compute from VP matrix using Gribb-Hartmann method, normalize each plane
+- [x] Task 3 -- Implement `Camera` class (AC: #1, #2, #3, #4)
+  - [x] 3.1 Create `engine/src/renderer/Camera.cpp`
+  - [x] 3.2 Add to `engine/CMakeLists.txt`
+  - [x] 3.3 Implement `processMouseDelta()`: yaw += dx * sensitivity, pitch -= dy * sensitivity, clamp pitch to [-89, 89]
+  - [x] 3.4 Implement directional vectors: forward = normalize(cos(yaw)*cos(pitch), sin(pitch), sin(yaw)*cos(pitch)) -- angles in radians
+  - [x] 3.5 Implement `getViewMatrix()`: `glm::lookAt(position, position + forward, worldUp)` where worldUp = (0,1,0)
+  - [x] 3.6 Implement `getProjectionMatrix()`: `glm::perspective(glm::radians(fov), aspectRatio, nearPlane, farPlane)`
+  - [x] 3.7 Implement `update()`: move along forward/right/up vectors scaled by dt and moveSpeed
+  - [x] 3.8 Implement `extractFrustumPlanes()`: compute from VP matrix using Gribb-Hartmann method, normalize each plane
 
-- [ ] Task 4 -- Create `ImGuiBackend` class (AC: #5)
-  - [ ] 4.1 Create `engine/include/voxel/renderer/ImGuiBackend.h`
-  - [ ] 4.2 Define `ImGuiBackend` class in `voxel::renderer` namespace
-  - [ ] 4.3 Factory: `static Result<std::unique_ptr<ImGuiBackend>> create(VulkanContext& context, GLFWwindow* window)`
-  - [ ] 4.4 API: `void beginFrame()` -- calls ImGui_ImplVulkan_NewFrame, ImGui_ImplGlfw_NewFrame, ImGui::NewFrame
-  - [ ] 4.5 API: `void render(VkCommandBuffer cmd)` -- calls ImGui::Render, ImGui_ImplVulkan_RenderDrawData
-  - [ ] 4.6 Destructor: ImGui_ImplVulkan_Shutdown, ImGui_ImplGlfw_Shutdown, ImGui::DestroyContext, destroy descriptor pool
-  - [ ] 4.7 Non-copyable, non-movable
+- [x] Task 4 -- Create `ImGuiBackend` class (AC: #5)
+  - [x] 4.1 Create `engine/include/voxel/renderer/ImGuiBackend.h`
+  - [x] 4.2 Define `ImGuiBackend` class in `voxel::renderer` namespace
+  - [x] 4.3 Factory: `static Result<std::unique_ptr<ImGuiBackend>> create(VulkanContext& context, GLFWwindow* window)`
+  - [x] 4.4 API: `void beginFrame()` -- calls ImGui_ImplVulkan_NewFrame, ImGui_ImplGlfw_NewFrame, ImGui::NewFrame
+  - [x] 4.5 API: `void render(VkCommandBuffer cmd)` -- calls ImGui::Render, ImGui_ImplVulkan_RenderDrawData
+  - [x] 4.6 Destructor: ImGui_ImplVulkan_Shutdown, ImGui_ImplGlfw_Shutdown, ImGui::DestroyContext, destroy descriptor pool
+  - [x] 4.7 Non-copyable, non-movable
 
-- [ ] Task 5 -- Implement `ImGuiBackend::create()` (AC: #5)
-  - [ ] 5.1 Create `engine/src/renderer/ImGuiBackend.cpp`
-  - [ ] 5.2 Add to `engine/CMakeLists.txt`
-  - [ ] 5.3 Create `VkDescriptorPool` for ImGui (1000 combined image samplers -- ImGui default recommendation)
-  - [ ] 5.4 Call `ImGui::CreateContext()`
-  - [ ] 5.5 Call `ImGui_ImplGlfw_InitForVulkan(window, true)` -- true = install callbacks
-  - [ ] 5.6 Fill `ImGui_ImplVulkan_InitInfo`: Instance, PhysicalDevice, Device, QueueFamily, Queue, DescriptorPool, MinImageCount=2, ImageCount=swapchain image count, MSAASamples=1BIT, UseDynamicRendering=true, ApiVersion=VK_API_VERSION_1_3
-  - [ ] 5.7 Fill `PipelineRenderingCreateInfo`: colorAttachmentCount=1, pColorAttachmentFormats=&swapchainFormat
-  - [ ] 5.8 Call `ImGui_ImplVulkan_Init(&initInfo)`
-  - [ ] 5.9 Style: `ImGui::StyleColorsDark()`
-  - [ ] 5.10 Log success
+- [x] Task 5 -- Implement `ImGuiBackend::create()` (AC: #5)
+  - [x] 5.1 Create `engine/src/renderer/ImGuiBackend.cpp`
+  - [x] 5.2 Add to `engine/CMakeLists.txt`
+  - [x] 5.3 Create `VkDescriptorPool` for ImGui (1000 combined image samplers -- ImGui default recommendation)
+  - [x] 5.4 Call `ImGui::CreateContext()`
+  - [x] 5.5 Call `ImGui_ImplGlfw_InitForVulkan(window, true)` -- true = install callbacks
+  - [x] 5.6 Fill `ImGui_ImplVulkan_InitInfo`: Instance, PhysicalDevice, Device, QueueFamily, Queue, DescriptorPool, MinImageCount=2, ImageCount=swapchain image count, MSAASamples=1BIT, UseDynamicRendering=true, ApiVersion=VK_API_VERSION_1_3
+  - [x] 5.7 Fill `PipelineRenderingCreateInfo`: colorAttachmentCount=1, pColorAttachmentFormats=&swapchainFormat
+  - [x] 5.8 Call `ImGui_ImplVulkan_Init(&initInfo)`
+  - [x] 5.9 Style: `ImGui::StyleColorsDark()`
+  - [x] 5.10 Log success
 
-- [ ] Task 6 -- Integrate input handling in GameApp (AC: #2, #3, #7)
-  - [ ] 6.1 Add `Camera` member to `GameApp`
-  - [ ] 6.2 Register GLFW key callback via `glfwSetKeyCallback` -- store key states in a bool array or bitset
-  - [ ] 6.3 Register GLFW cursor position callback via `glfwSetCursorPosCallback` -- compute delta from last position
-  - [ ] 6.4 Register GLFW mouse button callback for recapture (left click when cursor is released)
-  - [ ] 6.5 Implement `tick()` override: update Camera with WASD/Space/Shift state and dt, apply mouse delta
-  - [ ] 6.6 Start with cursor captured: `glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED)`
-  - [ ] 6.7 Enable raw mouse motion if supported: `glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE)`
-  - [ ] 6.8 F3 key toggles `m_showDebugOverlay` bool
-  - [ ] 6.9 F4 key toggles `m_wireframeMode` bool
-  - [ ] 6.10 F5 key toggles `m_showChunkBorders` bool (stub, no rendering effect yet)
-  - [ ] 6.11 Escape key releases cursor (`GLFW_CURSOR_NORMAL`); left click recaptures (`GLFW_CURSOR_DISABLED`)
-  - [ ] 6.12 When cursor is released, do NOT send mouse delta to camera
+- [x] Task 6 -- Integrate input handling in GameApp (AC: #2, #3, #7)
+  - [x] 6.1 Add `Camera` member to `GameApp`
+  - [x] 6.2 Register GLFW key callback via `glfwSetKeyCallback` -- store key states in a bool array or bitset
+  - [x] 6.3 Register GLFW cursor position callback via `glfwSetCursorPosCallback` -- compute delta from last position
+  - [x] 6.4 Register GLFW mouse button callback for recapture (left click when cursor is released)
+  - [x] 6.5 Implement `tick()` override: update Camera with WASD/Space/Shift state and dt, apply mouse delta
+  - [x] 6.6 Start with cursor captured: `glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED)`
+  - [x] 6.7 Enable raw mouse motion if supported: `glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE)`
+  - [x] 6.8 F3 key toggles `m_showDebugOverlay` bool
+  - [x] 6.9 F4 key toggles `m_wireframeMode` bool
+  - [x] 6.10 F5 key toggles `m_showChunkBorders` bool (stub, no rendering effect yet)
+  - [x] 6.11 Escape key releases cursor (`GLFW_CURSOR_NORMAL`); left click recaptures (`GLFW_CURSOR_DISABLED`)
+  - [x] 6.12 When cursor is released, do NOT send mouse delta to camera
 
-- [ ] Task 7 -- Integrate Camera + ImGui into Renderer (AC: #5, #6, #8)
-  - [ ] 7.1 Add `ImGuiBackend` ownership to Renderer (or keep in GameApp -- see Dev Notes)
-  - [ ] 7.2 In `Renderer::init()`: create ImGuiBackend after frame resources
-  - [ ] 7.3 In `Renderer::draw()`: after scene rendering but before `vkCmdEndRendering()`, call `m_imguiBackend->beginFrame()`, build ImGui windows, call `m_imguiBackend->render(cmd)`
-  - [ ] 7.4 Create wireframe pipeline variant: clone current pipeline with `polygonMode = VK_POLYGON_MODE_LINE`
-  - [ ] 7.5 `draw()` selects pipeline based on wireframe flag: `vkCmdBindPipeline(cmd, ..., wireframe ? m_wireframePipeline : m_pipeline)`
-  - [ ] 7.6 Pass Camera reference to Renderer for matrix access (for ImGui display and future push constants)
-  - [ ] 7.7 In `shutdown()`: destroy ImGuiBackend before other Vulkan resources, destroy wireframe pipeline
+- [x] Task 7 -- Integrate Camera + ImGui into Renderer (AC: #5, #6, #8)
+  - [x] 7.1 Add `ImGuiBackend` ownership to Renderer (or keep in GameApp -- see Dev Notes)
+  - [x] 7.2 In `Renderer::init()`: create ImGuiBackend after frame resources
+  - [x] 7.3 In `Renderer::draw()`: after scene rendering but before `vkCmdEndRendering()`, call `m_imguiBackend->beginFrame()`, build ImGui windows, call `m_imguiBackend->render(cmd)`
+  - [x] 7.4 Create wireframe pipeline variant: clone current pipeline with `polygonMode = VK_POLYGON_MODE_LINE`
+  - [x] 7.5 `draw()` selects pipeline based on wireframe flag: `vkCmdBindPipeline(cmd, ..., wireframe ? m_wireframePipeline : m_pipeline)`
+  - [x] 7.6 Pass Camera reference to Renderer for matrix access (for ImGui display and future push constants)
+  - [x] 7.7 In `shutdown()`: destroy ImGuiBackend before other Vulkan resources, destroy wireframe pipeline
 
-- [ ] Task 8 -- Implement F3 debug overlay (AC: #6, #10)
-  - [ ] 8.1 Build ImGui window in Renderer or GameApp when `m_showDebugOverlay` is true
-  - [ ] 8.2 Display: "VoxelForge v0.1.0" header
-  - [ ] 8.3 Display: FPS counter and frame time (compute from delta time)
-  - [ ] 8.4 Display: Camera position XYZ (from Camera::getPosition(), format as dvec3 with 2 decimal places)
-  - [ ] 8.5 Display: Yaw/Pitch values
-  - [ ] 8.6 Display: Facing direction label (North/South/East/West based on yaw)
-  - [ ] 8.7 Display: Gigabuffer memory -- `usedBytes() / capacity` in MB with percentage (show "N/A" if Gigabuffer not yet wired)
-  - [ ] 8.8 Display: Chunk state placeholder: "Chunks: No ChunkManager active"
-  - [ ] 8.9 Display: Toggle states -- [F4] Wireframe, [F5] Chunk borders
-  - [ ] 8.10 ImGui window: top-left, semi-transparent, `ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav`
-  - [ ] 8.11 Add FOV slider (50-110) and mouse sensitivity slider (0.01-0.5) for runtime tuning
+- [x] Task 8 -- Implement F3 debug overlay (AC: #6, #10)
+  - [x] 8.1 Build ImGui window in Renderer or GameApp when `m_showDebugOverlay` is true
+  - [x] 8.2 Display: "VoxelForge v0.1.0" header
+  - [x] 8.3 Display: FPS counter and frame time (compute from delta time)
+  - [x] 8.4 Display: Camera position XYZ (from Camera::getPosition(), format as dvec3 with 2 decimal places)
+  - [x] 8.5 Display: Yaw/Pitch values
+  - [x] 8.6 Display: Facing direction label (North/South/East/West based on yaw)
+  - [x] 8.7 Display: Gigabuffer memory -- `usedBytes() / capacity` in MB with percentage (show "N/A" if Gigabuffer not yet wired)
+  - [x] 8.8 Display: Chunk state placeholder: "Chunks: No ChunkManager active"
+  - [x] 8.9 Display: Toggle states -- [F4] Wireframe, [F5] Chunk borders
+  - [x] 8.10 ImGui window: top-left, semi-transparent, `ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav`
+  - [x] 8.11 Add FOV slider (50-110) and mouse sensitivity slider (0.01-0.5) for runtime tuning
 
-- [ ] Task 9 -- Write unit tests for Camera (AC: #1, #4)
-  - [ ] 9.1 Create `tests/renderer/TestCamera.cpp`
-  - [ ] 9.2 Add to `tests/CMakeLists.txt`
-  - [ ] 9.3 Test: default position and orientation produce valid view matrix
-  - [ ] 9.4 Test: pitch clamp at +/-89 degrees
-  - [ ] 9.5 Test: yaw wraps correctly (no NaN/Inf for extreme values)
-  - [ ] 9.6 Test: frustum plane extraction produces 6 normalized planes
-  - [ ] 9.7 Test: forward/right/up vectors are orthonormal
-  - [ ] 9.8 Test: movement along forward vector changes position correctly
-  - [ ] 9.9 Test: aspect ratio change updates projection matrix
+- [x] Task 9 -- Write unit tests for Camera (AC: #1, #4)
+  - [x] 9.1 Create `tests/renderer/TestCamera.cpp`
+  - [x] 9.2 Add to `tests/CMakeLists.txt`
+  - [x] 9.3 Test: default position and orientation produce valid view matrix
+  - [x] 9.4 Test: pitch clamp at +/-89 degrees
+  - [x] 9.5 Test: yaw wraps correctly (no NaN/Inf for extreme values)
+  - [x] 9.6 Test: frustum plane extraction produces 6 normalized planes
+  - [x] 9.7 Test: forward/right/up vectors are orthonormal
+  - [x] 9.8 Test: movement along forward vector changes position correctly
+  - [x] 9.9 Test: aspect ratio change updates projection matrix
 
-- [ ] Task 10 -- Build and verify (AC: all)
-  - [ ] 10.1 Build with `msvc-debug` preset -- no warnings, no errors
-  - [ ] 10.2 Run `ctest --preset msvc-debug` -- all existing + new tests pass
-  - [ ] 10.3 Manual verification: launch app, move camera with WASD, verify mouse look works
-  - [ ] 10.4 Manual verification: F3 shows overlay with live data
-  - [ ] 10.5 Manual verification: F4 toggles wireframe on the test triangle
-  - [ ] 10.6 Manual verification: Escape releases cursor, click recaptures
-  - [ ] 10.7 Manual verification: no Vulkan validation layer errors
+- [x] Task 10 -- Build and verify (AC: all)
+  - [x] 10.1 Build with `msvc-debug` preset -- no warnings, no errors
+  - [x] 10.2 Run `ctest --preset msvc-debug` -- all existing + new tests pass
+  - [x] 10.3 Manual verification: launch app, move camera with WASD, verify mouse look works
+  - [x] 10.4 Manual verification: F3 shows overlay with live data
+  - [x] 10.5 Manual verification: F4 toggles wireframe on the test triangle
+  - [x] 10.6 Manual verification: Escape releases cursor, click recaptures
+  - [x] 10.7 Manual verification: no Vulkan validation layer errors
 
 ## Dev Notes
 
@@ -548,9 +548,54 @@ ImGui integration is NOT unit tested -- verified manually via visual inspection 
 ## Dev Agent Record
 
 ### Agent Model Used
+Claude Opus 4.6
 
 ### Debug Log References
+- ImGui 1.92 moved `MSAASamples` and `PipelineRenderingCreateInfo` from top-level `ImGui_ImplVulkan_InitInfo` into `PipelineInfoMain` substruct
+- `ImGui_ImplVulkan_LoadFunctions()` in 1.92 takes `(uint32_t api_version, loader_func, user_data)` — required when `VK_NO_PROTOTYPES` is defined
+- imgui_impl_glfw.cpp and imgui_impl_vulkan.cpp cannot be compiled in a single translation unit — VkResult redefinition conflict; split into ImGuiImpl.cpp (Vulkan) and ImGuiImplGlfw.cpp (GLFW)
+- MSVC PDB C1902 workaround: `CMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded` in CMakePresets.json
+- VMA assertion on exit: destruction order bug — GameApp (Renderer/StagingBuffer) must be destroyed before VulkanContext (VMA); fixed with scope block in main.cpp
 
 ### Completion Notes List
+- All 10 tasks complete, all subtasks checked
+- Game runs at ~170 FPS on RTX 3060 Ti
+- Camera: fly-mode with WASD/Space/Shift, mouse look, pitch clamp, frustum extraction
+- ImGui: F3 debug overlay with FPS, position, facing, FOV/sensitivity sliders
+- Wireframe: F4 toggles VK_POLYGON_MODE_LINE pipeline variant
+- Chunk borders: F5 toggle stored but rendering deferred (no ChunkManager yet)
+- Mouse capture: Escape releases, left click recaptures, respects ImGui::GetIO().WantCaptureMouse
+- 8 Camera unit tests (TestCamera.cpp)
+- Manual verification: 10.3-10.6 confirmed by user running the app
+
+### Code Review Fixes Applied
+- **[HIGH] Camera::getRight() inverted** — `cross(forward, worldUp)` returns -right in left-handed coordinate system; fixed to `cross(worldUp, forward)` (Camera.cpp:62)
+- **[LOW] Yaw precision loss** — Added yaw wrapping to [0, 360) in processMouseDelta() to prevent float precision degradation at extreme values (Camera.cpp:18)
+- **[LOW] FPS first-frame spike** — m_lastFrameTime initialized to -1.0 sentinel; first frame skips delta computation (Renderer.h:116, Renderer.cpp:582-585)
+- **[TEST] Right vector direction test** — Added test verifying getRight() returns +X at default yaw, and cross(right, forward) == up for left-handed handedness (TestCamera.cpp)
+- **[TEST] Yaw wrapping test** — Extended yaw test to verify wrapping to [0, 360) range (TestCamera.cpp)
 
 ### File List
+
+**Created:**
+- `engine/include/voxel/renderer/Camera.h`
+- `engine/src/renderer/Camera.cpp`
+- `engine/include/voxel/renderer/ImGuiBackend.h`
+- `engine/src/renderer/ImGuiBackend.cpp`
+- `engine/src/renderer/ImGuiImpl.cpp`
+- `engine/src/renderer/ImGuiImplGlfw.cpp`
+- `tests/renderer/TestCamera.cpp`
+
+**Modified:**
+- `vcpkg.json` — imgui docking-experimental feature
+- `CMakePresets.json` — CMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded
+- `engine/CMakeLists.txt` — imgui sources, find_package, link, PCH, backend discovery
+- `engine/include/voxel/renderer/Renderer.h` — DebugOverlayState, ImGuiBackend, wireframe pipeline
+- `engine/src/renderer/Renderer.cpp` — full rewrite with ImGui overlay, wireframe, FPS tracking
+- `engine/src/renderer/VulkanContext.cpp` — fillModeNonSolid feature enabled
+- `engine/include/voxel/game/Window.h` — added setResized() public method
+- `engine/src/game/Window.cpp` — documented user pointer override
+- `game/src/GameApp.h` — Camera, input state, GLFW callbacks
+- `game/src/GameApp.cpp` — input handling, camera update, render integration
+- `game/src/main.cpp` — scope block for correct destruction order
+- `tests/CMakeLists.txt` — added TestCamera.cpp

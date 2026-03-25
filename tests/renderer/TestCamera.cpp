@@ -47,12 +47,14 @@ TEST_CASE("Camera", "[renderer][camera]")
         REQUIRE(cam2.getPitch() <= 89.0f);
     }
 
-    SECTION("yaw wraps correctly — no NaN/Inf")
+    SECTION("yaw wraps correctly — no NaN/Inf and stays in [0, 360)")
     {
         // Apply extreme yaw values
         camera.processMouseDelta(100000.0f, 0.0f);
         REQUIRE_FALSE(std::isnan(camera.getYaw()));
         REQUIRE_FALSE(std::isinf(camera.getYaw()));
+        REQUIRE(camera.getYaw() >= 0.0f);
+        REQUIRE(camera.getYaw() < 360.0f);
 
         auto fwd = camera.getForward();
         REQUIRE_FALSE(std::isnan(fwd.x));
@@ -89,6 +91,21 @@ TEST_CASE("Camera", "[renderer][camera]")
         REQUIRE_THAT(static_cast<double>(glm::dot(fwd, rgt)), WithinAbs(0.0, 0.001));
         REQUIRE_THAT(static_cast<double>(glm::dot(fwd, up)), WithinAbs(0.0, 0.001));
         REQUIRE_THAT(static_cast<double>(glm::dot(rgt, up)), WithinAbs(0.0, 0.001));
+
+        // Left-handed handedness: cross(right, forward) ≈ up
+        auto computedUp = glm::cross(rgt, fwd);
+        REQUIRE_THAT(static_cast<double>(computedUp.x), WithinAbs(static_cast<double>(up.x), 0.001));
+        REQUIRE_THAT(static_cast<double>(computedUp.y), WithinAbs(static_cast<double>(up.y), 0.001));
+        REQUIRE_THAT(static_cast<double>(computedUp.z), WithinAbs(static_cast<double>(up.z), 0.001));
+    }
+
+    SECTION("right vector points +X at default yaw")
+    {
+        // At yaw=0, pitch=0 in left-handed: forward=(0,0,1), right should be (+1,0,0)
+        auto rgt = camera.getRight();
+        REQUIRE_THAT(static_cast<double>(rgt.x), WithinAbs(1.0, 0.001));
+        REQUIRE_THAT(static_cast<double>(rgt.y), WithinAbs(0.0, 0.001));
+        REQUIRE_THAT(static_cast<double>(rgt.z), WithinAbs(0.0, 0.001));
     }
 
     SECTION("WASD movement updates position")

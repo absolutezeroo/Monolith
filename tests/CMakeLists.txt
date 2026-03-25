@@ -11,6 +11,7 @@ add_executable(VoxelTests
     renderer/TestGigabuffer.cpp
     renderer/TestStagingBuffer.cpp
     renderer/TestCamera.cpp
+    world/TestChunkSection.cpp
 )
 
 target_link_libraries(VoxelTests
