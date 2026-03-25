@@ -1,6 +1,6 @@
 # Story 3.4: ChunkManager + Spatial HashMap
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -23,33 +23,33 @@ so that **all higher-level systems (terrain gen, meshing, physics, rendering) ca
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Implement ChunkCoordHash (AC: #1)
-  - [ ] 1.1 Create `ChunkManager.h` with `ChunkCoordHash` struct
-  - [ ] 1.2 Use XOR-shift formula from architecture: `h ^= hash(v.y) + 0x9e3779b9 + (h << 6) + (h >> 2)`
-- [ ] Task 2: Implement coordinate translation helpers (AC: #4, #5, #9)
-  - [ ] 2.1 `worldToChunkCoord(glm::ivec3) → glm::ivec2` using floor division
-  - [ ] 2.2 `worldToLocalPos(glm::ivec3) → glm::ivec3` using Euclidean modulo
-  - [ ] 2.3 These can be free functions or static methods in `voxel::world` namespace
-- [ ] Task 3: Implement ChunkManager class (AC: #2–#8)
-  - [ ] 3.1 `getChunk()` — simple map lookup, return raw pointer or null
-  - [ ] 3.2 `getBlock()` — translate, lookup chunk, delegate to ChunkColumn::getBlock
-  - [ ] 3.3 `setBlock()` — translate, loadChunk if not loaded (or just no-op?), delegate to ChunkColumn::setBlock
-  - [ ] 3.4 `loadChunk()` — emplace new ChunkColumn if absent
-  - [ ] 3.5 `unloadChunk()` — erase from map
-  - [ ] 3.6 `loadedChunkCount()` — return `m_chunks.size()`
-  - [ ] 3.7 `dirtyChunkCount()` — iterate chunks, count those with any dirty section
-- [ ] Task 4: Write unit tests (AC: #10)
-  - [ ] 4.1 Load/unload lifecycle (load → verify present → unload → verify absent)
-  - [ ] 4.2 getBlock returns AIR for unloaded chunks
-  - [ ] 4.3 setBlock on unloaded chunk (decide: no-op or auto-load)
-  - [ ] 4.4 Cross-chunk-boundary getBlock (e.g., worldX=15 vs worldX=16)
-  - [ ] 4.5 setBlock marks correct section dirty
-  - [ ] 4.6 Negative coordinate translation (-1 → chunk -1, local 15)
-  - [ ] 4.7 Hash distribution: verify no collisions for common coord pairs
-  - [ ] 4.8 Multiple chunks loaded simultaneously
-- [ ] Task 5: Update CMakeLists.txt (AC: all)
-  - [ ] 5.1 Add ChunkManager.cpp to engine sources
-  - [ ] 5.2 Add TestChunkManager.cpp to test sources
+- [x] Task 1: Implement ChunkCoordHash (AC: #1)
+  - [x] 1.1 Create `ChunkManager.h` with `ChunkCoordHash` struct
+  - [x] 1.2 Use XOR-shift formula from architecture: `h ^= hash(v.y) + 0x9e3779b9 + (h << 6) + (h >> 2)`
+- [x] Task 2: Implement coordinate translation helpers (AC: #4, #5, #9)
+  - [x] 2.1 `worldToChunkCoord(glm::ivec3) → glm::ivec2` using floor division
+  - [x] 2.2 `worldToLocalPos(glm::ivec3) → glm::ivec3` using Euclidean modulo
+  - [x] 2.3 These can be free functions or static methods in `voxel::world` namespace
+- [x] Task 3: Implement ChunkManager class (AC: #2–#8)
+  - [x] 3.1 `getChunk()` — simple map lookup, return raw pointer or null
+  - [x] 3.2 `getBlock()` — translate, lookup chunk, delegate to ChunkColumn::getBlock
+  - [x] 3.3 `setBlock()` — translate, no-op if unloaded (VX_ASSERT in debug), delegate to ChunkColumn::setBlock
+  - [x] 3.4 `loadChunk()` — emplace new ChunkColumn if absent
+  - [x] 3.5 `unloadChunk()` — erase from map
+  - [x] 3.6 `loadedChunkCount()` — return `m_chunks.size()`
+  - [x] 3.7 `dirtyChunkCount()` — iterate chunks, count those with any dirty section
+- [x] Task 4: Write unit tests (AC: #10)
+  - [x] 4.1 Load/unload lifecycle (load → verify present → unload → verify absent)
+  - [x] 4.2 getBlock returns AIR for unloaded chunks
+  - [x] 4.3 setBlock on unloaded chunk — silently no-ops (VX_ASSERT in debug)
+  - [x] 4.4 Cross-chunk-boundary getBlock (e.g., worldX=15 vs worldX=16)
+  - [x] 4.5 setBlock marks correct section dirty
+  - [x] 4.6 Negative coordinate translation (-1 → chunk -1, local 15)
+  - [x] 4.7 Hash distribution: verify no collisions for common coord pairs
+  - [x] 4.8 Multiple chunks loaded simultaneously
+- [x] Task 5: Update CMakeLists.txt (AC: all)
+  - [x] 5.1 Add ChunkManager.cpp to engine sources
+  - [x] 5.2 Add TestChunkManager.cpp to test sources
 
 ## Dev Notes
 
