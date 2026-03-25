@@ -10,6 +10,7 @@ add_library(VoxelEngine STATIC
     src/renderer/Renderer.cpp
     src/renderer/Gigabuffer.cpp
     src/renderer/StagingBuffer.cpp
+    src/renderer/ImGuiImpl.cpp
 )
 
 target_include_directories(VoxelEngine
@@ -30,6 +31,7 @@ find_package(glfw3 CONFIG REQUIRED)
 find_package(volk CONFIG REQUIRED)
 find_package(vk-bootstrap CONFIG REQUIRED)
 find_package(VulkanMemoryAllocator CONFIG REQUIRED)
+find_package(imgui CONFIG REQUIRED)
 
 target_link_libraries(VoxelEngine
     PUBLIC  glm::glm
@@ -40,6 +42,7 @@ target_link_libraries(VoxelEngine
     PRIVATE volk::volk
     PRIVATE vk-bootstrap::vk-bootstrap
     PUBLIC  GPUOpen::VulkanMemoryAllocator
+    PRIVATE imgui::imgui
 )
 
 # spdlog: disable exceptions (project uses -fno-exceptions)
@@ -83,4 +86,31 @@ target_precompile_headers(VoxelEngine PRIVATE
     <spdlog/spdlog.h>
     <entt/entt.hpp>
     <GLFW/glfw3.h>
+    <imgui.h>
 )
+
+# ImGui backends: locate source files from vcpkg buildtrees.
+# We compile them ourselves (via ImGuiImpl.cpp) to ensure VK_NO_PROTOTYPES is set.
+file(GLOB _imgui_backend_dirs
+    "${VCPKG_INSTALLED_DIR}/vcpkg/blds/imgui/src/*/backends"
+)
+if(_imgui_backend_dirs)
+    list(GET _imgui_backend_dirs 0 IMGUI_BACKENDS_DIR)
+else()
+    message(FATAL_ERROR "Could not find imgui backends in vcpkg buildtrees. "
+        "Run cmake configure with vcpkg manifest mode enabled.")
+endif()
+
+# ImGuiImpl.cpp #includes backend .cpp files that pull in <vulkan/vulkan.h> directly,
+# which conflicts with volk.h from the PCH. Skip PCH and suppress warnings for this
+# translation unit — the backends are third-party code.
+set_source_files_properties(src/renderer/ImGuiImpl.cpp PROPERTIES
+    SKIP_PRECOMPILE_HEADERS ON
+    INCLUDE_DIRECTORIES "${IMGUI_BACKENDS_DIR}"
+)
+# Suppress warnings separately (INCLUDE_DIRECTORIES and COMPILE_FLAGS can coexist)
+if(MSVC)
+    set_property(SOURCE src/renderer/ImGuiImpl.cpp APPEND_STRING PROPERTY COMPILE_FLAGS " /w")
+else()
+    set_property(SOURCE src/renderer/ImGuiImpl.cpp APPEND_STRING PROPERTY COMPILE_FLAGS " -w")
+endif()

@@ -50,7 +50,8 @@
         "VCPKG_ROOT": "C:/Program Files/Microsoft Visual Studio/18/Community/VC/vcpkg"
       },
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug"
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_MSVC_DEBUG_INFORMATION_FORMAT": "Embedded"
       },
       "condition": {
         "type": "equals",
@@ -67,7 +68,8 @@
         "VCPKG_ROOT": "C:/Program Files/Microsoft Visual Studio/18/Community/VC/vcpkg"
       },
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release"
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_MSVC_DEBUG_INFORMATION_FORMAT": "Embedded"
       },
       "condition": {
         "type": "equals",

@@ -5,7 +5,7 @@
 project: VoxelForge
 methodology: BMAD v6 + Game Dev Studio
 created: 2026-03-24
-last_updated: 2026-03-25  # Story 2.6 in-progress
+last_updated: 2026-03-25  # Story 2.5 done (code review passed)
 
 # Status values: backlog | ready | in-progress | review | done | blocked
 
@@ -72,12 +72,12 @@ epics:
         assigned_to: dev-agent
       - id: "2.5"
         title: "Staging Buffer + Transfer Queue Upload"
-        status: ready-for-dev
-        assigned_to: null
+        status: done
+        assigned_to: dev-agent
       - id: "2.6"
         title: "FPS Camera + Dear ImGui Overlay"
-        status: ready-for-dev
-        assigned_to: null
+        status: in-progress
+        assigned_to: dev-agent
 
   - id: 3
     name: "Voxel World Core (Chunks + Registry)"
@@ -307,5 +307,5 @@ summary:
     ready-for-dev: 3
     in_progress: 0
     review: 0
-    done: 9
+    done: 10
     blocked: 0

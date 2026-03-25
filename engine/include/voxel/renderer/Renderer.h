@@ -1,6 +1,7 @@
 #pragma once
 
 #include "voxel/core/Result.h"
+#include "voxel/renderer/RendererConstants.h"
 
 #include <volk.h>
 
@@ -20,9 +21,6 @@ namespace voxel::renderer
 
 class StagingBuffer;
 class VulkanContext;
-
-/// Maximum number of frames that can be in flight simultaneously.
-inline constexpr uint32_t FRAMES_IN_FLIGHT = 2;
 
 /**
  * @brief Per-frame synchronization and command recording resources.

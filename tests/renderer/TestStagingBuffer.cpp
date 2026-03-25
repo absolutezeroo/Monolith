@@ -63,6 +63,7 @@ struct RingBufferSim
     uint32_t currentFrameIndex = 0;
     uint32_t maxUploadsPerFrame = StagingBuffer::DEFAULT_MAX_UPLOADS;
     std::vector<PendingTransfer> pendingTransfers;
+    std::array<bool, FRAMES_IN_FLIGHT> fenceSubmitted{};
 
     explicit RingBufferSim(VkDeviceSize cap = StagingBuffer::DEFAULT_STAGING_SIZE)
         : capacity(cap)
@@ -73,9 +74,19 @@ struct RingBufferSim
     void beginFrame(uint32_t frameIndex)
     {
         currentFrameIndex = frameIndex;
+        // Real StagingBuffer only waits/resets fence if fenceSubmitted[frameIndex] is true
+        if (fenceSubmitted[frameIndex])
+        {
+            fenceSubmitted[frameIndex] = false;
+        }
         writeOffset = static_cast<VkDeviceSize>(frameIndex) * frameRegionSize;
         usedBytes = 0;
         pendingTransfers.clear();
+    }
+
+    void markFenceSubmitted()
+    {
+        fenceSubmitted[currentFrameIndex] = true;
     }
 
     voxel::core::Result<void> upload(size_t size, VkDeviceSize dstOffset)
@@ -250,6 +261,38 @@ TEST_CASE("Frame regions do not overlap", "[renderer][staging]")
 
     // Frame 0's writes must not reach frame 1's region
     REQUIRE(frame0End <= frame1Start);
+}
+
+TEST_CASE("No deadlock when cycling frames without uploads", "[renderer][staging]")
+{
+    RingBufferSim sim(1024);
+
+    // Simulate several frame cycles with no uploads (no flushTransfers submit).
+    // Before the fix, this would deadlock on frame 3 because the fence
+    // was reset but never signaled.
+    for (int i = 0; i < 10; ++i)
+    {
+        uint32_t frameIdx = i % FRAMES_IN_FLIGHT;
+        sim.beginFrame(frameIdx);
+        // No uploads, no flush → fenceSubmitted stays false
+        REQUIRE(sim.fenceSubmitted[frameIdx] == false);
+    }
+}
+
+TEST_CASE("Fence tracking set after simulated flush", "[renderer][staging]")
+{
+    RingBufferSim sim(1024);
+
+    sim.beginFrame(0);
+    REQUIRE(sim.upload(64, 0).has_value());
+    sim.markFenceSubmitted(); // simulates flushTransfers queue submit
+
+    REQUIRE(sim.fenceSubmitted[0] == true);
+
+    // Next cycle for frame 0: should clear the flag (simulating wait+reset)
+    sim.beginFrame(1); // frame 1 first
+    sim.beginFrame(0); // back to frame 0
+    REQUIRE(sim.fenceSubmitted[0] == false);
 }
 
 TEST_CASE("Alignment rounds up correctly", "[renderer][staging]")

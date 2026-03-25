@@ -9,7 +9,10 @@
     "glm",
     "spdlog",
     "entt",
-    "imgui",
+    {
+      "name": "imgui",
+      "features": ["docking-experimental"]
+    },
     "catch2",
     "stb",
     "lz4",

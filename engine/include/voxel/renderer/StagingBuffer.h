@@ -1,14 +1,13 @@
 #pragma once
 
 #include "voxel/core/Result.h"
-#include "voxel/renderer/Renderer.h"
+#include "voxel/renderer/RendererConstants.h"
 
 #include <volk.h>
 #include <vk_mem_alloc.h>
 
 #include <array>
 #include <cstdint>
-#include <cstring>
 #include <memory>
 #include <vector>
 
@@ -117,6 +116,7 @@ private:
     VkCommandPool m_transferCommandPool = VK_NULL_HANDLE;
     std::array<VkCommandBuffer, FRAMES_IN_FLIGHT> m_transferCmdBuffers{};
     std::array<VkFence, FRAMES_IN_FLIGHT> m_transferFences{};
+    std::array<bool, FRAMES_IN_FLIGHT> m_fenceSubmitted{}; // tracks whether fence was signaled by a queue submit
     VkSemaphore m_transferSemaphore = VK_NULL_HANDLE;
 
     // Per-frame upload tracking
