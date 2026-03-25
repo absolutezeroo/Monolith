@@ -121,6 +121,38 @@ core::Result<void> Renderer::createFrameResources()
     return {};
 }
 
+void Renderer::recreateRenderFinishedSemaphores()
+{
+    VkDevice device = m_vulkanContext.getDevice();
+
+    // Destroy old semaphores
+    for (auto& sem : m_renderFinishedSemaphores)
+    {
+        if (sem != VK_NULL_HANDLE)
+        {
+            vkDestroySemaphore(device, sem, nullptr);
+        }
+    }
+
+    // Resize to match new swapchain image count
+    uint32_t swapchainImageCount = static_cast<uint32_t>(m_vulkanContext.getSwapchainImages().size());
+    m_renderFinishedSemaphores.assign(swapchainImageCount, VK_NULL_HANDLE);
+
+    VkSemaphoreCreateInfo semInfo{};
+    semInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+    for (uint32_t i = 0; i < swapchainImageCount; ++i)
+    {
+        VkResult result = vkCreateSemaphore(device, &semInfo, nullptr, &m_renderFinishedSemaphores[i]);
+        if (result != VK_SUCCESS)
+        {
+            VX_LOG_ERROR("Failed to recreate renderFinished semaphore for image {}: {}", i, static_cast<int>(result));
+        }
+    }
+
+    VX_LOG_DEBUG("Recreated {} render-finished semaphores for new swapchain", swapchainImageCount);
+}
+
 core::Result<VkShaderModule> Renderer::loadShaderModule(const std::string& path)
 {
     std::ifstream file(path, std::ios::ate | std::ios::binary);
@@ -131,6 +163,12 @@ core::Result<VkShaderModule> Renderer::loadShaderModule(const std::string& path)
     }
 
     auto fileSize = static_cast<size_t>(file.tellg());
+    if (fileSize == 0 || fileSize % sizeof(uint32_t) != 0)
+    {
+        VX_LOG_ERROR("Invalid SPIR-V file size ({} bytes, must be non-zero multiple of 4): {}", fileSize, path);
+        return std::unexpected(core::EngineError::InvalidFormat);
+    }
+
     std::vector<uint32_t> buffer(fileSize / sizeof(uint32_t));
     file.seekg(0);
     file.read(reinterpret_cast<char*>(buffer.data()), static_cast<std::streamsize>(fileSize));
@@ -367,6 +405,10 @@ void Renderer::draw(game::Window& window)
         {
             VX_LOG_ERROR("Failed to recreate swapchain");
         }
+        else
+        {
+            recreateRenderFinishedSemaphores();
+        }
         return;
     }
 
@@ -392,6 +434,10 @@ void Renderer::draw(game::Window& window)
         if (!recreateResult.has_value())
         {
             VX_LOG_ERROR("Failed to recreate swapchain after out-of-date acquire");
+        }
+        else
+        {
+            recreateRenderFinishedSemaphores();
         }
         return;
     }

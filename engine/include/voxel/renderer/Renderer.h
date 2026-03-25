@@ -70,6 +70,8 @@ private:
     core::Result<void> createPipeline(const std::string& shaderDir);
     core::Result<VkShaderModule> loadShaderModule(const std::string& path);
 
+    void recreateRenderFinishedSemaphores();
+
     void transitionImage(
         VkCommandBuffer cmd,
         VkImage image,

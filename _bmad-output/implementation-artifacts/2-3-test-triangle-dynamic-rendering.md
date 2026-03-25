@@ -1,6 +1,6 @@
 # Story 2.3: Test Triangle with Dynamic Rendering
 
-Status: review
+Status: done
 
 ## Story
 
@@ -489,6 +489,11 @@ Claude Opus 4.6 (claude-opus-4-6)
 - Swapchain recreation handles resize and minimize/restore
 - Per-swapchain-image renderFinished semaphores eliminate validation errors
 - Created `build_msvc.bat` and `run_tests.bat` helper scripts (untracked, for dev convenience)
+
+### Code Review Fixes Applied
+
+- **M1 Fixed**: Added SPIR-V file size validation in `loadShaderModule()` — rejects files with size 0 or not a multiple of 4 bytes, preventing potential buffer overflow with corrupt `.spv` files (`Renderer.cpp`)
+- **M2 Fixed**: Added `recreateRenderFinishedSemaphores()` method — destroys and recreates renderFinished semaphores after swapchain recreation to match new swapchain image count, preventing potential out-of-bounds access (`Renderer.h`, `Renderer.cpp`)
 
 ### File List
 
