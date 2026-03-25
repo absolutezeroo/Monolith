@@ -223,7 +223,6 @@ core::Result<void> StagingBuffer::flushTransfers(VkBuffer gigabuffer)
         return {};
     }
 
-    VkDevice device = m_context->getDevice();
     VkCommandBuffer cmd = m_transferCmdBuffers[m_currentFrameIndex];
 
     // Reset and begin command buffer
