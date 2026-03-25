@@ -1,6 +1,6 @@
 # Story 2.1: GLFW Window + Game Loop Skeleton
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -19,48 +19,48 @@ so that I have a stable frame for all subsequent rendering and simulation.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Add GLFW to engine CMake (AC: prerequisite)
-  - [ ] 1.1 `find_package(glfw3 CONFIG REQUIRED)` in `engine/CMakeLists.txt`
-  - [ ] 1.2 `target_link_libraries(VoxelEngine PRIVATE glfw)` — PRIVATE because GLFW is engine-internal
-  - [ ] 1.3 Add `<GLFW/glfw3.h>` to engine precompiled headers
-  - [ ] 1.4 Verify `game/CMakeLists.txt` does NOT need changes — game already links `VoxelEngine`
-- [ ] Task 2: Create `Window` class (AC: 1, 4)
-  - [ ] 2.1 Header: `engine/include/voxel/game/Window.h`
-  - [ ] 2.2 Source: `engine/src/game/Window.cpp`
-  - [ ] 2.3 Register both files in `engine/CMakeLists.txt` source list
-  - [ ] 2.4 RAII: constructor calls `glfwInit()` + `glfwCreateWindow()`, destructor calls `glfwDestroyWindow()` + `glfwTerminate()`
-  - [ ] 2.5 Factory method: `static Result<std::unique_ptr<Window>> create(int width, int height, const char* title)`
-  - [ ] 2.6 Set `GLFW_CLIENT_API` to `GLFW_NO_API` (Vulkan — no OpenGL context)
-  - [ ] 2.7 Set `GLFW_RESIZABLE` to `GLFW_TRUE`
-  - [ ] 2.8 Expose: `shouldClose()`, `pollEvents()`, `getHandle()`, `getFramebufferSize()`, `isMinimized()`
-  - [ ] 2.9 Store `m_framebufferResized` flag via `glfwSetFramebufferSizeCallback`
-  - [ ] 2.10 Handle minimize: detect via `glfwGetFramebufferSize` returning 0,0
-- [ ] Task 3: Create `GameLoop` class (AC: 2, 3, 5)
-  - [ ] 3.1 Header: `engine/include/voxel/game/GameLoop.h`
-  - [ ] 3.2 Source: `engine/src/game/GameLoop.cpp`
-  - [ ] 3.3 Register both files in `engine/CMakeLists.txt` source list
-  - [ ] 3.4 Constructor takes `Window&` reference (non-owning)
-  - [ ] 3.5 `run()` — main loop with fixed-timestep accumulator (see Dev Notes)
-  - [ ] 3.6 `tick(double dt)` — virtual or callable slot, currently a no-op placeholder
-  - [ ] 3.7 `render(double alpha)` — virtual or callable slot, currently just `pollEvents()`
-  - [ ] 3.8 Frame time measurement via `glfwGetTime()` (returns seconds as double)
-  - [ ] 3.9 FPS counter: count frames, log `VX_LOG_INFO("FPS: {}", fps)` every 1.0 second
-  - [ ] 3.10 Pause rendering when minimized — spin on `glfwWaitEvents()` instead of busy-loop
-- [ ] Task 4: Update `main.cpp` entry point (AC: 1, 6)
-  - [ ] 4.1 `Log::init()` at start
-  - [ ] 4.2 Create Window via `Window::create(1280, 720, "VoxelForge")`
-  - [ ] 4.3 Handle `Result` error — `VX_FATAL` on window creation failure
-  - [ ] 4.4 Create `GameLoop` with window reference
-  - [ ] 4.5 Call `loop.run()`
-  - [ ] 4.6 Clean shutdown: `Log::shutdown()` at end (Window RAII handles GLFW cleanup)
-- [ ] Task 5: Verify build and manual test (AC: all)
-  - [ ] 5.1 Build with `msvc-debug` preset on Windows
+- [x] Task 1: Add GLFW to engine CMake (AC: prerequisite)
+  - [x] 1.1 `find_package(glfw3 CONFIG REQUIRED)` in `engine/CMakeLists.txt`
+  - [x] 1.2 `target_link_libraries(VoxelEngine PRIVATE glfw)` — PRIVATE because GLFW is engine-internal
+  - [x] 1.3 Add `<GLFW/glfw3.h>` to engine precompiled headers
+  - [x] 1.4 Verify `game/CMakeLists.txt` does NOT need changes — game already links `VoxelEngine`
+- [x] Task 2: Create `Window` class (AC: 1, 4)
+  - [x] 2.1 Header: `engine/include/voxel/game/Window.h`
+  - [x] 2.2 Source: `engine/src/game/Window.cpp`
+  - [x] 2.3 Register both files in `engine/CMakeLists.txt` source list
+  - [x] 2.4 RAII: constructor calls `glfwInit()` + `glfwCreateWindow()`, destructor calls `glfwDestroyWindow()` + `glfwTerminate()`
+  - [x] 2.5 Factory method: `static Result<std::unique_ptr<Window>> create(int width, int height, const char* title)`
+  - [x] 2.6 Set `GLFW_CLIENT_API` to `GLFW_NO_API` (Vulkan — no OpenGL context)
+  - [x] 2.7 Set `GLFW_RESIZABLE` to `GLFW_TRUE`
+  - [x] 2.8 Expose: `shouldClose()`, `pollEvents()`, `getHandle()`, `getFramebufferSize()`, `isMinimized()`
+  - [x] 2.9 Store `m_framebufferResized` flag via `glfwSetFramebufferSizeCallback`
+  - [x] 2.10 Handle minimize: detect via `glfwGetFramebufferSize` returning 0,0
+- [x] Task 3: Create `GameLoop` class (AC: 2, 3, 5)
+  - [x] 3.1 Header: `engine/include/voxel/game/GameLoop.h`
+  - [x] 3.2 Source: `engine/src/game/GameLoop.cpp`
+  - [x] 3.3 Register both files in `engine/CMakeLists.txt` source list
+  - [x] 3.4 Constructor takes `Window&` reference (non-owning)
+  - [x] 3.5 `run()` — main loop with fixed-timestep accumulator (see Dev Notes)
+  - [x] 3.6 `tick(double dt)` — virtual or callable slot, currently a no-op placeholder
+  - [x] 3.7 `render(double alpha)` — virtual or callable slot, currently just `pollEvents()`
+  - [x] 3.8 Frame time measurement via `glfwGetTime()` (returns seconds as double)
+  - [x] 3.9 FPS counter: count frames, log `VX_LOG_INFO("FPS: {}", fps)` every 1.0 second
+  - [x] 3.10 Pause rendering when minimized — spin on `glfwWaitEvents()` instead of busy-loop
+- [x] Task 4: Update `main.cpp` entry point (AC: 1, 6)
+  - [x] 4.1 `Log::init()` at start
+  - [x] 4.2 Create Window via `Window::create(1280, 720, "VoxelForge")`
+  - [x] 4.3 Handle `Result` error — `VX_FATAL` on window creation failure
+  - [x] 4.4 Create `GameLoop` with window reference
+  - [x] 4.5 Call `loop.run()`
+  - [x] 4.6 Clean shutdown: `Log::shutdown()` at end (Window RAII handles GLFW cleanup)
+- [x] Task 5: Verify build and manual test (AC: all)
+  - [x] 5.1 Build with `msvc-debug` preset on Windows
   - [ ] 5.2 Run `VoxelGame.exe` — window appears at 1280x720, titled "VoxelForge"
   - [ ] 5.3 Verify FPS logging in console output every second
   - [ ] 5.4 Verify window resize triggers `m_framebufferResized` flag
   - [ ] 5.5 Verify window minimize pauses loop (no CPU spin)
   - [ ] 5.6 Verify window close terminates cleanly with no leaks/errors
-  - [ ] 5.7 Verify all existing tests still pass (`ctest --preset msvc-debug`: 19 tests)
+  - [x] 5.7 Verify all existing tests still pass (`ctest --preset msvc-debug`: 19 tests)
 
 ## Dev Notes
 
@@ -293,10 +293,31 @@ Future stories will add Vulkan validation layers (2.2) and rendering (2.3) that 
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 4.6 (claude-opus-4-6)
 
 ### Debug Log References
 
+- Build: `cmake --preset msvc-debug` — configured successfully (vcpkg installed glfw3, volk, vulkan-memory-allocator)
+- Build: `cmake --build build/msvc-debug` — compiled all targets (VoxelEngine.lib, VoxelGame.exe, VoxelTests.exe)
+- Tests: `ctest --preset msvc-debug` — 19/19 passed, 0 failed (no regressions)
+
 ### Completion Notes List
 
+- Task 1: Added `find_package(glfw3)` and `target_link_libraries(PRIVATE glfw)` to engine CMake. Added `<GLFW/glfw3.h>` to PCH. Verified game CMake needs no changes.
+- Task 2: Created `Window` class in `voxel::game` namespace. RAII lifecycle (glfwInit in create, glfwDestroyWindow+glfwTerminate in destructor). Factory method returns `Result<unique_ptr<Window>>`. GLFW error callback logs via VX_LOG_ERROR. Framebuffer resize callback sets flag via glfwSetWindowUserPointer. Minimize detection via 0x0 framebuffer size. Forward-declared GLFWwindow in header to keep GLFW as PRIVATE dependency.
+- Task 3: Created `GameLoop` class with fixed-timestep accumulator (20 TPS). Spiral-of-death clamp at 0.25s. FPS counter logged every second via VX_LOG_INFO. Minimize handling with glfwWaitEvents (no busy loop). tick() and render() are virtual no-op placeholders for future stories. previousTime reset after minimize resume to prevent accumulator spike.
+- Task 4: Updated main.cpp with Log::init/shutdown bookends, Window::create with VX_FATAL on failure, GameLoop construction and run(). Window destroyed via unique_ptr::reset() before Log::shutdown.
+- Task 5: Build succeeded on msvc-debug preset. All 19 existing tests pass (no regressions). Manual verification subtasks (5.2–5.6) require user to run VoxelGame.exe.
+
+### Change Log
+
+- 2026-03-25: Story 2.1 implementation complete — GLFW window + fixed-timestep game loop skeleton
+
 ### File List
+
+- engine/CMakeLists.txt (modified) — added glfw3 dependency, Window.cpp, GameLoop.cpp sources, GLFW PCH
+- engine/include/voxel/game/Window.h (new) — Window class header
+- engine/src/game/Window.cpp (new) — Window class implementation
+- engine/include/voxel/game/GameLoop.h (new) — GameLoop class header
+- engine/src/game/GameLoop.cpp (new) — GameLoop class implementation
+- game/src/main.cpp (modified) — entry point with Window + GameLoop + Log lifecycle

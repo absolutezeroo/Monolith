@@ -3,6 +3,8 @@
 add_library(VoxelEngine STATIC
     src/core/CoreModule.cpp
     src/core/Log.cpp
+    src/game/Window.cpp
+    src/game/GameLoop.cpp
 )
 
 target_include_directories(VoxelEngine
@@ -19,11 +21,13 @@ voxelforge_enable_sanitizers(VoxelEngine)
 find_package(glm CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 find_package(EnTT CONFIG REQUIRED)
+find_package(glfw3 CONFIG REQUIRED)
 
 target_link_libraries(VoxelEngine
     PUBLIC  glm::glm
     PUBLIC  spdlog::spdlog
     PUBLIC  EnTT::EnTT
+    PRIVATE glfw
 )
 
 # spdlog: disable exceptions (project uses -fno-exceptions)
@@ -56,4 +60,5 @@ target_precompile_headers(VoxelEngine PRIVATE
     <glm/glm.hpp>
     <spdlog/spdlog.h>
     <entt/entt.hpp>
+    <GLFW/glfw3.h>
 )
