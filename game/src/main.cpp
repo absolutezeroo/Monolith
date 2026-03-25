@@ -2,6 +2,7 @@
 #include "voxel/core/Log.h"
 #include "voxel/game/GameLoop.h"
 #include "voxel/game/Window.h"
+#include "voxel/renderer/VulkanContext.h"
 
 int main()
 {
@@ -15,10 +16,17 @@ int main()
 
     auto& window = *windowResult.value();
 
+    auto vulkanResult = voxel::renderer::VulkanContext::create(window);
+    if (!vulkanResult.has_value())
+    {
+        VX_FATAL("Failed to initialize Vulkan");
+    }
+
     voxel::game::GameLoop loop(window);
     loop.run();
 
-    // Window destroyed via unique_ptr RAII before Log::shutdown
+    // Destruction order: VulkanContext → Window → Log
+    vulkanResult.value().reset();
     windowResult.value().reset();
 
     voxel::core::Log::shutdown();

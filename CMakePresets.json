@@ -45,6 +45,10 @@
       "name": "msvc-debug",
       "displayName": "MSVC Debug",
       "inherits": "base",
+      "generator": "Ninja",
+      "environment": {
+        "VCPKG_ROOT": "C:/Program Files/Microsoft Visual Studio/18/Community/VC/vcpkg"
+      },
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug"
       },
@@ -58,6 +62,10 @@
       "name": "msvc-release",
       "displayName": "MSVC Release",
       "inherits": "base",
+      "generator": "Ninja",
+      "environment": {
+        "VCPKG_ROOT": "C:/Program Files/Microsoft Visual Studio/18/Community/VC/vcpkg"
+      },
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"
       },

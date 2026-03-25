@@ -16,13 +16,16 @@
   <component name="CMakeReloadState">
     <option name="reloaded" value="true" />
   </component>
-  <component name="CMakeSettings">
+  <component name="CMakeRunConfigurationManager">
+    <generated />
+  </component>
+  <component name="CMakeSettings" AUTO_RELOAD="true">
     <configurations>
-      <configuration PROFILE_NAME="Debug" ENABLED="true" CONFIG_NAME="Debug" />
+      <configuration PROFILE_NAME="Debug" ENABLED="false" CONFIG_NAME="Debug" />
+      <configuration PROFILE_NAME="msvc-debug" ENABLED="true" FROM_PRESET="true" GENERATION_DIR="$PROJECT_DIR$/build/msvc-debug" />
       <configuration PROFILE_NAME="debug" ENABLED="false" FROM_PRESET="true" GENERATION_DIR="$PROJECT_DIR$/build/debug" />
       <configuration PROFILE_NAME="release" ENABLED="false" FROM_PRESET="true" GENERATION_DIR="$PROJECT_DIR$/build/release" />
       <configuration PROFILE_NAME="relwithdebinfo" ENABLED="false" FROM_PRESET="true" GENERATION_DIR="$PROJECT_DIR$/build/relwithdebinfo" />
-      <configuration PROFILE_NAME="msvc-debug" ENABLED="false" FROM_PRESET="true" GENERATION_DIR="$PROJECT_DIR$/build/msvc-debug" />
       <configuration PROFILE_NAME="msvc-release" ENABLED="false" FROM_PRESET="true" GENERATION_DIR="$PROJECT_DIR$/build/msvc-release" />
       <configuration PROFILE_NAME="debug - debug" ENABLED="false" FROM_PRESET="true" GENERATION_DIR="$PROJECT_DIR$/build/debug" />
       <configuration PROFILE_NAME="release - release" ENABLED="false" FROM_PRESET="true" GENERATION_DIR="$PROJECT_DIR$/build/release" />
@@ -32,9 +35,13 @@
     </configurations>
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="a2d09ac4-8ab9-41b9-8f48-a108e400d6a8" name="Changes" comment="feat(renderer): add Vulkan 1.3 initialization using volk, vk-bootstrap, and VMA&#10;&#10;- Implemented `VulkanContext` for Vulkan initialization with RAII.&#10;- Integrated volk for Vulkan function loading, vk-bootstrap for instance/device/swapchain creation, and VMA for memory management.&#10;- Added GPU info logging: Vulkan version, device name, queue families, and memory heaps.&#10;- Updated `main.cpp` to initialize and manage `VulkanContext` lifecycle.&#10;- Updated CMake to include Vulkan dependencies and a single VMA implementation unit.&#10;- Verified manual initialization, logging, and clean shutdown with no validation errors.">
+    <list default="true" id="a2d09ac4-8ab9-41b9-8f48-a108e400d6a8" name="Changes" comment="chore(ide): update project files and add CMake integration settings&#10;&#10;- Added `.idea/misc.xml` with CMake and Python integration configurations.&#10;- Updated `.idea/Monolith.iml` and `.idea/workspace.xml` to reflect new CMake workspace options.&#10;- Included VMA implementation in `VmaImpl.cpp`.">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CMakePresets.json" beforeDir="false" afterPath="$PROJECT_DIR$/CMakePresets.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/_bmad-output/implementation-artifacts/2-2-vulkan-initialization-volk-vk-bootstrap-vma.md" beforeDir="false" afterPath="$PROJECT_DIR$/_bmad-output/implementation-artifacts/2-2-vulkan-initialization-volk-vk-bootstrap-vma.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/_bmad-output/implementation-artifacts/sprint-status.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/_bmad-output/implementation-artifacts/sprint-status.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/engine/CMakeLists.txt" beforeDir="false" afterPath="$PROJECT_DIR$/engine/CMakeLists.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/game/src/main.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/game/src/main.cpp" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -45,6 +52,7 @@
     <option name="cachedIndexableFilesCount" value="2314" />
     <option name="fileBasedEmbeddingIndicesEnabled" value="true" />
   </component>
+  <component name="ExecutionTargetManager" SELECTED_TARGET="CMakeBuildProfile:Debug" />
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
@@ -72,6 +80,7 @@
   </component>
   <component name="PropertiesComponent"><![CDATA[{
   "keyToString": {
+    "CMake Debug.VoxelForge.executor": "Debug",
     "ModuleVcsDetector.initialDetectionPerformed": "true",
     "RunOnceActivity.MCP Project settings loaded": "true",
     "RunOnceActivity.RadMigrateCodeStyle": "true",
@@ -88,7 +97,12 @@
     "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
     "git-widget-placeholder": "master",
     "junie.onboarding.icon.badge.shown": "true",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
     "nodejs_package_manager_path": "npm",
+    "settings.editor.selected.configurable": "CMakeSettings",
     "to.speed.mode.migration.done": "true",
     "vue.rearranger.settings.migration": "true"
   }
@@ -99,11 +113,14 @@
         <option name="CLION.EXTERNAL.BUILD" enabled="true" />
       </method>
     </configuration>
-    <configuration name="VoxelForge" type="CMakeRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true" RUN_PATH="$PROJECT_DIR$/build/msvc-debug/game/Debug/VoxelGame.exe" EXPLICIT_BUILD_TARGET_NAME="all">
-      <method v="2">
-        <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
-      </method>
+    <configuration name="VoxelForge" type="CMakeListConfigurationType" factoryName="CMakeListConfigurationFactory" temporary="true">
+      <method v="2" />
     </configuration>
+    <recent_temporary>
+      <list>
+        <item itemvalue="CMake Debug.VoxelForge" />
+      </list>
+    </recent_temporary>
   </component>
   <component name="TaskManager">
     <task active="true" id="Default" summary="Default task">
@@ -112,7 +129,7 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1774438897821</updated>
-      <workItem from="1774438901026" duration="193000" />
+      <workItem from="1774438901026" duration="1096000" />
     </task>
     <task id="LOCAL-00001" summary="feat(renderer): add Vulkan 1.3 initialization using volk, vk-bootstrap, and VMA&#10;&#10;- Implemented `VulkanContext` for Vulkan initialization with RAII.&#10;- Integrated volk for Vulkan function loading, vk-bootstrap for instance/device/swapchain creation, and VMA for memory management.&#10;- Added GPU info logging: Vulkan version, device name, queue families, and memory heaps.&#10;- Updated `main.cpp` to initialize and manage `VulkanContext` lifecycle.&#10;- Updated CMake to include Vulkan dependencies and a single VMA implementation unit.&#10;- Verified manual initialization, logging, and clean shutdown with no validation errors.">
       <option name="closed" value="true" />
@@ -122,14 +139,28 @@
       <option name="project" value="LOCAL" />
       <updated>1774439018004</updated>
     </task>
-    <option name="localTasksCounter" value="2" />
+    <task id="LOCAL-00002" summary="chore(ide): update project files and add CMake integration settings&#10;&#10;- Added `.idea/misc.xml` with CMake and Python integration configurations.&#10;- Updated `.idea/Monolith.iml` and `.idea/workspace.xml` to reflect new CMake workspace options.&#10;- Included VMA implementation in `VmaImpl.cpp`.">
+      <option name="closed" value="true" />
+      <created>1774439162741</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1774439162741</updated>
+    </task>
+    <option name="localTasksCounter" value="3" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
   </component>
+  <component name="VCPKGProject">
+    <isAutomaticCheckingOnLaunch value="false" />
+    <isAutomaticFoundErrors value="true" />
+    <isAutomaticReloadCMake value="true" />
+  </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="feat(renderer): add Vulkan 1.3 initialization using volk, vk-bootstrap, and VMA&#10;&#10;- Implemented `VulkanContext` for Vulkan initialization with RAII.&#10;- Integrated volk for Vulkan function loading, vk-bootstrap for instance/device/swapchain creation, and VMA for memory management.&#10;- Added GPU info logging: Vulkan version, device name, queue families, and memory heaps.&#10;- Updated `main.cpp` to initialize and manage `VulkanContext` lifecycle.&#10;- Updated CMake to include Vulkan dependencies and a single VMA implementation unit.&#10;- Verified manual initialization, logging, and clean shutdown with no validation errors." />
-    <option name="LAST_COMMIT_MESSAGE" value="feat(renderer): add Vulkan 1.3 initialization using volk, vk-bootstrap, and VMA&#10;&#10;- Implemented `VulkanContext` for Vulkan initialization with RAII.&#10;- Integrated volk for Vulkan function loading, vk-bootstrap for instance/device/swapchain creation, and VMA for memory management.&#10;- Added GPU info logging: Vulkan version, device name, queue families, and memory heaps.&#10;- Updated `main.cpp` to initialize and manage `VulkanContext` lifecycle.&#10;- Updated CMake to include Vulkan dependencies and a single VMA implementation unit.&#10;- Verified manual initialization, logging, and clean shutdown with no validation errors." />
+    <MESSAGE value="chore(ide): update project files and add CMake integration settings&#10;&#10;- Added `.idea/misc.xml` with CMake and Python integration configurations.&#10;- Updated `.idea/Monolith.iml` and `.idea/workspace.xml` to reflect new CMake workspace options.&#10;- Included VMA implementation in `VmaImpl.cpp`." />
+    <option name="LAST_COMMIT_MESSAGE" value="chore(ide): update project files and add CMake integration settings&#10;&#10;- Added `.idea/misc.xml` with CMake and Python integration configurations.&#10;- Updated `.idea/Monolith.iml` and `.idea/workspace.xml` to reflect new CMake workspace options.&#10;- Included VMA implementation in `VmaImpl.cpp`." />
   </component>
 </project>
