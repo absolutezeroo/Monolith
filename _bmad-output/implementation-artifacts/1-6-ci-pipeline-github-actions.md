@@ -1,6 +1,6 @@
 # Story 1.6: CI Pipeline (GitHub Actions)
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -21,17 +21,17 @@ so that regressions are caught immediately on both Windows and Linux.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Create `.github/workflows/ci.yml` (AC: 1, 2, 3, 4, 5, 7, 8)
-  - [ ] 1.1 Define trigger: `push` to any branch + `pull_request` to `main`
-  - [ ] 1.2 Define matrix: `{os: [windows-latest, ubuntu-latest], preset: [debug, release]}` with proper mapping
-  - [ ] 1.3 Map presets per OS: Windows → `msvc-debug`/`msvc-release`, Ubuntu → `debug`/`release`
-  - [ ] 1.4 Steps: checkout, setup vcpkg with caching, cmake configure via preset, build via preset, ctest
-  - [ ] 1.5 Add MSVC test presets to `CMakePresets.json` (currently missing — only `debug` and `release` test presets exist)
-- [ ] Task 2: Add clang-format check step to CI (bonus quality gate)
-  - [ ] 2.1 Run `tools/check-format.sh` on Ubuntu only (clang-format available via apt)
-- [ ] Task 3: Create or update `README.md` with build badge (AC: 6)
-  - [ ] 3.1 Badge URL format: `![CI](https://github.com/<owner>/<repo>/actions/workflows/ci.yml/badge.svg)`
-  - [ ] 3.2 Detect actual GitHub remote URL from `git remote get-url origin` for correct badge path
+- [x] Task 1: Create `.github/workflows/ci.yml` (AC: 1, 2, 3, 4, 5, 7, 8)
+  - [x] 1.1 Define trigger: `push` to any branch + `pull_request` to `main`
+  - [x] 1.2 Define matrix: `{os: [windows-latest, ubuntu-latest], preset: [debug, release]}` with proper mapping
+  - [x] 1.3 Map presets per OS: Windows → `msvc-debug`/`msvc-release`, Ubuntu → `debug`/`release`
+  - [x] 1.4 Steps: checkout, setup vcpkg with caching, cmake configure via preset, build via preset, ctest
+  - [x] 1.5 Add MSVC test presets to `CMakePresets.json` (currently missing — only `debug` and `release` test presets exist)
+- [x] Task 2: Add clang-format check step to CI (bonus quality gate)
+  - [x] 2.1 Run `tools/check-format.sh` on Ubuntu only (clang-format available via apt)
+- [x] Task 3: Create or update `README.md` with build badge (AC: 6)
+  - [x] 3.1 Badge URL format: `![CI](https://github.com/<owner>/<repo>/actions/workflows/ci.yml/badge.svg)`
+  - [x] 3.2 Detect actual GitHub remote URL from `git remote get-url origin` for correct badge path (no remote configured — used OWNER/REPO placeholder)
 
 ## Dev Notes
 
@@ -184,8 +184,32 @@ CI itself IS the test. Verify by:
 
 ### Agent Model Used
 
+Claude Opus 4.6
+
 ### Debug Log References
+
+- Validated CMakePresets.json is valid JSON after adding MSVC test presets
+- Verified `cmake --list-presets` shows all 5 configure presets correctly
+- Built project with `msvc-debug` preset: VoxelEngine.lib, VoxelGame.exe, VoxelTests.exe all compile
+- Ran `ctest --preset msvc-debug`: 19/19 tests pass, 0 failures
+- Validated ci.yml content: all required fields (triggers, matrix, actions, format check) present
 
 ### Completion Notes List
 
+- Created `.github/workflows/ci.yml` with 4-job matrix build (ubuntu debug/release, windows msvc-debug/msvc-release) using `lukka/run-vcpkg@v11` + `lukka/run-cmake@v10`
+- Added separate `format-check` job running `tools/check-format.sh` on Ubuntu with clang-format
+- Added `concurrency` group to cancel redundant runs on the same branch
+- Added MSVC test presets (`msvc-debug`, `msvc-release`) to `CMakePresets.json` testPresets array with `outputOnFailure: true`
+- Created `README.md` with CI badge (placeholder OWNER/REPO — no git remote configured), project description, and quick build instructions
+- No remote URL detected — badge uses `OWNER/REPO` placeholder; update when remote is configured
+- All 19 existing tests pass with no regressions
+
+### Change Log
+
+- 2026-03-24: Implemented CI pipeline (GitHub Actions), MSVC test presets, README with badge
+
 ### File List
+
+- `.github/workflows/ci.yml` (new)
+- `CMakePresets.json` (modified — added msvc-debug and msvc-release test presets)
+- `README.md` (new)
