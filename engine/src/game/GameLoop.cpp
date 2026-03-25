@@ -23,7 +23,7 @@ void GameLoop::run()
 {
     double accumulator = 0.0;
     double previousTime = glfwGetTime();
-    m_fpsTimer = previousTime;
+    m_fpsTimer = 0.0;
     m_frameCount = 0;
 
     VX_LOG_INFO("Game loop starting (tick rate: {} TPS)", static_cast<int>(1.0 / TICK_RATE));

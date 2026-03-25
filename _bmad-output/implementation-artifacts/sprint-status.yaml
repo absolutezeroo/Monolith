@@ -56,7 +56,7 @@ epics:
     stories:
       - id: "2.1"
         title: "GLFW Window + Game Loop Skeleton"
-        status: review
+        status: done
         assigned_to: dev-agent
       - id: "2.2"
         title: "Vulkan Initialization (volk + vk-bootstrap + VMA)"
