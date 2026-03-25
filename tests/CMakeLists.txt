@@ -13,6 +13,7 @@ add_executable(VoxelTests
     renderer/TestCamera.cpp
     world/TestChunkSection.cpp
     world/TestChunkColumn.cpp
+    world/TestBlockRegistry.cpp
 )
 
 target_link_libraries(VoxelTests
@@ -22,6 +23,11 @@ target_link_libraries(VoxelTests
 
 voxelforge_set_warnings(VoxelTests)
 voxelforge_enable_sanitizers(VoxelTests)
+
+# Provide path to assets directory for tests that load data files
+target_compile_definitions(VoxelTests PRIVATE
+    VOXELFORGE_ASSETS_DIR="${CMAKE_SOURCE_DIR}/assets"
+)
 
 include(CTest)
 include(Catch)

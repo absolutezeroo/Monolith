@@ -17,6 +17,7 @@
     "stb",
     "lz4",
     "sol2",
-    "luajit"
+    "luajit",
+    "nlohmann-json"
   ]
 }

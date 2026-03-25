@@ -1,13 +1,13 @@
 #pragma once
 
+#include "voxel/world/Block.h"
+
 #include "voxel/core/Assert.h"
 
 #include <cstdint>
 
 namespace voxel::world
 {
-
-constexpr uint16_t BLOCK_AIR = 0;
 
 struct ChunkSection
 {

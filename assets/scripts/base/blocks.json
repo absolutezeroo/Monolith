@@ -1,0 +1,112 @@
+[
+    {
+        "stringId": "base:stone",
+        "isSolid": true,
+        "isTransparent": false,
+        "hasCollision": true,
+        "lightEmission": 0,
+        "lightFilter": 15,
+        "hardness": 1.5,
+        "textureIndices": [1, 1, 1, 1, 1, 1],
+        "dropItem": "base:cobblestone"
+    },
+    {
+        "stringId": "base:dirt",
+        "isSolid": true,
+        "isTransparent": false,
+        "hasCollision": true,
+        "lightEmission": 0,
+        "lightFilter": 15,
+        "hardness": 0.5,
+        "textureIndices": [2, 2, 2, 2, 2, 2],
+        "dropItem": "base:dirt"
+    },
+    {
+        "stringId": "base:grass_block",
+        "isSolid": true,
+        "isTransparent": false,
+        "hasCollision": true,
+        "lightEmission": 0,
+        "lightFilter": 15,
+        "hardness": 0.6,
+        "textureIndices": [4, 4, 3, 2, 4, 4],
+        "dropItem": "base:dirt"
+    },
+    {
+        "stringId": "base:sand",
+        "isSolid": true,
+        "isTransparent": false,
+        "hasCollision": true,
+        "lightEmission": 0,
+        "lightFilter": 15,
+        "hardness": 0.5,
+        "textureIndices": [5, 5, 5, 5, 5, 5],
+        "dropItem": "base:sand"
+    },
+    {
+        "stringId": "base:water",
+        "isSolid": false,
+        "isTransparent": true,
+        "hasCollision": false,
+        "lightEmission": 0,
+        "lightFilter": 2,
+        "hardness": 100.0,
+        "textureIndices": [6, 6, 6, 6, 6, 6],
+        "dropItem": ""
+    },
+    {
+        "stringId": "base:oak_log",
+        "isSolid": true,
+        "isTransparent": false,
+        "hasCollision": true,
+        "lightEmission": 0,
+        "lightFilter": 15,
+        "hardness": 2.0,
+        "textureIndices": [8, 8, 7, 7, 8, 8],
+        "dropItem": "base:oak_log"
+    },
+    {
+        "stringId": "base:oak_leaves",
+        "isSolid": true,
+        "isTransparent": true,
+        "hasCollision": true,
+        "lightEmission": 0,
+        "lightFilter": 1,
+        "hardness": 0.2,
+        "textureIndices": [9, 9, 9, 9, 9, 9],
+        "dropItem": ""
+    },
+    {
+        "stringId": "base:glass",
+        "isSolid": true,
+        "isTransparent": true,
+        "hasCollision": true,
+        "lightEmission": 0,
+        "lightFilter": 0,
+        "hardness": 0.3,
+        "textureIndices": [10, 10, 10, 10, 10, 10],
+        "dropItem": ""
+    },
+    {
+        "stringId": "base:glowstone",
+        "isSolid": true,
+        "isTransparent": false,
+        "hasCollision": true,
+        "lightEmission": 15,
+        "lightFilter": 15,
+        "hardness": 0.3,
+        "textureIndices": [11, 11, 11, 11, 11, 11],
+        "dropItem": "base:glowstone"
+    },
+    {
+        "stringId": "base:torch",
+        "isSolid": false,
+        "isTransparent": true,
+        "hasCollision": false,
+        "lightEmission": 14,
+        "lightFilter": 0,
+        "hardness": 0.0,
+        "textureIndices": [12, 12, 12, 12, 12, 12],
+        "dropItem": "base:torch"
+    }
+]

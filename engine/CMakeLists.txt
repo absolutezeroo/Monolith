@@ -16,6 +16,7 @@ add_library(VoxelEngine STATIC
     src/renderer/ImGuiImplGlfw.cpp
     src/world/ChunkSection.cpp
     src/world/ChunkColumn.cpp
+    src/world/BlockRegistry.cpp
 )
 
 target_include_directories(VoxelEngine
@@ -37,6 +38,7 @@ find_package(volk CONFIG REQUIRED)
 find_package(vk-bootstrap CONFIG REQUIRED)
 find_package(VulkanMemoryAllocator CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
+find_package(nlohmann_json CONFIG REQUIRED)
 
 target_link_libraries(VoxelEngine
     PUBLIC  glm::glm
@@ -48,10 +50,14 @@ target_link_libraries(VoxelEngine
     PRIVATE vk-bootstrap::vk-bootstrap
     PUBLIC  GPUOpen::VulkanMemoryAllocator
     PRIVATE imgui::imgui
+    PRIVATE nlohmann_json::nlohmann_json
 )
 
 # spdlog: disable exceptions (project uses -fno-exceptions)
 target_compile_definitions(VoxelEngine PUBLIC SPDLOG_NO_EXCEPTIONS)
+
+# nlohmann-json: disable exceptions (uses std::abort on parse errors instead)
+target_compile_definitions(VoxelEngine PRIVATE JSON_NOEXCEPTION)
 
 # volk: prevent static linking to Vulkan loader — consumers need this via VulkanContext.h
 target_compile_definitions(VoxelEngine PUBLIC VK_NO_PROTOTYPES)
