@@ -10,7 +10,10 @@ add_library(VoxelEngine STATIC
     src/renderer/Renderer.cpp
     src/renderer/Gigabuffer.cpp
     src/renderer/StagingBuffer.cpp
+    src/renderer/Camera.cpp
+    src/renderer/ImGuiBackend.cpp
     src/renderer/ImGuiImpl.cpp
+    src/renderer/ImGuiImplGlfw.cpp
 )
 
 target_include_directories(VoxelEngine
@@ -99,6 +102,8 @@ file(GLOB _imgui_backend_dirs
 if(_imgui_backend_dirs)
     list(GET _imgui_backend_dirs 0 IMGUI_BACKENDS_DIR)
     message(STATUS "ImGui backends found: ${IMGUI_BACKENDS_DIR}")
+    # Make backend headers available to the entire engine (for ImGuiBackend.cpp etc.)
+    target_include_directories(VoxelEngine PRIVATE "${IMGUI_BACKENDS_DIR}")
 else()
     message(FATAL_ERROR
         "Could not find imgui backends in vcpkg buildtrees.\n"
@@ -106,15 +111,20 @@ else()
         "Ensure vcpkg manifest mode is enabled and imgui is installed.")
 endif()
 
-# ImGuiImpl.cpp #includes backend .cpp files that pull in <vulkan/vulkan.h> directly,
-# which conflicts with volk.h from the PCH. Skip PCH and suppress warnings for this
-# translation unit — the backends are third-party code.
-set_source_files_properties(src/renderer/ImGuiImpl.cpp PROPERTIES
-    SKIP_PRECOMPILE_HEADERS ON
-    INCLUDE_DIRECTORIES "${IMGUI_BACKENDS_DIR}"
+# ImGuiImpl.cpp and ImGuiImplGlfw.cpp each #include a backend .cpp that pulls in
+# <vulkan/vulkan.h> directly, which conflicts with volk.h from the PCH.
+# Skip PCH and suppress warnings for these TUs — the backends are third-party code.
+set_source_files_properties(
+    src/renderer/ImGuiImpl.cpp
+    src/renderer/ImGuiImplGlfw.cpp
+    PROPERTIES
+        SKIP_PRECOMPILE_HEADERS ON
+        INCLUDE_DIRECTORIES "${IMGUI_BACKENDS_DIR}"
 )
 if(MSVC)
-    set_property(SOURCE src/renderer/ImGuiImpl.cpp APPEND_STRING PROPERTY COMPILE_FLAGS " /w")
+    set_property(SOURCE src/renderer/ImGuiImpl.cpp src/renderer/ImGuiImplGlfw.cpp
+        APPEND_STRING PROPERTY COMPILE_FLAGS " /w")
 else()
-    set_property(SOURCE src/renderer/ImGuiImpl.cpp APPEND_STRING PROPERTY COMPILE_FLAGS " -w")
+    set_property(SOURCE src/renderer/ImGuiImpl.cpp src/renderer/ImGuiImplGlfw.cpp
+        APPEND_STRING PROPERTY COMPILE_FLAGS " -w")
 endif()

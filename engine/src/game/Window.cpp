@@ -47,6 +47,9 @@ core::Result<std::unique_ptr<Window>> Window::create(int width, int height, cons
 
     auto window = std::unique_ptr<Window>(new Window(handle));
 
+    // Set user pointer to Window for the default framebuffer resize callback.
+    // GameApp may override this with its own user pointer — that's fine,
+    // as long as it calls Window::setResized() from its own callback.
     glfwSetWindowUserPointer(handle, window.get());
     glfwSetFramebufferSizeCallback(handle, framebufferSizeCallback);
 

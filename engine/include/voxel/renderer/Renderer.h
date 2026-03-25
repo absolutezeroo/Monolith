@@ -19,6 +19,8 @@ class Window;
 namespace voxel::renderer
 {
 
+class Camera;
+class ImGuiBackend;
 class StagingBuffer;
 class VulkanContext;
 
@@ -31,6 +33,16 @@ struct FrameData
     VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
     VkSemaphore imageAvailableSemaphore = VK_NULL_HANDLE;
     VkFence renderFence = VK_NULL_HANDLE;
+};
+
+/// Passed from GameApp to Renderer each frame for ImGui overlay display.
+struct DebugOverlayState
+{
+    bool showOverlay = false;
+    bool wireframeMode = false;
+    bool showChunkBorders = false;
+    float fov = 70.0f;
+    float sensitivity = 0.1f;
 };
 
 /**
@@ -52,15 +64,18 @@ public:
     /**
      * @brief Initializes per-frame resources, loads shaders, and creates the graphics pipeline.
      * @param shaderDir Path to the directory containing compiled .spv shader files.
+     * @param window GLFW window for ImGui initialization.
      * @return Success or EngineError on failure.
      */
-    core::Result<void> init(const std::string& shaderDir);
+    core::Result<void> init(const std::string& shaderDir, game::Window& window);
 
     /**
      * @brief Renders one frame: acquire image, record commands, submit, present.
      * @param window Reference to the window for resize handling.
+     * @param camera Camera for overlay display.
+     * @param overlay Debug overlay state (F3/F4/F5 toggles).
      */
-    void draw(game::Window& window);
+    void draw(game::Window& window, const Camera& camera, DebugOverlayState& overlay);
 
     /// Waits for GPU idle and destroys all owned resources.
     void shutdown();
@@ -68,9 +83,12 @@ public:
 private:
     core::Result<void> createFrameResources();
     core::Result<void> createPipeline(const std::string& shaderDir);
+    core::Result<void> createWireframePipeline(const std::string& shaderDir);
     core::Result<VkShaderModule> loadShaderModule(const std::string& path);
 
     void recreateRenderFinishedSemaphores();
+
+    void buildDebugOverlay(const Camera& camera, DebugOverlayState& overlay);
 
     void transitionImage(
         VkCommandBuffer cmd,
@@ -86,11 +104,19 @@ private:
 
     VkPipelineLayout m_pipelineLayout = VK_NULL_HANDLE;
     VkPipeline m_pipeline = VK_NULL_HANDLE;
+    VkPipeline m_wireframePipeline = VK_NULL_HANDLE;
 
     std::unique_ptr<StagingBuffer> m_stagingBuffer;
+    std::unique_ptr<ImGuiBackend> m_imguiBackend;
 
     bool m_isInitialized = false;
     bool m_framebufferResized = false;
+
+    // FPS tracking
+    double m_lastFrameTime = 0.0;
+    int m_fpsCount = 0;
+    double m_fpsTimer = 0.0;
+    int m_displayFps = 0;
 };
 
 } // namespace voxel::renderer

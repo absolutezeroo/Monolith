@@ -1,9 +1,14 @@
 #include "voxel/renderer/Renderer.h"
 #include "voxel/core/Assert.h"
 #include "voxel/core/Log.h"
+#include "voxel/renderer/Camera.h"
+#include "voxel/renderer/ImGuiBackend.h"
 #include "voxel/renderer/StagingBuffer.h"
 #include "voxel/renderer/VulkanContext.h"
 #include "voxel/game/Window.h"
+
+#include <imgui.h>
+#include <GLFW/glfw3.h>
 
 #include <fstream>
 #include <vector>
@@ -21,7 +26,7 @@ Renderer::~Renderer()
     shutdown();
 }
 
-core::Result<void> Renderer::init(const std::string& shaderDir)
+core::Result<void> Renderer::init(const std::string& shaderDir, game::Window& window)
 {
     auto frameResult = createFrameResources();
     if (!frameResult.has_value())
@@ -35,6 +40,13 @@ core::Result<void> Renderer::init(const std::string& shaderDir)
         return std::unexpected(pipelineResult.error());
     }
 
+    auto wireframeResult = createWireframePipeline(shaderDir);
+    if (!wireframeResult.has_value())
+    {
+        VX_LOG_WARN("Wireframe pipeline creation failed — wireframe mode disabled");
+        // Non-fatal: wireframe is optional
+    }
+
     // Create staging buffer for CPU→GPU uploads
     auto stagingResult = StagingBuffer::create(m_vulkanContext);
     if (!stagingResult.has_value())
@@ -42,6 +54,14 @@ core::Result<void> Renderer::init(const std::string& shaderDir)
         return std::unexpected(stagingResult.error());
     }
     m_stagingBuffer = std::move(stagingResult.value());
+
+    // Initialize ImGui
+    auto imguiResult = ImGuiBackend::create(m_vulkanContext, window.getHandle());
+    if (!imguiResult.has_value())
+    {
+        return std::unexpected(imguiResult.error());
+    }
+    m_imguiBackend = std::move(imguiResult.value());
 
     m_isInitialized = true;
     VX_LOG_INFO("Renderer initialized — {} frames in flight", FRAMES_IN_FLIGHT);
@@ -57,7 +77,6 @@ core::Result<void> Renderer::createFrameResources()
     {
         auto& frame = m_frames[i];
 
-        // Command pool — one per frame, resettable command buffers
         VkCommandPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
         poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
@@ -70,7 +89,6 @@ core::Result<void> Renderer::createFrameResources()
             return std::unexpected(core::EngineError::VulkanError);
         }
 
-        // Command buffer — one per frame
         VkCommandBufferAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
         allocInfo.commandPool = frame.commandPool;
@@ -84,7 +102,6 @@ core::Result<void> Renderer::createFrameResources()
             return std::unexpected(core::EngineError::VulkanError);
         }
 
-        // Fence — must start signaled so first vkWaitForFences does not deadlock
         VkFenceCreateInfo fenceInfo{};
         fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
         fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
@@ -96,7 +113,6 @@ core::Result<void> Renderer::createFrameResources()
             return std::unexpected(core::EngineError::VulkanError);
         }
 
-        // Semaphore — imageAvailable (per-frame)
         VkSemaphoreCreateInfo semInfo{};
         semInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
@@ -108,7 +124,6 @@ core::Result<void> Renderer::createFrameResources()
         }
     }
 
-    // renderFinished semaphores — one per swapchain image to avoid presentation reuse conflicts
     uint32_t swapchainImageCount = static_cast<uint32_t>(m_vulkanContext.getSwapchainImages().size());
     m_renderFinishedSemaphores.resize(swapchainImageCount, VK_NULL_HANDLE);
 
@@ -134,7 +149,6 @@ void Renderer::recreateRenderFinishedSemaphores()
 {
     VkDevice device = m_vulkanContext.getDevice();
 
-    // Destroy old semaphores
     for (auto& sem : m_renderFinishedSemaphores)
     {
         if (sem != VK_NULL_HANDLE)
@@ -143,7 +157,6 @@ void Renderer::recreateRenderFinishedSemaphores()
         }
     }
 
-    // Resize to match new swapchain image count
     uint32_t swapchainImageCount = static_cast<uint32_t>(m_vulkanContext.getSwapchainImages().size());
     m_renderFinishedSemaphores.assign(swapchainImageCount, VK_NULL_HANDLE);
 
@@ -203,7 +216,6 @@ core::Result<void> Renderer::createPipeline(const std::string& shaderDir)
 {
     VkDevice device = m_vulkanContext.getDevice();
 
-    // Load shader modules
     std::string vertPath = shaderDir + "/triangle.vert.spv";
     std::string fragPath = shaderDir + "/triangle.frag.spv";
 
@@ -222,7 +234,6 @@ core::Result<void> Renderer::createPipeline(const std::string& shaderDir)
     }
     VkShaderModule fragModule = fragResult.value();
 
-    // Shader stages
     VkPipelineShaderStageCreateInfo vertStageInfo{};
     vertStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     vertStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
@@ -237,34 +248,28 @@ core::Result<void> Renderer::createPipeline(const std::string& shaderDir)
 
     std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages = {vertStageInfo, fragStageInfo};
 
-    // Vertex input — empty (positions hardcoded in shader)
     VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 
-    // Input assembly
     VkPipelineInputAssemblyStateCreateInfo inputAssemblyInfo{};
     inputAssemblyInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
     inputAssemblyInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
     inputAssemblyInfo.primitiveRestartEnable = VK_FALSE;
 
-    // Dynamic state — viewport and scissor set at draw time
     std::array<VkDynamicState, 2> dynamicStates = {
         VK_DYNAMIC_STATE_VIEWPORT,
-        VK_DYNAMIC_STATE_SCISSOR
-    };
+        VK_DYNAMIC_STATE_SCISSOR};
 
     VkPipelineDynamicStateCreateInfo dynamicStateInfo{};
     dynamicStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
     dynamicStateInfo.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
     dynamicStateInfo.pDynamicStates = dynamicStates.data();
 
-    // Viewport state — count only, actual values set dynamically
     VkPipelineViewportStateCreateInfo viewportStateInfo{};
     viewportStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
     viewportStateInfo.viewportCount = 1;
     viewportStateInfo.scissorCount = 1;
 
-    // Rasterization
     VkPipelineRasterizationStateCreateInfo rasterizationInfo{};
     rasterizationInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
     rasterizationInfo.depthClampEnable = VK_FALSE;
@@ -275,13 +280,11 @@ core::Result<void> Renderer::createPipeline(const std::string& shaderDir)
     rasterizationInfo.depthBiasEnable = VK_FALSE;
     rasterizationInfo.lineWidth = 1.0f;
 
-    // Multisampling — no MSAA
     VkPipelineMultisampleStateCreateInfo multisampleInfo{};
     multisampleInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
     multisampleInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
     multisampleInfo.sampleShadingEnable = VK_FALSE;
 
-    // Color blend — no blending, write RGBA
     VkPipelineColorBlendAttachmentState colorBlendAttachment{};
     colorBlendAttachment.blendEnable = VK_FALSE;
     colorBlendAttachment.colorWriteMask =
@@ -294,7 +297,6 @@ core::Result<void> Renderer::createPipeline(const std::string& shaderDir)
     colorBlendInfo.attachmentCount = 1;
     colorBlendInfo.pAttachments = &colorBlendAttachment;
 
-    // Pipeline layout — empty (no push constants, no descriptor sets)
     VkPipelineLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 
@@ -307,7 +309,6 @@ core::Result<void> Renderer::createPipeline(const std::string& shaderDir)
         return std::unexpected(core::EngineError::VulkanError);
     }
 
-    // Dynamic rendering — chain VkPipelineRenderingCreateInfo in pNext
     VkFormat swapchainFormat = m_vulkanContext.getSwapchainFormat();
 
     VkPipelineRenderingCreateInfo renderingCreateInfo{};
@@ -315,7 +316,6 @@ core::Result<void> Renderer::createPipeline(const std::string& shaderDir)
     renderingCreateInfo.colorAttachmentCount = 1;
     renderingCreateInfo.pColorAttachmentFormats = &swapchainFormat;
 
-    // Graphics pipeline
     VkGraphicsPipelineCreateInfo pipelineInfo{};
     pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
     pipelineInfo.pNext = &renderingCreateInfo;
@@ -334,7 +334,6 @@ core::Result<void> Renderer::createPipeline(const std::string& shaderDir)
 
     result = vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_pipeline);
 
-    // Destroy shader modules immediately — pipeline has its own copy
     vkDestroyShaderModule(device, vertModule, nullptr);
     vkDestroyShaderModule(device, fragModule, nullptr);
 
@@ -345,6 +344,113 @@ core::Result<void> Renderer::createPipeline(const std::string& shaderDir)
     }
 
     VX_LOG_INFO("Graphics pipeline created (dynamic rendering, no VkRenderPass)");
+    return {};
+}
+
+core::Result<void> Renderer::createWireframePipeline(const std::string& shaderDir)
+{
+    VkDevice device = m_vulkanContext.getDevice();
+
+    std::string vertPath = shaderDir + "/triangle.vert.spv";
+    std::string fragPath = shaderDir + "/triangle.frag.spv";
+
+    auto vertResult = loadShaderModule(vertPath);
+    if (!vertResult.has_value()) return std::unexpected(vertResult.error());
+    VkShaderModule vertModule = vertResult.value();
+
+    auto fragResult = loadShaderModule(fragPath);
+    if (!fragResult.has_value())
+    {
+        vkDestroyShaderModule(device, vertModule, nullptr);
+        return std::unexpected(fragResult.error());
+    }
+    VkShaderModule fragModule = fragResult.value();
+
+    VkPipelineShaderStageCreateInfo vertStage{};
+    vertStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    vertStage.stage = VK_SHADER_STAGE_VERTEX_BIT;
+    vertStage.module = vertModule;
+    vertStage.pName = "main";
+
+    VkPipelineShaderStageCreateInfo fragStage{};
+    fragStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    fragStage.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+    fragStage.module = fragModule;
+    fragStage.pName = "main";
+
+    std::array<VkPipelineShaderStageCreateInfo, 2> stages = {vertStage, fragStage};
+
+    VkPipelineVertexInputStateCreateInfo vertexInput{};
+    vertexInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+
+    VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
+    inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+
+    std::array<VkDynamicState, 2> dynStates = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+    VkPipelineDynamicStateCreateInfo dynState{};
+    dynState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    dynState.dynamicStateCount = static_cast<uint32_t>(dynStates.size());
+    dynState.pDynamicStates = dynStates.data();
+
+    VkPipelineViewportStateCreateInfo viewportState{};
+    viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+    viewportState.viewportCount = 1;
+    viewportState.scissorCount = 1;
+
+    VkPipelineRasterizationStateCreateInfo raster{};
+    raster.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    raster.polygonMode = VK_POLYGON_MODE_LINE; // Wireframe
+    raster.cullMode = VK_CULL_MODE_NONE;
+    raster.frontFace = VK_FRONT_FACE_CLOCKWISE;
+    raster.lineWidth = 1.0f;
+
+    VkPipelineMultisampleStateCreateInfo msaa{};
+    msaa.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+    msaa.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+    VkPipelineColorBlendAttachmentState blend{};
+    blend.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+                           VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+
+    VkPipelineColorBlendStateCreateInfo blendState{};
+    blendState.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+    blendState.attachmentCount = 1;
+    blendState.pAttachments = &blend;
+
+    VkFormat swapFmt = m_vulkanContext.getSwapchainFormat();
+    VkPipelineRenderingCreateInfo rendering{};
+    rendering.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+    rendering.colorAttachmentCount = 1;
+    rendering.pColorAttachmentFormats = &swapFmt;
+
+    VkGraphicsPipelineCreateInfo ci{};
+    ci.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    ci.pNext = &rendering;
+    ci.stageCount = static_cast<uint32_t>(stages.size());
+    ci.pStages = stages.data();
+    ci.pVertexInputState = &vertexInput;
+    ci.pInputAssemblyState = &inputAssembly;
+    ci.pViewportState = &viewportState;
+    ci.pRasterizationState = &raster;
+    ci.pMultisampleState = &msaa;
+    ci.pColorBlendState = &blendState;
+    ci.pDynamicState = &dynState;
+    ci.layout = m_pipelineLayout;
+    ci.renderPass = VK_NULL_HANDLE;
+
+    VkResult result = vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &ci, nullptr, &m_wireframePipeline);
+
+    vkDestroyShaderModule(device, vertModule, nullptr);
+    vkDestroyShaderModule(device, fragModule, nullptr);
+
+    if (result != VK_SUCCESS)
+    {
+        VX_LOG_ERROR("Failed to create wireframe pipeline: {}", static_cast<int>(result));
+        return std::unexpected(core::EngineError::VulkanError);
+    }
+
+    VX_LOG_INFO("Wireframe pipeline created");
     return {};
 }
 
@@ -398,14 +504,91 @@ void Renderer::transitionImage(
     vkCmdPipelineBarrier2(cmd, &depInfo);
 }
 
-void Renderer::draw(game::Window& window)
+void Renderer::buildDebugOverlay(const Camera& camera, DebugOverlayState& overlay)
+{
+    if (!overlay.showOverlay)
+    {
+        return;
+    }
+
+    ImGui::SetNextWindowPos(ImVec2(10.0f, 10.0f), ImGuiCond_Always);
+    ImGui::SetNextWindowBgAlpha(0.5f);
+
+    constexpr ImGuiWindowFlags flags =
+        ImGuiWindowFlags_NoDecoration |
+        ImGuiWindowFlags_AlwaysAutoResize |
+        ImGuiWindowFlags_NoFocusOnAppearing |
+        ImGuiWindowFlags_NoNav;
+
+    if (ImGui::Begin("##DebugOverlay", nullptr, flags))
+    {
+        ImGui::Text("VoxelForge v0.1.0");
+        ImGui::Separator();
+
+        // FPS
+        ImGui::Text("FPS: %d (%.1f ms)", m_displayFps, m_displayFps > 0 ? 1000.0f / static_cast<float>(m_displayFps) : 0.0f);
+
+        // Camera position
+        const auto& pos = camera.getPosition();
+        ImGui::Text("Position: %.2f, %.2f, %.2f", pos.x, pos.y, pos.z);
+        ImGui::Text("Yaw: %.1f  Pitch: %.1f", camera.getYaw(), camera.getPitch());
+
+        // Facing direction
+        float yaw = camera.getYaw();
+        // Normalize yaw to [0, 360)
+        float normalizedYaw = yaw - 360.0f * std::floor(yaw / 360.0f);
+        const char* facing = "North (+Z)";
+        if (normalizedYaw >= 45.0f && normalizedYaw < 135.0f)
+            facing = "East (+X)";
+        else if (normalizedYaw >= 135.0f && normalizedYaw < 225.0f)
+            facing = "South (-Z)";
+        else if (normalizedYaw >= 225.0f && normalizedYaw < 315.0f)
+            facing = "West (-X)";
+        ImGui::Text("Facing: %s", facing);
+
+        ImGui::Separator();
+
+        // Memory (placeholder — Gigabuffer not wired yet)
+        ImGui::Text("Gigabuffer: N/A");
+
+        // Chunks (placeholder)
+        ImGui::Text("Chunks: No ChunkManager active");
+
+        ImGui::Separator();
+
+        // Toggle states
+        ImGui::Text("[F4] Wireframe: %s", overlay.wireframeMode ? "ON" : "OFF");
+        ImGui::Text("[F5] Chunk borders: %s", overlay.showChunkBorders ? "ON" : "OFF");
+
+        ImGui::Separator();
+
+        // Runtime tuning sliders
+        ImGui::SliderFloat("FOV", &overlay.fov, 50.0f, 110.0f, "%.0f");
+        ImGui::SliderFloat("Sensitivity", &overlay.sensitivity, 0.01f, 0.5f, "%.3f");
+    }
+    ImGui::End();
+}
+
+void Renderer::draw(game::Window& window, const Camera& camera, DebugOverlayState& overlay)
 {
     if (!m_isInitialized)
     {
         return;
     }
 
-    // Handle deferred swapchain recreation (from VK_SUBOPTIMAL_KHR)
+    // FPS tracking
+    double now = glfwGetTime();
+    m_fpsTimer += now - m_lastFrameTime;
+    m_lastFrameTime = now;
+    ++m_fpsCount;
+    if (m_fpsTimer >= 1.0)
+    {
+        m_displayFps = m_fpsCount;
+        m_fpsCount = 0;
+        m_fpsTimer -= 1.0;
+    }
+
+    // Handle deferred swapchain recreation
     if (m_framebufferResized || window.wasResized())
     {
         m_framebufferResized = false;
@@ -424,13 +607,10 @@ void Renderer::draw(game::Window& window)
     VkDevice device = m_vulkanContext.getDevice();
     auto& frame = m_frames[m_frameIndex];
 
-    // CPU-GPU sync: wait for this frame's previous work to complete
     vkWaitForFences(device, 1, &frame.renderFence, VK_TRUE, UINT64_MAX);
 
-    // Advance staging buffer to this frame's ring-buffer region
     m_stagingBuffer->beginFrame(m_frameIndex);
 
-    // Acquire swapchain image
     uint32_t imageIndex = 0;
     VkResult acquireResult = vkAcquireNextImageKHR(
         device,
@@ -460,10 +640,8 @@ void Renderer::draw(game::Window& window)
         return;
     }
 
-    // Reset fence only after successful acquire — avoids deadlock if acquire triggers swapchain recreation
     vkResetFences(device, 1, &frame.renderFence);
 
-    // Reset and begin command buffer
     VkCommandBuffer cmd = frame.commandBuffer;
     vkResetCommandBuffer(cmd, 0);
 
@@ -472,11 +650,9 @@ void Renderer::draw(game::Window& window)
     beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     vkBeginCommandBuffer(cmd, &beginInfo);
 
-    // Transition: UNDEFINED -> COLOR_ATTACHMENT_OPTIMAL
     VkImage swapchainImage = m_vulkanContext.getSwapchainImages()[imageIndex];
     transitionImage(cmd, swapchainImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
-    // Begin dynamic rendering
     VkExtent2D extent = m_vulkanContext.getSwapchainExtent();
 
     VkRenderingAttachmentInfo colorAttachment{};
@@ -497,7 +673,6 @@ void Renderer::draw(game::Window& window)
 
     vkCmdBeginRendering(cmd, &renderingInfo);
 
-    // Set dynamic viewport and scissor
     VkViewport viewport{};
     viewport.x = 0.0f;
     viewport.y = 0.0f;
@@ -512,32 +687,34 @@ void Renderer::draw(game::Window& window)
     scissor.extent = extent;
     vkCmdSetScissor(cmd, 0, 1, &scissor);
 
-    // Bind pipeline and draw the triangle
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
+    // Select fill or wireframe pipeline
+    bool useWireframe = overlay.wireframeMode && m_wireframePipeline != VK_NULL_HANDLE;
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, useWireframe ? m_wireframePipeline : m_pipeline);
     vkCmdDraw(cmd, 3, 1, 0, 0);
+
+    // ImGui — build UI and render inside the dynamic rendering pass
+    m_imguiBackend->beginFrame();
+    buildDebugOverlay(camera, overlay);
+    m_imguiBackend->render(cmd);
 
     vkCmdEndRendering(cmd);
 
-    // Transition: COLOR_ATTACHMENT_OPTIMAL -> PRESENT_SRC_KHR
     transitionImage(cmd, swapchainImage, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
     vkEndCommandBuffer(cmd);
 
-    // Flush any pending staging buffer transfers before graphics submission
-    // (no-op if no uploads were enqueued this frame)
+    // Flush staging transfers
     auto flushResult = m_stagingBuffer->flushTransfers(VK_NULL_HANDLE);
     if (!flushResult.has_value())
     {
         VX_LOG_ERROR("Failed to flush staging transfers");
     }
 
-    // Submit via vkQueueSubmit2 (sync2)
+    // Submit
     VkCommandBufferSubmitInfo cmdSubmitInfo{};
     cmdSubmitInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
     cmdSubmitInfo.commandBuffer = cmd;
 
-    // Build wait semaphore list — always wait on imageAvailable,
-    // optionally wait on transfer semaphore if transfers were submitted
     std::array<VkSemaphoreSubmitInfo, 2> waitInfos{};
     uint32_t waitCount = 0;
 
@@ -569,10 +746,7 @@ void Renderer::draw(game::Window& window)
     submitInfo.pSignalSemaphoreInfos = &signalInfo;
 
     VkResult submitResult = vkQueueSubmit2(
-        m_vulkanContext.getGraphicsQueue(),
-        1,
-        &submitInfo,
-        frame.renderFence);
+        m_vulkanContext.getGraphicsQueue(), 1, &submitInfo, frame.renderFence);
 
     if (submitResult != VK_SUCCESS)
     {
@@ -601,7 +775,6 @@ void Renderer::draw(game::Window& window)
         VX_LOG_ERROR("Failed to present swapchain image: {}", static_cast<int>(presentResult));
     }
 
-    // Advance frame index
     m_frameIndex = (m_frameIndex + 1) % FRAMES_IN_FLIGHT;
 }
 
@@ -615,10 +788,17 @@ void Renderer::shutdown()
     VkDevice device = m_vulkanContext.getDevice();
     vkDeviceWaitIdle(device);
 
-    // Destroy staging buffer first (before VulkanContext resources)
+    // ImGui must be destroyed before other Vulkan resources
+    m_imguiBackend.reset();
+
     m_stagingBuffer.reset();
 
-    // Destroy in reverse creation order
+    if (m_wireframePipeline != VK_NULL_HANDLE)
+    {
+        vkDestroyPipeline(device, m_wireframePipeline, nullptr);
+        m_wireframePipeline = VK_NULL_HANDLE;
+    }
+
     if (m_pipeline != VK_NULL_HANDLE)
     {
         vkDestroyPipeline(device, m_pipeline, nullptr);
@@ -631,7 +811,6 @@ void Renderer::shutdown()
         m_pipelineLayout = VK_NULL_HANDLE;
     }
 
-    // Destroy per-swapchain-image renderFinished semaphores
     for (auto& sem : m_renderFinishedSemaphores)
     {
         if (sem != VK_NULL_HANDLE)

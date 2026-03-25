@@ -53,6 +53,9 @@ public:
     /// Returns true if the framebuffer was resized since last checked, then resets the flag.
     bool wasResized();
 
+    /// Sets the resize flag (called from external framebuffer callbacks).
+    void setResized() { m_framebufferResized = true; }
+
 private:
     explicit Window(GLFWwindow* window);
 

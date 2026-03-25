@@ -10,6 +10,7 @@ add_executable(VoxelTests
     math/TestCoordUtils.cpp
     renderer/TestGigabuffer.cpp
     renderer/TestStagingBuffer.cpp
+    renderer/TestCamera.cpp
 )
 
 target_link_libraries(VoxelTests
