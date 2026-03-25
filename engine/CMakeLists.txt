@@ -90,15 +90,20 @@ target_precompile_headers(VoxelEngine PRIVATE
 )
 
 # ImGui backends: locate source files from vcpkg buildtrees.
-# We compile them ourselves (via ImGuiImpl.cpp) to ensure VK_NO_PROTOTYPES is set.
+# We compile them ourselves (via ImGuiImpl.cpp) to ensure VK_NO_PROTOTYPES is set,
+# because vcpkg's pre-compiled backends don't have this define.
 file(GLOB _imgui_backend_dirs
+    "${CMAKE_BINARY_DIR}/vcpkg_installed/vcpkg/blds/imgui/src/*/backends"
     "${VCPKG_INSTALLED_DIR}/vcpkg/blds/imgui/src/*/backends"
 )
 if(_imgui_backend_dirs)
     list(GET _imgui_backend_dirs 0 IMGUI_BACKENDS_DIR)
+    message(STATUS "ImGui backends found: ${IMGUI_BACKENDS_DIR}")
 else()
-    message(FATAL_ERROR "Could not find imgui backends in vcpkg buildtrees. "
-        "Run cmake configure with vcpkg manifest mode enabled.")
+    message(FATAL_ERROR
+        "Could not find imgui backends in vcpkg buildtrees.\n"
+        "Searched: ${CMAKE_BINARY_DIR}/vcpkg_installed/vcpkg/blds/imgui/src/*/backends\n"
+        "Ensure vcpkg manifest mode is enabled and imgui is installed.")
 endif()
 
 # ImGuiImpl.cpp #includes backend .cpp files that pull in <vulkan/vulkan.h> directly,
@@ -108,7 +113,6 @@ set_source_files_properties(src/renderer/ImGuiImpl.cpp PROPERTIES
     SKIP_PRECOMPILE_HEADERS ON
     INCLUDE_DIRECTORIES "${IMGUI_BACKENDS_DIR}"
 )
-# Suppress warnings separately (INCLUDE_DIRECTORIES and COMPILE_FLAGS can coexist)
 if(MSVC)
     set_property(SOURCE src/renderer/ImGuiImpl.cpp APPEND_STRING PROPERTY COMPILE_FLAGS " /w")
 else()

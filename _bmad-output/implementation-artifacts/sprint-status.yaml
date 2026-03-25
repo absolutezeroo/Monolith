@@ -5,7 +5,7 @@
 project: VoxelForge
 methodology: BMAD v6 + Game Dev Studio
 created: 2026-03-24
-last_updated: 2026-03-25  # Story 2.5 done (code review passed)
+last_updated: 2026-03-25  # Story 3.1 ready-for-dev
 
 # Status values: backlog | ready | in-progress | review | done | blocked
 
@@ -82,12 +82,12 @@ epics:
   - id: 3
     name: "Voxel World Core (Chunks + Registry)"
     priority: P0
-    status: backlog
+    status: in-progress
     dependencies: [1]
     stories:
       - id: "3.1"
         title: "ChunkSection Flat Array Storage"
-        status: backlog
+        status: ready-for-dev
         assigned_to: null
       - id: "3.2"
         title: "ChunkColumn (Vertical Stack of Sections)"
@@ -303,8 +303,8 @@ summary:
     P1: 14
     P2: 4
   by_status:
-    backlog: 41
-    ready-for-dev: 3
+    backlog: 40
+    ready-for-dev: 4
     in_progress: 0
     review: 0
     done: 10
