@@ -41,6 +41,14 @@ public:
     [[nodiscard]] const std::vector<VkImage>& getSwapchainImages() const { return m_swapchainImages; }
     [[nodiscard]] const std::vector<VkImageView>& getSwapchainImageViews() const { return m_swapchainImageViews; }
 
+    /**
+     * @brief Rebuilds the swapchain after a resize or out-of-date event.
+     *
+     * Waits for GPU idle, destroys old image views and swapchain, and creates new ones.
+     * Handles minimized windows by blocking until the framebuffer is non-zero.
+     */
+    core::Result<void> recreateSwapchain(game::Window& window);
+
 private:
     VulkanContext() = default;
 

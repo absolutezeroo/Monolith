@@ -261,6 +261,75 @@ core::Result<std::unique_ptr<VulkanContext>> VulkanContext::create(game::Window&
     return ctx;
 }
 
+core::Result<void> VulkanContext::recreateSwapchain(game::Window& window)
+{
+    vkDeviceWaitIdle(m_device);
+
+    // Handle minimized window: wait until framebuffer is non-zero
+    int fbWidth = 0;
+    int fbHeight = 0;
+    window.getFramebufferSize(fbWidth, fbHeight);
+    while (fbWidth == 0 || fbHeight == 0)
+    {
+        glfwWaitEvents();
+        window.getFramebufferSize(fbWidth, fbHeight);
+    }
+
+    // Destroy old image views
+    for (auto view : m_swapchainImageViews)
+    {
+        vkDestroyImageView(m_device, view, nullptr);
+    }
+    m_swapchainImageViews.clear();
+
+    // Rebuild swapchain via vk-bootstrap, passing old swapchain for reuse
+    vkb::SwapchainBuilder builder{m_physicalDevice, m_device, m_surface};
+    auto result = builder
+        .set_old_swapchain(m_swapchain)
+        .set_desired_format({VK_FORMAT_B8G8R8A8_SRGB, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR})
+        .set_desired_present_mode(VK_PRESENT_MODE_FIFO_KHR)
+        .set_desired_extent(static_cast<uint32_t>(fbWidth), static_cast<uint32_t>(fbHeight))
+        .build();
+
+    // Destroy old swapchain AFTER building new one (builder may reuse internal resources)
+    vkDestroySwapchainKHR(m_device, m_swapchain, nullptr);
+
+    if (!result)
+    {
+        VX_LOG_ERROR("Failed to recreate swapchain: {}", result.error().message());
+        m_swapchain = VK_NULL_HANDLE;
+        return std::unexpected(core::EngineError::VulkanError);
+    }
+
+    vkb::Swapchain vkbSwapchain = result.value();
+    m_swapchain = vkbSwapchain.swapchain;
+    m_swapchainFormat = vkbSwapchain.image_format;
+    m_swapchainExtent = vkbSwapchain.extent;
+
+    auto swapImages = vkbSwapchain.get_images();
+    if (!swapImages)
+    {
+        VX_LOG_ERROR("Failed to get new swapchain images: {}", swapImages.error().message());
+        return std::unexpected(core::EngineError::VulkanError);
+    }
+    m_swapchainImages = swapImages.value();
+
+    auto swapImageViews = vkbSwapchain.get_image_views();
+    if (!swapImageViews)
+    {
+        VX_LOG_ERROR("Failed to get new swapchain image views: {}", swapImageViews.error().message());
+        return std::unexpected(core::EngineError::VulkanError);
+    }
+    m_swapchainImageViews = swapImageViews.value();
+
+    VX_LOG_INFO("Swapchain recreated — {}x{}, {} images",
+        m_swapchainExtent.width,
+        m_swapchainExtent.height,
+        m_swapchainImages.size());
+
+    return {};
+}
+
 VulkanContext::~VulkanContext()
 {
     if (m_device != VK_NULL_HANDLE)

@@ -7,6 +7,7 @@ add_library(VoxelEngine STATIC
     src/game/GameLoop.cpp
     src/renderer/VmaImpl.cpp
     src/renderer/VulkanContext.cpp
+    src/renderer/Renderer.cpp
 )
 
 target_include_directories(VoxelEngine

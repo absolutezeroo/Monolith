@@ -1,6 +1,7 @@
+#include "GameApp.h"
+
 #include "voxel/core/Assert.h"
 #include "voxel/core/Log.h"
-#include "voxel/game/GameLoop.h"
 #include "voxel/game/Window.h"
 #include "voxel/renderer/VulkanContext.h"
 
@@ -22,10 +23,19 @@ int main()
         VX_FATAL("Failed to initialize Vulkan");
     }
 
-    voxel::game::GameLoop loop(window);
-    loop.run();
+    auto& vulkanContext = *vulkanResult.value();
 
-    // Destruction order: VulkanContext → Window → Log
+    GameApp app(window, vulkanContext);
+
+    auto initResult = app.init(VX_SHADER_DIR);
+    if (!initResult.has_value())
+    {
+        VX_FATAL("Failed to initialize renderer");
+    }
+
+    app.run();
+
+    // Destruction order: GameApp (Renderer) → VulkanContext → Window → Log
     vulkanResult.value().reset();
     windowResult.value().reset();
 

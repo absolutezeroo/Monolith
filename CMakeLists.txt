@@ -17,6 +17,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # CMake modules
 include(cmake/CompilerWarnings.cmake)
 include(cmake/Sanitizers.cmake)
+include(cmake/CompileShaders.cmake)
 
 # Enable testing
 enable_testing()
@@ -25,3 +26,16 @@ enable_testing()
 add_subdirectory(engine)
 add_subdirectory(game)
 add_subdirectory(tests)
+
+# Shader compilation — output .spv to build tree; Renderer resolves path at runtime
+compile_shaders(Shaders
+    "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders"
+    "${CMAKE_BINARY_DIR}/shaders"
+)
+
+add_dependencies(VoxelGame Shaders)
+
+# Pass shader output directory to C++ so Renderer can find .spv files
+target_compile_definitions(VoxelGame PRIVATE
+    VX_SHADER_DIR="${CMAKE_BINARY_DIR}/shaders"
+)

@@ -2,6 +2,7 @@
 
 add_executable(VoxelGame
     src/main.cpp
+    src/GameApp.cpp
 )
 
 target_link_libraries(VoxelGame
