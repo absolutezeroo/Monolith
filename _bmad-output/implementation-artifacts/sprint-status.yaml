@@ -126,7 +126,7 @@ epics:
         assigned_to: dev-agent
       - id: "3.7"
         title: "Chunk Serialization (Disk I/O)"
-        status: review
+        status: done
         assigned_to: dev-agent
 
   - id: 4

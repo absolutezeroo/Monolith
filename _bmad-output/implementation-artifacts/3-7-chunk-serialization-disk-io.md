@@ -1,6 +1,6 @@
 # Story 3.6: Chunk Serialization (Disk I/O)
 
-Status: review
+Status: done
 
 ## Story
 
@@ -365,6 +365,7 @@ Claude Opus 4.6
 ### Change Log
 
 - 2026-03-26: Initial implementation — all tasks complete, all tests passing.
+- 2026-03-26: Code review (3 fixes): replaced dead memcpy + O(4096) deserialization loop with direct copy assignment (M1), rewrote RegionFile header I/O to explicit little-endian for cross-platform portability (M2), added 4MB sanity cap on LZ4 uncompressed size to guard against corrupt files (L1).
 
 ### File List
 
