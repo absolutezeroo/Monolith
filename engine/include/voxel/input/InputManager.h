@@ -39,6 +39,9 @@ class InputManager
     [[nodiscard]] bool wasMouseButtonReleased(int button) const;
     [[nodiscard]] float getMouseButtonHoldDuration(int button) const;
 
+    // --- Scroll ---
+    [[nodiscard]] float getScrollDelta() const;
+
     // --- Cursor capture ---
     void setCursorCaptured(bool captured);
     [[nodiscard]] bool isCursorCaptured() const;
@@ -51,6 +54,7 @@ class InputManager
     static void keyCallback(GLFWwindow* w, int key, int scancode, int action, int mods);
     static void cursorPosCallback(GLFWwindow* w, double xpos, double ypos);
     static void mouseButtonCallback(GLFWwindow* w, int button, int action, int mods);
+    static void scrollCallback(GLFWwindow* w, double xoffset, double yoffset);
 
     GLFWwindow* m_window = nullptr;
 
@@ -71,6 +75,7 @@ class InputManager
     // Mouse cursor
     float m_mouseDeltaX = 0.0f;
     float m_mouseDeltaY = 0.0f;
+    float m_scrollDelta = 0.0f;
     double m_lastCursorX = 0.0;
     double m_lastCursorY = 0.0;
     bool m_cursorCaptured = true;

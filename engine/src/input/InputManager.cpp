@@ -13,6 +13,7 @@ InputManager::InputManager(GLFWwindow* window) : m_window(window)
     glfwSetKeyCallback(window, &InputManager::keyCallback);
     glfwSetCursorPosCallback(window, &InputManager::cursorPosCallback);
     glfwSetMouseButtonCallback(window, &InputManager::mouseButtonCallback);
+    glfwSetScrollCallback(window, &InputManager::scrollCallback);
 }
 
 void InputManager::update(float dt)
@@ -43,9 +44,10 @@ void InputManager::update(float dt)
         }
     }
 
-    // Clear mouse delta (accumulated from callbacks since last update)
+    // Clear mouse delta and scroll delta (accumulated from callbacks since last update)
     m_mouseDeltaX = 0.0f;
     m_mouseDeltaY = 0.0f;
+    m_scrollDelta = 0.0f;
 }
 
 // --- Key queries ---
@@ -83,6 +85,13 @@ bool InputManager::wasKeyDoubleTapped(int key) const
     if (key < 0 || key >= MAX_KEYS)
         return false;
     return m_keyDoubleTapped[static_cast<size_t>(key)];
+}
+
+// --- Scroll ---
+
+float InputManager::getScrollDelta() const
+{
+    return m_scrollDelta;
 }
 
 // --- Mouse button queries ---
@@ -217,6 +226,15 @@ void InputManager::mouseButtonCallback(GLFWwindow* w, int button, int action, in
         mgr->m_mouseReleased[idx] = true;
         mgr->m_mouseHoldTime[idx] = 0.0f;
     }
+}
+
+void InputManager::scrollCallback(GLFWwindow* w, double /*xoffset*/, double yoffset)
+{
+    auto* mgr = static_cast<InputManager*>(glfwGetWindowUserPointer(w));
+    if (!mgr)
+        return;
+
+    mgr->m_scrollDelta += static_cast<float>(yoffset);
 }
 
 } // namespace voxel::input

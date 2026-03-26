@@ -45,7 +45,7 @@ core::Result<void> Renderer::init(const std::string& shaderDir, game::Window& wi
     std::string fragPath = shaderDir + "/triangle.frag.spv";
 
     // Fill pipeline (required)
-    auto fillResult = buildPipeline({VK_POLYGON_MODE_FILL, vertPath, fragPath});
+    auto fillResult = buildPipeline({VK_POLYGON_MODE_FILL, true, true, vertPath, fragPath});
     if (!fillResult.has_value())
     {
         return std::unexpected(fillResult.error());
@@ -53,7 +53,7 @@ core::Result<void> Renderer::init(const std::string& shaderDir, game::Window& wi
     m_pipeline = fillResult.value();
 
     // Wireframe pipeline (optional)
-    auto wireResult = buildPipeline({VK_POLYGON_MODE_LINE, vertPath, fragPath});
+    auto wireResult = buildPipeline({VK_POLYGON_MODE_LINE, true, true, vertPath, fragPath});
     if (!wireResult.has_value())
     {
         VX_LOG_WARN("Wireframe pipeline creation failed — wireframe mode disabled");
@@ -63,6 +63,13 @@ core::Result<void> Renderer::init(const std::string& shaderDir, game::Window& wi
         m_wireframePipeline = wireResult.value();
     }
 
+    // Create depth buffer and other extent-dependent resources
+    auto swapResResult = createSwapchainResources();
+    if (!swapResResult.has_value())
+    {
+        return std::unexpected(swapResResult.error());
+    }
+
     // Create staging buffer for CPU→GPU uploads
     auto stagingResult = StagingBuffer::create(m_vulkanContext);
     if (!stagingResult.has_value())
@@ -70,6 +77,14 @@ core::Result<void> Renderer::init(const std::string& shaderDir, game::Window& wi
         return std::unexpected(stagingResult.error());
     }
     m_stagingBuffer = std::move(stagingResult.value());
+
+    // Create Gigabuffer for GPU mesh storage
+    auto gigaResult = Gigabuffer::create(m_vulkanContext);
+    if (!gigaResult.has_value())
+    {
+        return std::unexpected(gigaResult.error());
+    }
+    m_gigabuffer = std::move(gigaResult.value());
 
     // Initialize ImGui
     auto imguiResult = ImGuiBackend::create(m_vulkanContext, window.getHandle());
@@ -198,6 +213,83 @@ void Renderer::recreateRenderFinishedSemaphores()
     VX_LOG_DEBUG("Recreated {} render-finished semaphores for new swapchain", swapchainImageCount);
 }
 
+core::Result<void> Renderer::createSwapchainResources()
+{
+    VkExtent2D extent = m_vulkanContext.getSwapchainExtent();
+
+    // Create depth image (D32_SFLOAT, device-local)
+    VkImageCreateInfo depthImageInfo{};
+    depthImageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    depthImageInfo.imageType = VK_IMAGE_TYPE_2D;
+    depthImageInfo.format = VK_FORMAT_D32_SFLOAT;
+    depthImageInfo.extent = {extent.width, extent.height, 1};
+    depthImageInfo.mipLevels = 1;
+    depthImageInfo.arrayLayers = 1;
+    depthImageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    depthImageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+    depthImageInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+
+    VmaAllocationCreateInfo depthAllocInfo{};
+    depthAllocInfo.usage = VMA_MEMORY_USAGE_AUTO;
+    depthAllocInfo.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+
+    VkResult result = vmaCreateImage(
+        m_vulkanContext.getAllocator(),
+        &depthImageInfo,
+        &depthAllocInfo,
+        &m_swapchainResources.depthImage,
+        &m_swapchainResources.depthAllocation,
+        nullptr);
+    if (result != VK_SUCCESS)
+    {
+        VX_LOG_ERROR("Failed to create depth image: {}", static_cast<int>(result));
+        return std::unexpected(core::EngineError::vulkan(static_cast<int32_t>(result), "Failed to create depth image"));
+    }
+
+    // Create depth image view
+    VkImageViewCreateInfo depthViewInfo{};
+    depthViewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    depthViewInfo.image = m_swapchainResources.depthImage;
+    depthViewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    depthViewInfo.format = VK_FORMAT_D32_SFLOAT;
+    depthViewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    depthViewInfo.subresourceRange.baseMipLevel = 0;
+    depthViewInfo.subresourceRange.levelCount = 1;
+    depthViewInfo.subresourceRange.baseArrayLayer = 0;
+    depthViewInfo.subresourceRange.layerCount = 1;
+
+    result = vkCreateImageView(
+        m_vulkanContext.getDevice(), &depthViewInfo, nullptr, &m_swapchainResources.depthImageView);
+    if (result != VK_SUCCESS)
+    {
+        VX_LOG_ERROR("Failed to create depth image view: {}", static_cast<int>(result));
+        vmaDestroyImage(
+            m_vulkanContext.getAllocator(), m_swapchainResources.depthImage, m_swapchainResources.depthAllocation);
+        m_swapchainResources = {};
+        return std::unexpected(
+            core::EngineError::vulkan(static_cast<int32_t>(result), "Failed to create depth image view"));
+    }
+
+    VX_LOG_DEBUG("Created depth buffer {}x{} (D32_SFLOAT)", extent.width, extent.height);
+    return {};
+}
+
+void Renderer::destroySwapchainResources()
+{
+    VkDevice device = m_vulkanContext.getDevice();
+
+    if (m_swapchainResources.depthImageView != VK_NULL_HANDLE)
+    {
+        vkDestroyImageView(device, m_swapchainResources.depthImageView, nullptr);
+    }
+    if (m_swapchainResources.depthImage != VK_NULL_HANDLE)
+    {
+        vmaDestroyImage(
+            m_vulkanContext.getAllocator(), m_swapchainResources.depthImage, m_swapchainResources.depthAllocation);
+    }
+    m_swapchainResources = {};
+}
+
 core::Result<VkShaderModule> Renderer::loadShaderModule(const std::string& path)
 {
     std::ifstream file(path, std::ios::ate | std::ios::binary);
@@ -307,11 +399,20 @@ core::Result<VkPipeline> Renderer::buildPipeline(const PipelineConfig& config)
     blendState.attachmentCount = 1;
     blendState.pAttachments = &blend;
 
+    VkPipelineDepthStencilStateCreateInfo depthStencil{};
+    depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depthStencil.depthTestEnable = config.depthTestEnable ? VK_TRUE : VK_FALSE;
+    depthStencil.depthWriteEnable = config.depthWriteEnable ? VK_TRUE : VK_FALSE;
+    depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
+    depthStencil.depthBoundsTestEnable = VK_FALSE;
+    depthStencil.stencilTestEnable = VK_FALSE;
+
     VkFormat swapFmt = m_vulkanContext.getSwapchainFormat();
     VkPipelineRenderingCreateInfo rendering{};
     rendering.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
     rendering.colorAttachmentCount = 1;
     rendering.pColorAttachmentFormats = &swapFmt;
+    rendering.depthAttachmentFormat = VK_FORMAT_D32_SFLOAT;
 
     VkGraphicsPipelineCreateInfo ci{};
     ci.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -323,6 +424,7 @@ core::Result<VkPipeline> Renderer::buildPipeline(const PipelineConfig& config)
     ci.pViewportState = &viewportState;
     ci.pRasterizationState = &raster;
     ci.pMultisampleState = &msaa;
+    ci.pDepthStencilState = &depthStencil;
     ci.pColorBlendState = &blendState;
     ci.pDynamicState = &dynState;
     ci.layout = m_pipelineLayout;
@@ -357,7 +459,6 @@ void Renderer::transitionImage(VkCommandBuffer cmd, VkImage image, VkImageLayout
     barrier.newLayout = newLayout;
     barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     barrier.subresourceRange.baseMipLevel = 0;
     barrier.subresourceRange.levelCount = 1;
     barrier.subresourceRange.baseArrayLayer = 0;
@@ -365,6 +466,7 @@ void Renderer::transitionImage(VkCommandBuffer cmd, VkImage image, VkImageLayout
 
     if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
     {
+        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         barrier.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
         barrier.srcAccessMask = VK_ACCESS_2_NONE;
         barrier.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
@@ -372,10 +474,20 @@ void Renderer::transitionImage(VkCommandBuffer cmd, VkImage image, VkImageLayout
     }
     else if (oldLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR)
     {
+        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         barrier.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
         barrier.srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
         barrier.dstStageMask = VK_PIPELINE_STAGE_2_NONE;
         barrier.dstAccessMask = VK_ACCESS_2_NONE;
+    }
+    else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL)
+    {
+        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+        barrier.srcStageMask = VK_PIPELINE_STAGE_2_NONE;
+        barrier.srcAccessMask = VK_ACCESS_2_NONE;
+        barrier.dstStageMask =
+            VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
+        barrier.dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
     }
     else
     {
@@ -401,26 +513,32 @@ bool Renderer::beginFrame(game::Window& window, const DebugOverlayState& overlay
         return false;
     }
 
-    // Handle deferred swapchain recreation
-    if (m_framebufferResized || window.wasResized())
-    {
-        m_framebufferResized = false;
-        auto recreateResult = m_vulkanContext.recreateSwapchain(window);
-        if (!recreateResult.has_value())
-        {
-            VX_LOG_ERROR("Failed to recreate swapchain");
-        }
-        else
-        {
-            recreateRenderFinishedSemaphores();
-        }
-        return false;
-    }
-
     VkDevice device = m_vulkanContext.getDevice();
     auto& frame = m_frames[m_frameIndex];
 
     vkWaitForFences(device, 1, &frame.renderFence, VK_TRUE, UINT64_MAX);
+
+    // Handle deferred swapchain recreation (flag set by present or window resize)
+    if (m_needsSwapchainRecreate || window.wasResized())
+    {
+        vkDeviceWaitIdle(device);
+        auto recreateResult = m_vulkanContext.recreateSwapchain(window);
+        if (!recreateResult.has_value())
+        {
+            VX_LOG_ERROR("Failed to recreate swapchain");
+            m_needsSwapchainRecreate = false;
+            return false;
+        }
+        recreateRenderFinishedSemaphores();
+        destroySwapchainResources();
+        auto resResult = createSwapchainResources();
+        if (!resResult.has_value())
+        {
+            VX_LOG_ERROR("Failed to recreate depth resources after swapchain resize");
+        }
+        m_needsSwapchainRecreate = false;
+        return false; // skip this frame
+    }
 
     m_stagingBuffer->beginFrame(m_frameIndex);
 
@@ -435,19 +553,15 @@ bool Renderer::beginFrame(game::Window& window, const DebugOverlayState& overlay
 
     if (acquireResult == VK_ERROR_OUT_OF_DATE_KHR)
     {
-        auto recreateResult = m_vulkanContext.recreateSwapchain(window);
-        if (!recreateResult.has_value())
-        {
-            VX_LOG_ERROR("Failed to recreate swapchain after out-of-date acquire");
-        }
-        else
-        {
-            recreateRenderFinishedSemaphores();
-        }
+        m_needsSwapchainRecreate = true;
         return false;
     }
 
-    if (acquireResult != VK_SUCCESS && acquireResult != VK_SUBOPTIMAL_KHR)
+    if (acquireResult == VK_SUBOPTIMAL_KHR)
+    {
+        VX_LOG_DEBUG("Swapchain suboptimal — continuing");
+    }
+    else if (acquireResult != VK_SUCCESS)
     {
         VX_LOG_ERROR("Failed to acquire swapchain image: {}", static_cast<int>(acquireResult));
         return false;
@@ -466,6 +580,13 @@ bool Renderer::beginFrame(game::Window& window, const DebugOverlayState& overlay
     VkImage swapchainImage = m_vulkanContext.getSwapchainImages()[m_currentImageIndex];
     transitionImage(cmd, swapchainImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
+    // Transition depth image to depth attachment layout
+    transitionImage(
+        cmd,
+        m_swapchainResources.depthImage,
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+
     VkExtent2D extent = m_vulkanContext.getSwapchainExtent();
 
     VkRenderingAttachmentInfo colorAttachment{};
@@ -476,6 +597,14 @@ bool Renderer::beginFrame(game::Window& window, const DebugOverlayState& overlay
     colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     colorAttachment.clearValue.color = {{0.1f, 0.1f, 0.1f, 1.0f}};
 
+    VkRenderingAttachmentInfo depthAttachment{};
+    depthAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+    depthAttachment.imageView = m_swapchainResources.depthImageView;
+    depthAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
+    depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    depthAttachment.clearValue.depthStencil = {1.0f, 0};
+
     VkRenderingInfo renderingInfo{};
     renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
     renderingInfo.renderArea.offset = {0, 0};
@@ -483,6 +612,7 @@ bool Renderer::beginFrame(game::Window& window, const DebugOverlayState& overlay
     renderingInfo.layerCount = 1;
     renderingInfo.colorAttachmentCount = 1;
     renderingInfo.pColorAttachments = &colorAttachment;
+    renderingInfo.pDepthAttachment = &depthAttachment;
 
     vkCmdBeginRendering(cmd, &renderingInfo);
 
@@ -534,8 +664,8 @@ void Renderer::endFrame()
 
     vkEndCommandBuffer(cmd);
 
-    // Flush staging transfers
-    auto flushResult = m_stagingBuffer->flushTransfers(VK_NULL_HANDLE);
+    // Flush staging transfers to Gigabuffer
+    auto flushResult = m_stagingBuffer->flushTransfers(m_gigabuffer->getBuffer());
     if (!flushResult.has_value())
     {
         VX_LOG_ERROR("Failed to flush staging transfers");
@@ -596,9 +726,13 @@ void Renderer::endFrame()
 
     VkResult presentResult = vkQueuePresentKHR(m_vulkanContext.getGraphicsQueue(), &presentInfo);
 
-    if (presentResult == VK_ERROR_OUT_OF_DATE_KHR || presentResult == VK_SUBOPTIMAL_KHR)
+    if (presentResult == VK_ERROR_OUT_OF_DATE_KHR)
     {
-        m_framebufferResized = true;
+        m_needsSwapchainRecreate = true;
+    }
+    else if (presentResult == VK_SUBOPTIMAL_KHR)
+    {
+        VX_LOG_DEBUG("Swapchain suboptimal on present — continuing");
     }
     else if (presentResult != VK_SUCCESS)
     {
@@ -622,6 +756,10 @@ void Renderer::shutdown()
     m_imguiBackend.reset();
 
     m_stagingBuffer.reset();
+
+    m_gigabuffer.reset();
+
+    destroySwapchainResources();
 
     if (m_wireframePipeline != VK_NULL_HANDLE)
     {

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "voxel/core/ConfigManager.h"
 #include "voxel/core/Result.h"
 #include "voxel/game/GameLoop.h"
 #include "voxel/input/InputManager.h"
@@ -25,6 +26,7 @@ class GameApp : public voxel::game::GameLoop
 {
   public:
     GameApp(voxel::game::Window& window, voxel::renderer::VulkanContext& vulkanContext);
+    ~GameApp();
 
     voxel::core::Result<void> init(const std::string& shaderDir);
 
@@ -35,13 +37,24 @@ class GameApp : public voxel::game::GameLoop
   private:
     void handleInputToggles();
     void buildDebugOverlay();
+    void drawCrosshair();
+    void drawHotbar();
+    void toggleFullscreen();
+    void captureScreenshot();
 
     voxel::game::Window& m_window;
     voxel::renderer::Renderer m_renderer;
     voxel::renderer::Camera m_camera;
     voxel::renderer::DebugOverlayState m_overlayState;
+    voxel::core::ConfigManager m_config;
 
     std::unique_ptr<voxel::input::InputManager> m_input;
+
+    // HUD state
+    int m_hotbarSlot = 0;
+
+    // Config file path
+    std::string m_configPath;
 
     // FPS tracking
     double m_lastFrameTime = -1.0;

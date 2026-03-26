@@ -5,7 +5,7 @@
 project: VoxelForge
 methodology: BMAD v6 + Game Dev Studio
 created: 2026-03-24
-last_updated: 2026-03-26  # Story 3.0a code review complete → done
+last_updated: 2026-03-26  # Story 3.0b dev-complete, ready for review
 
 # Status values: backlog | ready | in-progress | review | done | blocked
 
@@ -100,8 +100,8 @@ epics:
         notes: "6 parts: InputManager, Pipeline dedup, Overlay split, Config files, EngineError, ChunkSection O(1). No GPU changes."
       - id: "3.0b"
         title: "Renderer Fixes + Missing Features"
-        status: ready-for-dev
-        assigned_to: null
+        status: review
+        assigned_to: dev-agent
         notes: "4 parts: Wire Gigabuffer, Swapchain fix, Depth buffer, HUD/Config/Screenshot. Depends on 3.0a."
       - id: "3.3"
         title: "BlockRegistry + JSON Loading"

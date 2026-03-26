@@ -2,6 +2,7 @@
 
 add_library(VoxelEngine STATIC
         src/core/CoreModule.cpp
+        src/core/ConfigManager.cpp
         src/core/Log.cpp
         src/game/Window.cpp
         src/game/GameLoop.cpp

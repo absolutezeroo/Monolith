@@ -1,8 +1,10 @@
 #pragma once
 
 #include "voxel/core/Result.h"
+#include "voxel/renderer/Gigabuffer.h"
 #include "voxel/renderer/RendererConstants.h"
 
+#include <vk_mem_alloc.h>
 #include <volk.h>
 
 #include <array>
@@ -88,19 +90,36 @@ class Renderer
     /// Waits for GPU idle and destroys all owned resources.
     void shutdown();
 
+    /// Returns the Gigabuffer (non-owning, for stats queries). May be null before init.
+    [[nodiscard]] const Gigabuffer* getGigabuffer() const { return m_gigabuffer.get(); }
+
   private:
+    /// Extent-dependent resources that must be recreated on swapchain resize.
+    struct SwapchainResources
+    {
+        VkImage depthImage = VK_NULL_HANDLE;
+        VmaAllocation depthAllocation = VK_NULL_HANDLE;
+        VkImageView depthImageView = VK_NULL_HANDLE;
+    };
+
     /// Configuration for graphics pipeline creation.
     struct PipelineConfig
     {
         VkPolygonMode polygonMode = VK_POLYGON_MODE_FILL;
+        bool depthTestEnable = true;
+        bool depthWriteEnable = true;
         std::string vertShaderPath;
         std::string fragShaderPath;
     };
+
     core::Result<void> createFrameResources();
     core::Result<VkPipeline> buildPipeline(const PipelineConfig& config);
     core::Result<VkShaderModule> loadShaderModule(const std::string& path);
 
     void recreateRenderFinishedSemaphores();
+
+    core::Result<void> createSwapchainResources();
+    void destroySwapchainResources();
 
     void transitionImage(VkCommandBuffer cmd, VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout);
 
@@ -115,10 +134,13 @@ class Renderer
     VkPipeline m_wireframePipeline = VK_NULL_HANDLE;
 
     std::unique_ptr<StagingBuffer> m_stagingBuffer;
+    std::unique_ptr<Gigabuffer> m_gigabuffer;
     std::unique_ptr<ImGuiBackend> m_imguiBackend;
 
+    SwapchainResources m_swapchainResources{};
+
     bool m_isInitialized = false;
-    bool m_framebufferResized = false;
+    bool m_needsSwapchainRecreate = false;
 
     // Per-frame state (set by beginFrame, used by endFrame)
     game::Window* m_currentWindow = nullptr;
