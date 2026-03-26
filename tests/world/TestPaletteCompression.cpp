@@ -339,4 +339,22 @@ TEST_CASE("PaletteCompression: edge cases", "[world][palette]")
         ChunkSection decompressed = PaletteCompression::decompress(compressed);
         requireBlocksEqual(section, decompressed);
     }
+
+    SECTION("large block IDs near UINT16_MAX roundtrip correctly")
+    {
+        ChunkSection section;
+        uint16_t largeIds[] = {0, 1, 32768, 65534, 65535};
+        for (int i = 0; i < ChunkSection::VOLUME; ++i)
+        {
+            section.blocks[i] = largeIds[i % 5];
+        }
+
+        CompressedSection compressed = PaletteCompression::compress(section);
+
+        REQUIRE(compressed.bitsPerEntry == 4); // 5 unique -> tier 4
+        REQUIRE(compressed.palette.size() == 5);
+
+        ChunkSection decompressed = PaletteCompression::decompress(compressed);
+        requireBlocksEqual(section, decompressed);
+    }
 }

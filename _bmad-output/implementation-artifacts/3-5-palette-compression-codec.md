@@ -1,6 +1,6 @@
 # Story 3.5: Palette Compression Codec
 
-Status: review
+Status: done
 
 ## Story
 
@@ -331,6 +331,7 @@ No issues encountered during implementation.
 
 ### Change Log
 - 2026-03-26: Implemented palette compression codec — all tasks complete (pending user build verification)
+- 2026-03-26: Code review passed — added large block ID test (near UINT16_MAX) per LOW-1 finding
 
 ### File List
 - `engine/include/voxel/world/PaletteCompression.h` (new)
