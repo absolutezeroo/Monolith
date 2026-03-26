@@ -3,8 +3,8 @@
 #include "voxel/core/Result.h"
 #include "voxel/renderer/RendererConstants.h"
 
-#include <volk.h>
 #include <vk_mem_alloc.h>
+#include <volk.h>
 
 #include <array>
 #include <cstdint>
@@ -33,7 +33,7 @@ struct PendingTransfer
  */
 class StagingBuffer
 {
-public:
+  public:
     static constexpr VkDeviceSize DEFAULT_STAGING_SIZE = 16 * 1024 * 1024; // 16 MB
     static constexpr uint32_t DEFAULT_MAX_UPLOADS = 8;
     static constexpr VkDeviceSize ALIGNMENT = 16;
@@ -46,8 +46,7 @@ public:
      * @return The created StagingBuffer, or an error on failure.
      */
     static core::Result<std::unique_ptr<StagingBuffer>> create(
-        VulkanContext& context,
-        VkDeviceSize capacity = DEFAULT_STAGING_SIZE);
+        VulkanContext& context, VkDeviceSize capacity = DEFAULT_STAGING_SIZE);
 
     ~StagingBuffer();
 
@@ -64,10 +63,7 @@ public:
      * @param dstOffset Destination offset in the gigabuffer.
      * @return Success, or InvalidArgument/OutOfMemory on failure.
      */
-    [[nodiscard]] core::Result<void> uploadToGigabuffer(
-        const void* data,
-        size_t size,
-        VkDeviceSize dstOffset);
+    [[nodiscard]] core::Result<void> uploadToGigabuffer(const void* data, size_t size, VkDeviceSize dstOffset);
 
     /**
      * @brief Records and submits all pending transfers as a single vkCmdCopyBuffer.
@@ -95,7 +91,7 @@ public:
     void setMaxUploadsPerFrame(uint32_t max) { m_maxUploadsPerFrame = max; }
     [[nodiscard]] uint32_t getMaxUploadsPerFrame() const { return m_maxUploadsPerFrame; }
 
-private:
+  private:
     StagingBuffer() = default;
 
     VulkanContext* m_context = nullptr;

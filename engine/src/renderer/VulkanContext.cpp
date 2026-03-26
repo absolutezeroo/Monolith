@@ -1,10 +1,11 @@
 #include "voxel/renderer/VulkanContext.h"
+
 #include "voxel/core/Assert.h"
 #include "voxel/core/Log.h"
 #include "voxel/game/Window.h"
 
-#include <VkBootstrap.h>
 #include <GLFW/glfw3.h>
+#include <VkBootstrap.h>
 
 namespace voxel::renderer
 {
@@ -47,10 +48,8 @@ void logMemoryHeaps(VkPhysicalDevice physicalDevice)
     {
         const auto& heap = memProps.memoryHeaps[i];
         bool isDeviceLocal = (heap.flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) != 0;
-        VX_LOG_INFO("Memory heap {}: {} MB {}",
-            i,
-            heap.size / (1024 * 1024),
-            isDeviceLocal ? "(DEVICE_LOCAL)" : "(HOST)");
+        VX_LOG_INFO(
+            "Memory heap {}: {} MB {}", i, heap.size / (1024 * 1024), isDeviceLocal ? "(DEVICE_LOCAL)" : "(HOST)");
     }
 }
 
@@ -76,21 +75,19 @@ core::Result<std::unique_ptr<VulkanContext>> VulkanContext::create(game::Window&
 
     // Step 2: vk-bootstrap Instance — validation layers in debug only
     vkb::InstanceBuilder instanceBuilder;
-    instanceBuilder
-        .set_app_name("VoxelForge")
-        .require_api_version(1, 3, 0);
+    instanceBuilder.set_app_name("VoxelForge").require_api_version(1, 3, 0);
 
 #ifndef NDEBUG
-    instanceBuilder
-        .request_validation_layers()
-        .use_default_debug_messenger();
+    instanceBuilder.request_validation_layers().use_default_debug_messenger();
 #endif
 
     auto instanceResult = instanceBuilder.build();
     if (!instanceResult)
     {
         VX_LOG_ERROR("Failed to create Vulkan instance: {}", instanceResult.error().message());
-        return std::unexpected(core::EngineError{core::ErrorCode::VulkanError, "Failed to create Vulkan instance: " + instanceResult.error().message()});
+        return std::unexpected(
+            core::EngineError{
+                core::ErrorCode::VulkanError, "Failed to create Vulkan instance: " + instanceResult.error().message()});
     }
 
     vkb::Instance vkbInstance = instanceResult.value();
@@ -101,16 +98,13 @@ core::Result<std::unique_ptr<VulkanContext>> VulkanContext::create(game::Window&
     volkLoadInstance(ctx->m_instance);
 
     // Step 4: Create window surface via GLFW
-    VkResult surfaceResult = glfwCreateWindowSurface(
-        ctx->m_instance,
-        window.getHandle(),
-        nullptr,
-        &ctx->m_surface);
+    VkResult surfaceResult = glfwCreateWindowSurface(ctx->m_instance, window.getHandle(), nullptr, &ctx->m_surface);
 
     if (surfaceResult != VK_SUCCESS)
     {
         VX_LOG_ERROR("Failed to create window surface: {}", static_cast<int>(surfaceResult));
-        return std::unexpected(core::EngineError::vulkan(static_cast<int32_t>(surfaceResult), "Failed to create window surface"));
+        return std::unexpected(
+            core::EngineError::vulkan(static_cast<int32_t>(surfaceResult), "Failed to create window surface"));
     }
 
     // Step 5: Physical device selection — require Vulkan 1.3 features
@@ -128,19 +122,20 @@ core::Result<std::unique_ptr<VulkanContext>> VulkanContext::create(game::Window&
     features10.fillModeNonSolid = VK_TRUE; // Required for wireframe (VK_POLYGON_MODE_LINE)
 
     vkb::PhysicalDeviceSelector selector{vkbInstance};
-    auto physResult = selector
-        .set_surface(ctx->m_surface)
-        .set_minimum_version(1, 3)
-        .set_required_features(features10)
-        .set_required_features_13(features13)
-        .set_required_features_12(features12)
-        .prefer_gpu_device_type(vkb::PreferredDeviceType::discrete)
-        .select();
+    auto physResult = selector.set_surface(ctx->m_surface)
+                          .set_minimum_version(1, 3)
+                          .set_required_features(features10)
+                          .set_required_features_13(features13)
+                          .set_required_features_12(features12)
+                          .prefer_gpu_device_type(vkb::PreferredDeviceType::discrete)
+                          .select();
 
     if (!physResult)
     {
         VX_LOG_ERROR("Failed to select physical device: {}", physResult.error().message());
-        return std::unexpected(core::EngineError{core::ErrorCode::VulkanError, "Failed to select physical device: " + physResult.error().message()});
+        return std::unexpected(
+            core::EngineError{
+                core::ErrorCode::VulkanError, "Failed to select physical device: " + physResult.error().message()});
     }
 
     vkb::PhysicalDevice vkbPhysicalDevice = physResult.value();
@@ -152,7 +147,9 @@ core::Result<std::unique_ptr<VulkanContext>> VulkanContext::create(game::Window&
     if (!deviceResult)
     {
         VX_LOG_ERROR("Failed to create logical device: {}", deviceResult.error().message());
-        return std::unexpected(core::EngineError{core::ErrorCode::VulkanError, "Failed to create logical device: " + deviceResult.error().message()});
+        return std::unexpected(
+            core::EngineError{
+                core::ErrorCode::VulkanError, "Failed to create logical device: " + deviceResult.error().message()});
     }
 
     vkb::Device vkbDevice = deviceResult.value();
@@ -202,7 +199,9 @@ core::Result<std::unique_ptr<VulkanContext>> VulkanContext::create(game::Window&
     if (importResult != VK_SUCCESS)
     {
         VX_LOG_ERROR("Failed to import Vulkan functions from volk for VMA: {}", static_cast<int>(importResult));
-        return std::unexpected(core::EngineError::vulkan(static_cast<int32_t>(importResult), "Failed to import Vulkan functions from volk for VMA"));
+        return std::unexpected(
+            core::EngineError::vulkan(
+                static_cast<int32_t>(importResult), "Failed to import Vulkan functions from volk for VMA"));
     }
     allocatorInfo.pVulkanFunctions = &vulkanFunctions;
 
@@ -210,7 +209,8 @@ core::Result<std::unique_ptr<VulkanContext>> VulkanContext::create(game::Window&
     if (vmaResult != VK_SUCCESS)
     {
         VX_LOG_ERROR("Failed to create VMA allocator: {}", static_cast<int>(vmaResult));
-        return std::unexpected(core::EngineError::vulkan(static_cast<int32_t>(vmaResult), "Failed to create VMA allocator"));
+        return std::unexpected(
+            core::EngineError::vulkan(static_cast<int32_t>(vmaResult), "Failed to create VMA allocator"));
     }
 
     // Step 9: Swapchain via vk-bootstrap
@@ -219,16 +219,17 @@ core::Result<std::unique_ptr<VulkanContext>> VulkanContext::create(game::Window&
     window.getFramebufferSize(fbWidth, fbHeight);
 
     vkb::SwapchainBuilder swapchainBuilder{ctx->m_physicalDevice, ctx->m_device, ctx->m_surface};
-    auto swapResult = swapchainBuilder
-        .set_desired_format({VK_FORMAT_B8G8R8A8_SRGB, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR})
-        .set_desired_present_mode(VK_PRESENT_MODE_FIFO_KHR)
-        .set_desired_extent(static_cast<uint32_t>(fbWidth), static_cast<uint32_t>(fbHeight))
-        .build();
+    auto swapResult = swapchainBuilder.set_desired_format({VK_FORMAT_B8G8R8A8_SRGB, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR})
+                          .set_desired_present_mode(VK_PRESENT_MODE_FIFO_KHR)
+                          .set_desired_extent(static_cast<uint32_t>(fbWidth), static_cast<uint32_t>(fbHeight))
+                          .build();
 
     if (!swapResult)
     {
         VX_LOG_ERROR("Failed to create swapchain: {}", swapResult.error().message());
-        return std::unexpected(core::EngineError{core::ErrorCode::VulkanError, "Failed to create swapchain: " + swapResult.error().message()});
+        return std::unexpected(
+            core::EngineError{
+                core::ErrorCode::VulkanError, "Failed to create swapchain: " + swapResult.error().message()});
     }
 
     vkb::Swapchain vkbSwapchain = swapResult.value();
@@ -240,7 +241,9 @@ core::Result<std::unique_ptr<VulkanContext>> VulkanContext::create(game::Window&
     if (!swapImages)
     {
         VX_LOG_ERROR("Failed to get swapchain images: {}", swapImages.error().message());
-        return std::unexpected(core::EngineError{core::ErrorCode::VulkanError, "Failed to get swapchain images: " + swapImages.error().message()});
+        return std::unexpected(
+            core::EngineError{
+                core::ErrorCode::VulkanError, "Failed to get swapchain images: " + swapImages.error().message()});
     }
     ctx->m_swapchainImages = swapImages.value();
 
@@ -248,7 +251,10 @@ core::Result<std::unique_ptr<VulkanContext>> VulkanContext::create(game::Window&
     if (!swapImageViews)
     {
         VX_LOG_ERROR("Failed to get swapchain image views: {}", swapImageViews.error().message());
-        return std::unexpected(core::EngineError{core::ErrorCode::VulkanError, "Failed to get swapchain image views: " + swapImageViews.error().message()});
+        return std::unexpected(
+            core::EngineError{
+                core::ErrorCode::VulkanError,
+                "Failed to get swapchain image views: " + swapImageViews.error().message()});
     }
     ctx->m_swapchainImageViews = swapImageViews.value();
 
@@ -257,7 +263,8 @@ core::Result<std::unique_ptr<VulkanContext>> VulkanContext::create(game::Window&
     logQueueFamilies(ctx->m_graphicsQueueFamily, ctx->m_transferQueueFamily);
     logMemoryHeaps(ctx->m_physicalDevice);
 
-    VX_LOG_INFO("Vulkan initialization complete — swapchain {}x{}, {} images",
+    VX_LOG_INFO(
+        "Vulkan initialization complete — swapchain {}x{}, {} images",
         ctx->m_swapchainExtent.width,
         ctx->m_swapchainExtent.height,
         ctx->m_swapchainImages.size());
@@ -288,12 +295,11 @@ core::Result<void> VulkanContext::recreateSwapchain(game::Window& window)
 
     // Rebuild swapchain via vk-bootstrap, passing old swapchain for reuse
     vkb::SwapchainBuilder builder{m_physicalDevice, m_device, m_surface};
-    auto result = builder
-        .set_old_swapchain(m_swapchain)
-        .set_desired_format({VK_FORMAT_B8G8R8A8_SRGB, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR})
-        .set_desired_present_mode(VK_PRESENT_MODE_FIFO_KHR)
-        .set_desired_extent(static_cast<uint32_t>(fbWidth), static_cast<uint32_t>(fbHeight))
-        .build();
+    auto result = builder.set_old_swapchain(m_swapchain)
+                      .set_desired_format({VK_FORMAT_B8G8R8A8_SRGB, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR})
+                      .set_desired_present_mode(VK_PRESENT_MODE_FIFO_KHR)
+                      .set_desired_extent(static_cast<uint32_t>(fbWidth), static_cast<uint32_t>(fbHeight))
+                      .build();
 
     // Destroy old swapchain AFTER building new one (builder may reuse internal resources)
     vkDestroySwapchainKHR(m_device, m_swapchain, nullptr);
@@ -302,7 +308,9 @@ core::Result<void> VulkanContext::recreateSwapchain(game::Window& window)
     {
         VX_LOG_ERROR("Failed to recreate swapchain: {}", result.error().message());
         m_swapchain = VK_NULL_HANDLE;
-        return std::unexpected(core::EngineError{core::ErrorCode::VulkanError, "Failed to recreate swapchain: " + result.error().message()});
+        return std::unexpected(
+            core::EngineError{
+                core::ErrorCode::VulkanError, "Failed to recreate swapchain: " + result.error().message()});
     }
 
     vkb::Swapchain vkbSwapchain = result.value();
@@ -314,7 +322,9 @@ core::Result<void> VulkanContext::recreateSwapchain(game::Window& window)
     if (!swapImages)
     {
         VX_LOG_ERROR("Failed to get new swapchain images: {}", swapImages.error().message());
-        return std::unexpected(core::EngineError{core::ErrorCode::VulkanError, "Failed to get new swapchain images: " + swapImages.error().message()});
+        return std::unexpected(
+            core::EngineError{
+                core::ErrorCode::VulkanError, "Failed to get new swapchain images: " + swapImages.error().message()});
     }
     m_swapchainImages = swapImages.value();
 
@@ -322,11 +332,15 @@ core::Result<void> VulkanContext::recreateSwapchain(game::Window& window)
     if (!swapImageViews)
     {
         VX_LOG_ERROR("Failed to get new swapchain image views: {}", swapImageViews.error().message());
-        return std::unexpected(core::EngineError{core::ErrorCode::VulkanError, "Failed to get new swapchain image views: " + swapImageViews.error().message()});
+        return std::unexpected(
+            core::EngineError{
+                core::ErrorCode::VulkanError,
+                "Failed to get new swapchain image views: " + swapImageViews.error().message()});
     }
     m_swapchainImageViews = swapImageViews.value();
 
-    VX_LOG_INFO("Swapchain recreated — {}x{}, {} images",
+    VX_LOG_INFO(
+        "Swapchain recreated — {}x{}, {} images",
         m_swapchainExtent.width,
         m_swapchainExtent.height,
         m_swapchainImages.size());

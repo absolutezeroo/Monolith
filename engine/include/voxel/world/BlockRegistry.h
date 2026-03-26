@@ -1,8 +1,7 @@
 #pragma once
 
-#include "voxel/world/Block.h"
-
 #include "voxel/core/Result.h"
+#include "voxel/world/Block.h"
 
 #include <cstdint>
 #include <filesystem>
@@ -16,7 +15,7 @@ namespace voxel::world
 
 class BlockRegistry
 {
-public:
+  public:
     BlockRegistry();
 
     /// Register a new block definition. Returns assigned numeric ID.
@@ -35,7 +34,7 @@ public:
     /// Load block definitions from a JSON file. Returns count of blocks loaded.
     [[nodiscard]] core::Result<uint16_t> loadFromJson(const std::filesystem::path& filePath);
 
-private:
+  private:
     std::vector<BlockDefinition> m_blocks;
     std::unordered_map<std::string, uint16_t> m_nameToId;
 

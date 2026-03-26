@@ -54,7 +54,7 @@ struct DebugOverlayState
  */
 class Renderer
 {
-public:
+  public:
     explicit Renderer(VulkanContext& vulkanContext);
     ~Renderer();
 
@@ -88,7 +88,7 @@ public:
     /// Waits for GPU idle and destroys all owned resources.
     void shutdown();
 
-private:
+  private:
     /// Configuration for graphics pipeline creation.
     struct PipelineConfig
     {
@@ -102,11 +102,7 @@ private:
 
     void recreateRenderFinishedSemaphores();
 
-    void transitionImage(
-        VkCommandBuffer cmd,
-        VkImage image,
-        VkImageLayout oldLayout,
-        VkImageLayout newLayout);
+    void transitionImage(VkCommandBuffer cmd, VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout);
 
     VulkanContext& m_vulkanContext;
 

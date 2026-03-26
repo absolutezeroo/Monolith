@@ -84,9 +84,9 @@ inline constexpr int32_t SECTION_VOLUME = SECTION_SIZE * SECTION_SIZE * SECTION_
  */
 [[nodiscard]] inline IVec3 indexToBlock(int32_t index)
 {
-    int32_t y = index >> 8;          // index / 256
-    int32_t z = (index >> 4) & 0xF;  // (index % 256) / 16
-    int32_t x = index & 0xF;         // index % 16
+    int32_t y = index >> 8;         // index / 256
+    int32_t z = (index >> 4) & 0xF; // (index % 256) / 16
+    int32_t x = index & 0xF;        // index % 16
     return IVec3{x, y, z};
 }
 

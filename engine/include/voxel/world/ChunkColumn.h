@@ -13,7 +13,7 @@ namespace voxel::world
 
 class ChunkColumn
 {
-public:
+  public:
     static constexpr int32_t SECTIONS_PER_COLUMN = 16;
     static constexpr int32_t COLUMN_HEIGHT = SECTIONS_PER_COLUMN * ChunkSection::SIZE; // 256
 
@@ -38,7 +38,7 @@ public:
     [[nodiscard]] bool isAllEmpty() const;
     [[nodiscard]] int getHighestNonEmptySection() const;
 
-private:
+  private:
     glm::ivec2 m_chunkCoord;
     std::array<std::unique_ptr<ChunkSection>, SECTIONS_PER_COLUMN> m_sections;
     std::array<bool, SECTIONS_PER_COLUMN> m_dirty;

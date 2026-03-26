@@ -15,7 +15,7 @@ class VulkanContext;
 
 class ImGuiBackend
 {
-public:
+  public:
     static core::Result<std::unique_ptr<ImGuiBackend>> create(VulkanContext& context, GLFWwindow* window);
     ~ImGuiBackend();
 
@@ -30,7 +30,7 @@ public:
     /// Call inside the rendering pass to record ImGui draw commands.
     void render(VkCommandBuffer cmd);
 
-private:
+  private:
     ImGuiBackend() = default;
 
     VkDevice m_device = VK_NULL_HANDLE;

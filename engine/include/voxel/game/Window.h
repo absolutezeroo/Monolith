@@ -17,7 +17,7 @@ namespace voxel::game
  */
 class Window
 {
-public:
+  public:
     /**
      * @brief Creates a resizable GLFW window with no OpenGL context.
      *
@@ -56,7 +56,7 @@ public:
     /// Sets the resize flag (called from external framebuffer callbacks).
     void setResized() { m_framebufferResized = true; }
 
-private:
+  private:
     explicit Window(GLFWwindow* window);
 
     GLFWwindow* m_window = nullptr;

@@ -31,12 +31,18 @@ void Camera::update(float dt, bool forward, bool backward, bool left, bool right
 
     glm::dvec3 velocity{0.0};
 
-    if (forward) velocity += glm::dvec3(fwd);
-    if (backward) velocity -= glm::dvec3(fwd);
-    if (right) velocity += glm::dvec3(rgt);
-    if (left) velocity -= glm::dvec3(rgt);
-    if (up) velocity += glm::dvec3(worldUp);
-    if (down) velocity -= glm::dvec3(worldUp);
+    if (forward)
+        velocity += glm::dvec3(fwd);
+    if (backward)
+        velocity -= glm::dvec3(fwd);
+    if (right)
+        velocity += glm::dvec3(rgt);
+    if (left)
+        velocity -= glm::dvec3(rgt);
+    if (up)
+        velocity += glm::dvec3(worldUp);
+    if (down)
+        velocity -= glm::dvec3(worldUp);
 
     if (glm::length(velocity) > 0.0)
     {
@@ -51,10 +57,8 @@ glm::vec3 Camera::getForward() const
     float yawRad = glm::radians(m_yaw);
     float pitchRad = glm::radians(m_pitch);
 
-    return glm::normalize(glm::vec3{
-        std::cos(pitchRad) * std::sin(yawRad),
-        std::sin(pitchRad),
-        std::cos(pitchRad) * std::cos(yawRad)});
+    return glm::normalize(
+        glm::vec3{std::cos(pitchRad) * std::sin(yawRad), std::sin(pitchRad), std::cos(pitchRad) * std::cos(yawRad)});
 }
 
 glm::vec3 Camera::getRight() const

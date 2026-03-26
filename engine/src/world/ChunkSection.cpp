@@ -5,8 +5,7 @@
 namespace voxel::world
 {
 
-ChunkSection::ChunkSection()
-    : m_nonAirCount(0)
+ChunkSection::ChunkSection() : m_nonAirCount(0)
 {
     std::fill(std::begin(blocks), std::end(blocks), BLOCK_AIR);
 }

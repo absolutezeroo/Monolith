@@ -21,8 +21,7 @@ void Log::init()
     std::filesystem::create_directories("logs");
 
     auto consoleSink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
-    auto fileSink =
-        std::make_shared<spdlog::sinks::rotating_file_sink_mt>("logs/voxelforge.log", 5 * 1024 * 1024, 3);
+    auto fileSink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>("logs/voxelforge.log", 5 * 1024 * 1024, 3);
 
     std::vector<spdlog::sink_ptr> sinks{consoleSink, fileSink};
     s_logger = std::make_shared<spdlog::logger>("VoxelForge", sinks.begin(), sinks.end());

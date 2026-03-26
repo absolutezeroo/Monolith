@@ -50,7 +50,7 @@ struct ChunkCoordHash
 
 class ChunkManager
 {
-public:
+  public:
     ChunkManager() = default;
 
     /// Returns the ChunkColumn at the given coordinate, or nullptr if not loaded.
@@ -75,7 +75,7 @@ public:
     /// Number of chunk columns with at least one dirty section.
     [[nodiscard]] size_t dirtyChunkCount() const;
 
-private:
+  private:
     std::unordered_map<glm::ivec2, std::unique_ptr<ChunkColumn>, ChunkCoordHash> m_chunks;
 };
 

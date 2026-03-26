@@ -2,8 +2,8 @@
 
 #include "voxel/core/Result.h"
 
-#include <volk.h>
 #include <vk_mem_alloc.h>
+#include <volk.h>
 
 #include <cstdint>
 #include <memory>
@@ -29,7 +29,7 @@ struct GigabufferAllocation
  */
 class Gigabuffer
 {
-public:
+  public:
     static constexpr VkDeviceSize DEFAULT_SIZE = 256 * 1024 * 1024; // 256 MB
 
     /**
@@ -68,7 +68,7 @@ public:
     [[nodiscard]] VkDeviceAddress getBufferAddress() const { return m_bufferAddress; }
     [[nodiscard]] VkDeviceSize getCapacity() const { return m_capacity; }
 
-private:
+  private:
     Gigabuffer() = default;
 
     VkBuffer m_buffer = VK_NULL_HANDLE;

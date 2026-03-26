@@ -2,8 +2,8 @@
 
 #include "voxel/core/Result.h"
 
-#include <volk.h>
 #include <vk_mem_alloc.h>
+#include <volk.h>
 
 #include <cstdint>
 #include <memory>
@@ -19,7 +19,7 @@ namespace voxel::renderer
 
 class VulkanContext
 {
-public:
+  public:
     static core::Result<std::unique_ptr<VulkanContext>> create(game::Window& window);
     ~VulkanContext();
 
@@ -50,7 +50,7 @@ public:
      */
     core::Result<void> recreateSwapchain(game::Window& window);
 
-private:
+  private:
     VulkanContext() = default;
 
     VkInstance m_instance = VK_NULL_HANDLE;

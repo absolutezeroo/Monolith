@@ -30,19 +30,14 @@ struct EngineError
     int32_t nativeResult = 0;
 
     EngineError(ErrorCode c, std::string msg = {}, int32_t native = 0)
-        : code(c)
-        , message(std::move(msg))
-        , nativeResult(native)
+        : code(c), message(std::move(msg)), nativeResult(native)
     {
     }
 
     /// Factory for Vulkan errors with VkResult context.
     static EngineError vulkan(int32_t vkResult, std::string_view context)
     {
-        return {
-            ErrorCode::VulkanError,
-            std::string(context) + ": VkResult " + std::to_string(vkResult),
-            vkResult};
+        return {ErrorCode::VulkanError, std::string(context) + ": VkResult " + std::to_string(vkResult), vkResult};
     }
 
     /// Factory for file-not-found errors with path context.

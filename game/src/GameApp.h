@@ -23,18 +23,16 @@ class VulkanContext;
 
 class GameApp : public voxel::game::GameLoop
 {
-public:
-    GameApp(
-        voxel::game::Window& window,
-        voxel::renderer::VulkanContext& vulkanContext);
+  public:
+    GameApp(voxel::game::Window& window, voxel::renderer::VulkanContext& vulkanContext);
 
     voxel::core::Result<void> init(const std::string& shaderDir);
 
-protected:
+  protected:
     void tick(double dt) override;
     void render(double alpha) override;
 
-private:
+  private:
     void handleInputToggles();
     void buildDebugOverlay();
 

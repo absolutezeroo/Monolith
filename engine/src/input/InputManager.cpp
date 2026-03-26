@@ -7,8 +7,7 @@
 namespace voxel::input
 {
 
-InputManager::InputManager(GLFWwindow* window)
-    : m_window(window)
+InputManager::InputManager(GLFWwindow* window) : m_window(window)
 {
     glfwSetWindowUserPointer(window, this);
     glfwSetKeyCallback(window, &InputManager::keyCallback);
@@ -53,31 +52,36 @@ void InputManager::update(float dt)
 
 bool InputManager::isKeyDown(int key) const
 {
-    if (key < 0 || key >= MAX_KEYS) return false;
+    if (key < 0 || key >= MAX_KEYS)
+        return false;
     return m_keyDown[static_cast<size_t>(key)];
 }
 
 bool InputManager::wasKeyPressed(int key) const
 {
-    if (key < 0 || key >= MAX_KEYS) return false;
+    if (key < 0 || key >= MAX_KEYS)
+        return false;
     return m_keyPressed[static_cast<size_t>(key)];
 }
 
 bool InputManager::wasKeyReleased(int key) const
 {
-    if (key < 0 || key >= MAX_KEYS) return false;
+    if (key < 0 || key >= MAX_KEYS)
+        return false;
     return m_keyReleased[static_cast<size_t>(key)];
 }
 
 float InputManager::getKeyHoldDuration(int key) const
 {
-    if (key < 0 || key >= MAX_KEYS) return 0.0f;
+    if (key < 0 || key >= MAX_KEYS)
+        return 0.0f;
     return m_keyHoldTime[static_cast<size_t>(key)];
 }
 
 bool InputManager::wasKeyDoubleTapped(int key) const
 {
-    if (key < 0 || key >= MAX_KEYS) return false;
+    if (key < 0 || key >= MAX_KEYS)
+        return false;
     return m_keyDoubleTapped[static_cast<size_t>(key)];
 }
 
@@ -90,25 +94,29 @@ glm::vec2 InputManager::getMouseDelta() const
 
 bool InputManager::isMouseButtonDown(int button) const
 {
-    if (button < 0 || button >= MAX_MOUSE_BUTTONS) return false;
+    if (button < 0 || button >= MAX_MOUSE_BUTTONS)
+        return false;
     return m_mouseDown[static_cast<size_t>(button)];
 }
 
 bool InputManager::wasMouseButtonPressed(int button) const
 {
-    if (button < 0 || button >= MAX_MOUSE_BUTTONS) return false;
+    if (button < 0 || button >= MAX_MOUSE_BUTTONS)
+        return false;
     return m_mousePressed[static_cast<size_t>(button)];
 }
 
 bool InputManager::wasMouseButtonReleased(int button) const
 {
-    if (button < 0 || button >= MAX_MOUSE_BUTTONS) return false;
+    if (button < 0 || button >= MAX_MOUSE_BUTTONS)
+        return false;
     return m_mouseReleased[static_cast<size_t>(button)];
 }
 
 float InputManager::getMouseButtonHoldDuration(int button) const
 {
-    if (button < 0 || button >= MAX_MOUSE_BUTTONS) return 0.0f;
+    if (button < 0 || button >= MAX_MOUSE_BUTTONS)
+        return 0.0f;
     return m_mouseHoldTime[static_cast<size_t>(button)];
 }
 
@@ -134,8 +142,10 @@ bool InputManager::isCursorCaptured() const
 void InputManager::keyCallback(GLFWwindow* w, int key, int /*scancode*/, int action, int /*mods*/)
 {
     auto* mgr = static_cast<InputManager*>(glfwGetWindowUserPointer(w));
-    if (!mgr) return;
-    if (key < 0 || key >= MAX_KEYS) return;
+    if (!mgr)
+        return;
+    if (key < 0 || key >= MAX_KEYS)
+        return;
 
     auto idx = static_cast<size_t>(key);
 
@@ -164,7 +174,8 @@ void InputManager::keyCallback(GLFWwindow* w, int key, int /*scancode*/, int act
 void InputManager::cursorPosCallback(GLFWwindow* w, double xpos, double ypos)
 {
     auto* mgr = static_cast<InputManager*>(glfwGetWindowUserPointer(w));
-    if (!mgr) return;
+    if (!mgr)
+        return;
 
     if (mgr->m_firstMouse)
     {
@@ -187,8 +198,10 @@ void InputManager::cursorPosCallback(GLFWwindow* w, double xpos, double ypos)
 void InputManager::mouseButtonCallback(GLFWwindow* w, int button, int action, int /*mods*/)
 {
     auto* mgr = static_cast<InputManager*>(glfwGetWindowUserPointer(w));
-    if (!mgr) return;
-    if (button < 0 || button >= MAX_MOUSE_BUTTONS) return;
+    if (!mgr)
+        return;
+    if (button < 0 || button >= MAX_MOUSE_BUTTONS)
+        return;
 
     auto idx = static_cast<size_t>(button);
 

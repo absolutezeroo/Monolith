@@ -9,13 +9,13 @@ namespace voxel::core
 
 class Log
 {
-public:
+  public:
     static void init();
     static void shutdown();
     static void setLevel(spdlog::level::level_enum level);
     static std::shared_ptr<spdlog::logger>& getLogger();
 
-private:
+  private:
     static std::shared_ptr<spdlog::logger> s_logger;
 };
 

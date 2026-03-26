@@ -1,8 +1,7 @@
 #pragma once
 
-#include "voxel/world/Block.h"
-
 #include "voxel/core/Assert.h"
+#include "voxel/world/Block.h"
 
 #include <cstdint>
 
@@ -25,13 +24,10 @@ struct ChunkSection
     [[nodiscard]] bool isFull() const;
     [[nodiscard]] int32_t countNonAir() const;
 
-private:
+  private:
     int32_t m_nonAirCount = 0;
 
-    [[nodiscard]] static constexpr int toIndex(int x, int y, int z)
-    {
-        return y * 256 + z * 16 + x;
-    }
+    [[nodiscard]] static constexpr int toIndex(int x, int y, int z) { return y * 256 + z * 16 + x; }
 };
 
 } // namespace voxel::world

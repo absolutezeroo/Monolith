@@ -49,18 +49,12 @@ struct AABB
     /**
      * @brief Returns the center point of this AABB.
      */
-    [[nodiscard]] inline Vec3 center() const
-    {
-        return (min + max) * 0.5f;
-    }
+    [[nodiscard]] inline Vec3 center() const { return (min + max) * 0.5f; }
 
     /**
      * @brief Returns the half-widths (extents) of this AABB along each axis.
      */
-    [[nodiscard]] inline Vec3 extents() const
-    {
-        return (max - min) * 0.5f;
-    }
+    [[nodiscard]] inline Vec3 extents() const { return (max - min) * 0.5f; }
 };
 
 } // namespace voxel::math

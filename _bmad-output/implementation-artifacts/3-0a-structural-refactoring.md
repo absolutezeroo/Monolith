@@ -1,6 +1,6 @@
 # Story 3.0a: Structural Refactoring (Code Organization)
 
-Status: review
+Status: done
 
 ## Story
 
@@ -47,7 +47,7 @@ so that ChunkManager, meshing, and scripting can integrate cleanly without GameA
   - [x] C.6 Verify: overlay displays correctly, FPS counter accurate, ImGui interactable
 - [x] Task D: Config Files (AC: 5)
   - [x] D.1 Verify `.clang-format`, `.clang-tidy`, `.editorconfig` exist at repo root (they do — already present)
-  - [ ] D.2 Run `clang-format -i` on all `.h` and `.cpp` files
+  - [x] D.2 Run `clang-format -i` on all `.h` and `.cpp` files
   - [x] D.3 Commit formatted result
 - [x] Task F: Enrich EngineError with Context (AC: 6)
   - [x] F.1 Replace `EngineError` enum in `Result.h` with `ErrorCode` enum + `EngineError` struct
@@ -414,7 +414,7 @@ Claude Opus 4.6 (claude-opus-4-6)
 ### Completion Notes List
 
 - **Task G (ChunkSection O(1)):** Added `m_nonAirCount` incremental counter with early-out on same-value writes. `isEmpty()`, `isFull()`, `countNonAir()` are now O(1). Added 3 new test sections to TestChunkSection.cpp.
-- **Task D (Config Files):** Verified `.clang-format`, `.clang-tidy`, `.editorconfig` exist at repo root. D.2 (run `clang-format -i` on all source files) NOT YET DONE — deferred to user (runs from CLion).
+- **Task D (Config Files):** Verified `.clang-format`, `.clang-tidy`, `.editorconfig` exist at repo root. D.2 formatting run by user via CLion.
 - **Task F (EngineError):** Replaced `enum class EngineError` with `enum class ErrorCode` + `struct EngineError{code, message, nativeResult}`. Added `vulkan()` and `file()` factory methods. Migrated ~40 callsites across 7 source files and 3 test files. Zero residual references to old enum.
 - **Task A (InputManager):** Created `InputManager` class with full edge detection, hold duration, double-tap, cursor capture. GameApp has zero static callbacks and zero raw input state. Resolved GLFW user pointer conflict and update() timing issues.
 - **Task B (Pipeline Dedup):** Replaced ~200 lines of duplicated pipeline code with `buildPipeline(PipelineConfig)`. Pipeline layout creation shared in init(). Wireframe failure is non-fatal (log + continue).

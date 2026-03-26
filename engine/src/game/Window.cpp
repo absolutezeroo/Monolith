@@ -7,10 +7,7 @@
 namespace voxel::game
 {
 
-Window::Window(GLFWwindow* window)
-    : m_window(window)
-{
-}
+Window::Window(GLFWwindow* window) : m_window(window) {}
 
 Window::~Window()
 {
@@ -24,9 +21,8 @@ Window::~Window()
 
 core::Result<std::unique_ptr<Window>> Window::create(int width, int height, const char* title)
 {
-    glfwSetErrorCallback([](int code, const char* description) {
-        VX_LOG_ERROR("GLFW error {}: {}", code, description);
-    });
+    glfwSetErrorCallback([](int code, const char* description)
+                         { VX_LOG_ERROR("GLFW error {}: {}", code, description); });
 
     if (glfwInit() == GLFW_FALSE)
     {

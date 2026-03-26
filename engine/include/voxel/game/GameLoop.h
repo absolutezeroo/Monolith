@@ -14,14 +14,14 @@ class Window;
  */
 class GameLoop
 {
-public:
+  public:
     /// Constructs a game loop bound to the given window (non-owning).
     explicit GameLoop(Window& window);
 
     /// Runs the main loop until the window is closed.
     void run();
 
-protected:
+  protected:
     /**
      * @brief Called at a fixed rate (20 times/sec).
      * @param dt Fixed timestep in seconds (always TICK_RATE).
@@ -34,7 +34,7 @@ protected:
      */
     virtual void render(double alpha);
 
-private:
+  private:
     Window& m_window;
 
     int m_frameCount = 0;

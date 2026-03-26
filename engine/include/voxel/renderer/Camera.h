@@ -9,7 +9,7 @@ namespace voxel::renderer
 
 class Camera
 {
-public:
+  public:
     Camera() = default;
 
     /// Apply raw mouse delta to yaw/pitch. Pitch clamped to +/-89 degrees.
@@ -44,7 +44,7 @@ public:
     [[nodiscard]] glm::vec3 getRight() const;
     [[nodiscard]] glm::vec3 getUp() const;
 
-private:
+  private:
     glm::dvec3 m_position{0.0, 80.0, 0.0};
     float m_yaw = 0.0f;
     float m_pitch = 0.0f;

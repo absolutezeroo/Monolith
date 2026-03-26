@@ -2,15 +2,11 @@
 
 #include "voxel/game/Window.h"
 
-#include <imgui.h>
 #include <GLFW/glfw3.h>
+#include <imgui.h>
 
-GameApp::GameApp(
-    voxel::game::Window& window,
-    voxel::renderer::VulkanContext& vulkanContext)
-    : GameLoop(window)
-    , m_window(window)
-    , m_renderer(vulkanContext)
+GameApp::GameApp(voxel::game::Window& window, voxel::renderer::VulkanContext& vulkanContext)
+    : GameLoop(window), m_window(window), m_renderer(vulkanContext)
 {
 }
 
@@ -129,18 +125,16 @@ void GameApp::buildDebugOverlay()
     ImGui::SetNextWindowPos(ImVec2(10.0f, 10.0f), ImGuiCond_Always);
     ImGui::SetNextWindowBgAlpha(0.5f);
 
-    constexpr ImGuiWindowFlags flags =
-        ImGuiWindowFlags_NoDecoration |
-        ImGuiWindowFlags_AlwaysAutoResize |
-        ImGuiWindowFlags_NoFocusOnAppearing |
-        ImGuiWindowFlags_NoNav;
+    constexpr ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize |
+                                       ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav;
 
     if (ImGui::Begin("##DebugOverlay", nullptr, flags))
     {
         ImGui::Text("VoxelForge v0.1.0");
         ImGui::Separator();
 
-        ImGui::Text("FPS: %d (%.1f ms)", m_displayFps, m_displayFps > 0 ? 1000.0f / static_cast<float>(m_displayFps) : 0.0f);
+        ImGui::Text(
+            "FPS: %d (%.1f ms)", m_displayFps, m_displayFps > 0 ? 1000.0f / static_cast<float>(m_displayFps) : 0.0f);
 
         const auto& pos = m_camera.getPosition();
         ImGui::Text("Position: %.2f, %.2f, %.2f", pos.x, pos.y, pos.z);

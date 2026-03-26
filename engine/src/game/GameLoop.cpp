@@ -14,10 +14,7 @@ static constexpr double TICK_RATE = 1.0 / 20.0;
 /// Maximum frame time to prevent spiral of death (e.g., after debugger breakpoint).
 static constexpr double MAX_FRAME_TIME = 0.25;
 
-GameLoop::GameLoop(Window& window)
-    : m_window(window)
-{
-}
+GameLoop::GameLoop(Window& window) : m_window(window) {}
 
 void GameLoop::run()
 {

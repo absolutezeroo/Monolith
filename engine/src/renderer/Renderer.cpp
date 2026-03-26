@@ -1,11 +1,12 @@
 #include "voxel/renderer/Renderer.h"
+
 #include "voxel/core/Assert.h"
 #include "voxel/core/Log.h"
+#include "voxel/game/Window.h"
 #include "voxel/renderer/Camera.h"
 #include "voxel/renderer/ImGuiBackend.h"
 #include "voxel/renderer/StagingBuffer.h"
 #include "voxel/renderer/VulkanContext.h"
-#include "voxel/game/Window.h"
 
 #include <fstream>
 #include <vector>
@@ -13,10 +14,7 @@
 namespace voxel::renderer
 {
 
-Renderer::Renderer(VulkanContext& vulkanContext)
-    : m_vulkanContext(vulkanContext)
-{
-}
+Renderer::Renderer(VulkanContext& vulkanContext) : m_vulkanContext(vulkanContext) {}
 
 Renderer::~Renderer()
 {
@@ -34,11 +32,13 @@ core::Result<void> Renderer::init(const std::string& shaderDir, game::Window& wi
     // Create pipeline layout (shared by fill and wireframe pipelines)
     VkPipelineLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    VkResult layoutResult = vkCreatePipelineLayout(m_vulkanContext.getDevice(), &layoutInfo, nullptr, &m_pipelineLayout);
+    VkResult layoutResult =
+        vkCreatePipelineLayout(m_vulkanContext.getDevice(), &layoutInfo, nullptr, &m_pipelineLayout);
     if (layoutResult != VK_SUCCESS)
     {
         VX_LOG_ERROR("Failed to create pipeline layout: {}", static_cast<int>(layoutResult));
-        return std::unexpected(core::EngineError::vulkan(static_cast<int32_t>(layoutResult), "Failed to create pipeline layout"));
+        return std::unexpected(
+            core::EngineError::vulkan(static_cast<int32_t>(layoutResult), "Failed to create pipeline layout"));
     }
 
     std::string vertPath = shaderDir + "/triangle.vert.spv";
@@ -102,7 +102,8 @@ core::Result<void> Renderer::createFrameResources()
         if (result != VK_SUCCESS)
         {
             VX_LOG_ERROR("Failed to create command pool for frame {}: {}", i, static_cast<int>(result));
-            return std::unexpected(core::EngineError::vulkan(static_cast<int32_t>(result), "Failed to create command pool"));
+            return std::unexpected(
+                core::EngineError::vulkan(static_cast<int32_t>(result), "Failed to create command pool"));
         }
 
         VkCommandBufferAllocateInfo allocInfo{};
@@ -115,7 +116,8 @@ core::Result<void> Renderer::createFrameResources()
         if (result != VK_SUCCESS)
         {
             VX_LOG_ERROR("Failed to allocate command buffer for frame {}: {}", i, static_cast<int>(result));
-            return std::unexpected(core::EngineError::vulkan(static_cast<int32_t>(result), "Failed to allocate command buffer"));
+            return std::unexpected(
+                core::EngineError::vulkan(static_cast<int32_t>(result), "Failed to allocate command buffer"));
         }
 
         VkFenceCreateInfo fenceInfo{};
@@ -126,7 +128,8 @@ core::Result<void> Renderer::createFrameResources()
         if (result != VK_SUCCESS)
         {
             VX_LOG_ERROR("Failed to create render fence for frame {}: {}", i, static_cast<int>(result));
-            return std::unexpected(core::EngineError::vulkan(static_cast<int32_t>(result), "Failed to create render fence"));
+            return std::unexpected(
+                core::EngineError::vulkan(static_cast<int32_t>(result), "Failed to create render fence"));
         }
 
         VkSemaphoreCreateInfo semInfo{};
@@ -136,7 +139,8 @@ core::Result<void> Renderer::createFrameResources()
         if (result != VK_SUCCESS)
         {
             VX_LOG_ERROR("Failed to create imageAvailable semaphore for frame {}: {}", i, static_cast<int>(result));
-            return std::unexpected(core::EngineError::vulkan(static_cast<int32_t>(result), "Failed to create imageAvailable semaphore"));
+            return std::unexpected(
+                core::EngineError::vulkan(static_cast<int32_t>(result), "Failed to create imageAvailable semaphore"));
         }
     }
 
@@ -152,12 +156,15 @@ core::Result<void> Renderer::createFrameResources()
         if (result != VK_SUCCESS)
         {
             VX_LOG_ERROR("Failed to create renderFinished semaphore for image {}: {}", i, static_cast<int>(result));
-            return std::unexpected(core::EngineError::vulkan(static_cast<int32_t>(result), "Failed to create renderFinished semaphore"));
+            return std::unexpected(
+                core::EngineError::vulkan(static_cast<int32_t>(result), "Failed to create renderFinished semaphore"));
         }
     }
 
-    VX_LOG_DEBUG("Created per-frame resources for {} frames, {} render-finished semaphores",
-        FRAMES_IN_FLIGHT, swapchainImageCount);
+    VX_LOG_DEBUG(
+        "Created per-frame resources for {} frames, {} render-finished semaphores",
+        FRAMES_IN_FLIGHT,
+        swapchainImageCount);
     return {};
 }
 
@@ -222,7 +229,8 @@ core::Result<VkShaderModule> Renderer::loadShaderModule(const std::string& path)
     if (result != VK_SUCCESS)
     {
         VX_LOG_ERROR("Failed to create shader module from {}: {}", path, static_cast<int>(result));
-        return std::unexpected(core::EngineError::vulkan(static_cast<int32_t>(result), "Failed to create shader module from " + path));
+        return std::unexpected(
+            core::EngineError::vulkan(static_cast<int32_t>(result), "Failed to create shader module from " + path));
     }
 
     return shaderModule;
@@ -291,8 +299,8 @@ core::Result<VkPipeline> Renderer::buildPipeline(const PipelineConfig& config)
     msaa.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
     VkPipelineColorBlendAttachmentState blend{};
-    blend.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-                           VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    blend.colorWriteMask =
+        VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 
     VkPipelineColorBlendStateCreateInfo blendState{};
     blendState.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
@@ -328,19 +336,19 @@ core::Result<VkPipeline> Renderer::buildPipeline(const PipelineConfig& config)
 
     if (result != VK_SUCCESS)
     {
-        VX_LOG_ERROR("Failed to create pipeline (polygonMode={}): {}", static_cast<int>(config.polygonMode), static_cast<int>(result));
-        return std::unexpected(core::EngineError::vulkan(static_cast<int32_t>(result), "Failed to create graphics pipeline"));
+        VX_LOG_ERROR(
+            "Failed to create pipeline (polygonMode={}): {}",
+            static_cast<int>(config.polygonMode),
+            static_cast<int>(result));
+        return std::unexpected(
+            core::EngineError::vulkan(static_cast<int32_t>(result), "Failed to create graphics pipeline"));
     }
 
     VX_LOG_INFO("Pipeline created (polygonMode={})", static_cast<int>(config.polygonMode));
     return pipeline;
 }
 
-void Renderer::transitionImage(
-    VkCommandBuffer cmd,
-    VkImage image,
-    VkImageLayout oldLayout,
-    VkImageLayout newLayout)
+void Renderer::transitionImage(VkCommandBuffer cmd, VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout)
 {
     VkImageMemoryBarrier2 barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
@@ -355,16 +363,14 @@ void Renderer::transitionImage(
     barrier.subresourceRange.baseArrayLayer = 0;
     barrier.subresourceRange.layerCount = 1;
 
-    if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED &&
-        newLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+    if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
     {
         barrier.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
         barrier.srcAccessMask = VK_ACCESS_2_NONE;
         barrier.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
         barrier.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
     }
-    else if (oldLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL &&
-             newLayout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR)
+    else if (oldLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR)
     {
         barrier.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
         barrier.srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
@@ -373,8 +379,8 @@ void Renderer::transitionImage(
     }
     else
     {
-        VX_LOG_ERROR("Unhandled image layout transition: {} -> {}",
-            static_cast<int>(oldLayout), static_cast<int>(newLayout));
+        VX_LOG_ERROR(
+            "Unhandled image layout transition: {} -> {}", static_cast<int>(oldLayout), static_cast<int>(newLayout));
         VX_ASSERT(false, "Unhandled image layout transition");
     }
 
@@ -570,8 +576,7 @@ void Renderer::endFrame()
     submitInfo.signalSemaphoreInfoCount = 1;
     submitInfo.pSignalSemaphoreInfos = &signalInfo;
 
-    VkResult submitResult = vkQueueSubmit2(
-        m_vulkanContext.getGraphicsQueue(), 1, &submitInfo, frame.renderFence);
+    VkResult submitResult = vkQueueSubmit2(m_vulkanContext.getGraphicsQueue(), 1, &submitInfo, frame.renderFence);
 
     if (submitResult != VK_SUCCESS)
     {

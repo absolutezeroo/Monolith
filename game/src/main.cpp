@@ -1,9 +1,9 @@
-#include "GameApp.h"
-
 #include "voxel/core/Assert.h"
 #include "voxel/core/Log.h"
 #include "voxel/game/Window.h"
 #include "voxel/renderer/VulkanContext.h"
+
+#include "GameApp.h"
 
 int main()
 {

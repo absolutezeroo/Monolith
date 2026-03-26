@@ -1,4 +1,5 @@
 #include "voxel/renderer/ImGuiBackend.h"
+
 #include "voxel/core/Log.h"
 #include "voxel/renderer/VulkanContext.h"
 
@@ -15,8 +16,7 @@ core::Result<std::unique_ptr<ImGuiBackend>> ImGuiBackend::create(VulkanContext& 
     backend->m_device = context.getDevice();
 
     // Descriptor pool for ImGui — generous limits, FREE_DESCRIPTOR_SET_BIT required
-    VkDescriptorPoolSize poolSizes[] = {
-        {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 100}};
+    VkDescriptorPoolSize poolSizes[] = {{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 100}};
 
     VkDescriptorPoolCreateInfo poolCI{};
     poolCI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -29,7 +29,8 @@ core::Result<std::unique_ptr<ImGuiBackend>> ImGuiBackend::create(VulkanContext& 
     if (result != VK_SUCCESS)
     {
         VX_LOG_ERROR("Failed to create ImGui descriptor pool: {}", static_cast<int>(result));
-        return std::unexpected(core::EngineError::vulkan(static_cast<int32_t>(result), "Failed to create ImGui descriptor pool"));
+        return std::unexpected(
+            core::EngineError::vulkan(static_cast<int32_t>(result), "Failed to create ImGui descriptor pool"));
     }
 
     // ImGui context
@@ -41,10 +42,11 @@ core::Result<std::unique_ptr<ImGuiBackend>> ImGuiBackend::create(VulkanContext& 
     // Load Vulkan functions for ImGui — required when VK_NO_PROTOTYPES is defined.
     // volk loads Vulkan dynamically, so ImGui needs a loader callback to resolve them.
     VkInstance instance = context.getInstance();
-    ImGui_ImplVulkan_LoadFunctions(VK_API_VERSION_1_3,
-        [](const char* functionName, void* userData) {
-            return vkGetInstanceProcAddr(static_cast<VkInstance>(userData), functionName);
-        }, instance);
+    ImGui_ImplVulkan_LoadFunctions(
+        VK_API_VERSION_1_3,
+        [](const char* functionName, void* userData)
+        { return vkGetInstanceProcAddr(static_cast<VkInstance>(userData), functionName); },
+        instance);
 
     // Vulkan backend — dynamic rendering, no VkRenderPass
     // ImGui 1.92+: MSAASamples and PipelineRenderingCreateInfo moved to PipelineInfoMain.

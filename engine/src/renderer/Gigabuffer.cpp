@@ -1,4 +1,5 @@
 #include "voxel/renderer/Gigabuffer.h"
+
 #include "voxel/core/Log.h"
 #include "voxel/renderer/VulkanContext.h"
 
@@ -15,10 +16,8 @@ core::Result<std::unique_ptr<Gigabuffer>> Gigabuffer::create(VulkanContext& cont
     VkBufferCreateInfo bufferCI{};
     bufferCI.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bufferCI.size = size;
-    bufferCI.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
-                   | VK_BUFFER_USAGE_TRANSFER_DST_BIT
-                   | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT
-                   | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+    bufferCI.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                     VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
 
     VmaAllocationCreateInfo allocCI{};
     allocCI.usage = VMA_MEMORY_USAGE_AUTO;
@@ -28,7 +27,8 @@ core::Result<std::unique_ptr<Gigabuffer>> Gigabuffer::create(VulkanContext& cont
     if (result != VK_SUCCESS)
     {
         VX_LOG_ERROR("Gigabuffer: vmaCreateBuffer failed: {}", static_cast<int>(result));
-        return std::unexpected(core::EngineError::vulkan(static_cast<int32_t>(result), "Gigabuffer: vmaCreateBuffer failed"));
+        return std::unexpected(
+            core::EngineError::vulkan(static_cast<int32_t>(result), "Gigabuffer: vmaCreateBuffer failed"));
     }
 
     // Step 2: Get buffer device address
@@ -49,7 +49,8 @@ core::Result<std::unique_ptr<Gigabuffer>> Gigabuffer::create(VulkanContext& cont
         vmaDestroyBuffer(gb->m_allocator, gb->m_buffer, gb->m_allocation);
         gb->m_buffer = VK_NULL_HANDLE;
         gb->m_allocation = VK_NULL_HANDLE;
-        return std::unexpected(core::EngineError::vulkan(static_cast<int32_t>(result), "Gigabuffer: vmaCreateVirtualBlock failed"));
+        return std::unexpected(
+            core::EngineError::vulkan(static_cast<int32_t>(result), "Gigabuffer: vmaCreateVirtualBlock failed"));
     }
 
     VX_LOG_INFO("Gigabuffer created: {} MB, BDA: 0x{:X}", size / (1024 * 1024), gb->m_bufferAddress);
@@ -82,7 +83,8 @@ core::Result<GigabufferAllocation> Gigabuffer::allocate(VkDeviceSize size, VkDev
 void Gigabuffer::free(const GigabufferAllocation& allocation)
 {
     vmaVirtualFree(m_virtualBlock, allocation.handle);
-    VX_LOG_DEBUG("Gigabuffer: freed {} bytes at offset {}, total used: {}", allocation.size, allocation.offset, usedBytes());
+    VX_LOG_DEBUG(
+        "Gigabuffer: freed {} bytes at offset {}, total used: {}", allocation.size, allocation.offset, usedBytes());
 }
 
 VkDeviceSize Gigabuffer::usedBytes() const

@@ -19,7 +19,7 @@ namespace voxel::input
  */
 class InputManager
 {
-public:
+  public:
     explicit InputManager(GLFWwindow* window);
 
     /// Call once per frame at the end of tick (after reading input). Clears edge flags and updates hold timers.
@@ -43,7 +43,7 @@ public:
     void setCursorCaptured(bool captured);
     [[nodiscard]] bool isCursorCaptured() const;
 
-private:
+  private:
     static constexpr int MAX_KEYS = 512;
     static constexpr int MAX_MOUSE_BUTTONS = 8;
     static constexpr float DOUBLE_TAP_INTERVAL = 0.3f;

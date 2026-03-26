@@ -3,10 +3,9 @@
 #include "voxel/core/Assert.h"
 #include "voxel/core/Log.h"
 
-#include <nlohmann/json.hpp>
-
 #include <algorithm>
 #include <fstream>
+#include <nlohmann/json.hpp>
 
 namespace voxel::world
 {
@@ -31,12 +30,14 @@ core::Result<uint16_t> BlockRegistry::registerBlock(BlockDefinition def)
 {
     if (!isValidNamespace(def.stringId))
     {
-        return std::unexpected(core::EngineError{core::ErrorCode::InvalidArgument, "Invalid block namespace: " + def.stringId});
+        return std::unexpected(
+            core::EngineError{core::ErrorCode::InvalidArgument, "Invalid block namespace: " + def.stringId});
     }
 
     if (m_nameToId.contains(def.stringId))
     {
-        return std::unexpected(core::EngineError{core::ErrorCode::InvalidArgument, "Duplicate block ID: " + def.stringId});
+        return std::unexpected(
+            core::EngineError{core::ErrorCode::InvalidArgument, "Duplicate block ID: " + def.stringId});
     }
 
     VX_ASSERT(m_blocks.size() < UINT16_MAX, "Block registry capacity exceeded (max 65535)");
@@ -86,7 +87,8 @@ core::Result<uint16_t> BlockRegistry::loadFromJson(const std::filesystem::path& 
     auto json = nlohmann::json::parse(file, nullptr, false);
     if (json.is_discarded() || !json.is_array())
     {
-        return std::unexpected(core::EngineError{core::ErrorCode::InvalidFormat, "Invalid JSON format: " + filePath.string()});
+        return std::unexpected(
+            core::EngineError{core::ErrorCode::InvalidFormat, "Invalid JSON format: " + filePath.string()});
     }
 
     uint16_t count = 0;

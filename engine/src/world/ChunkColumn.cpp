@@ -5,12 +5,7 @@
 namespace voxel::world
 {
 
-ChunkColumn::ChunkColumn(glm::ivec2 chunkCoord)
-    : m_chunkCoord(chunkCoord)
-    , m_sections{}
-    , m_dirty{}
-{
-}
+ChunkColumn::ChunkColumn(glm::ivec2 chunkCoord) : m_chunkCoord(chunkCoord), m_sections{}, m_dirty{} {}
 
 glm::ivec2 ChunkColumn::getChunkCoord() const
 {
