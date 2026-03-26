@@ -8,7 +8,6 @@
 
 #include <lz4.h>
 
-#include <cstring>
 #include <filesystem>
 #include <string>
 
@@ -303,24 +302,9 @@ core::Result<ChunkColumn> ChunkSerializer::deserializeColumn(
 
         ChunkSection decompressed = PaletteCompression::decompress(compressed);
 
-        // Copy into the column (getOrCreateSection allocates if needed)
-        ChunkSection& target = column.getOrCreateSection(i);
-        std::memcpy(target.blocks, decompressed.blocks, sizeof(target.blocks));
-        // Re-fill to update internal non-air count
-        // We need to set blocks through the API to maintain m_nonAirCount, but blocks[] is public.
-        // Since ChunkSection::blocks is public, just copy and reconstruct the count by filling.
-        // Actually, let's set each block properly to keep m_nonAirCount consistent.
-        target.fill(BLOCK_AIR); // Reset count
-        for (int idx = 0; idx < ChunkSection::VOLUME; ++idx)
-        {
-            int x = idx % ChunkSection::SIZE;
-            int z = (idx / ChunkSection::SIZE) % ChunkSection::SIZE;
-            int y = idx / (ChunkSection::SIZE * ChunkSection::SIZE);
-            if (decompressed.blocks[idx] != BLOCK_AIR)
-            {
-                target.setBlock(x, y, z, decompressed.blocks[idx]);
-            }
-        }
+        // Copy into the column — default copy assignment transfers both blocks[]
+        // and m_nonAirCount (correctly maintained by PaletteCompression::decompress).
+        column.getOrCreateSection(i) = decompressed;
     }
 
     return column;
@@ -404,6 +388,15 @@ core::Result<ChunkColumn> ChunkSerializer::load(
                                 (static_cast<uint32_t>(regionEntry[1]) << 8) |
                                 (static_cast<uint32_t>(regionEntry[2]) << 16) |
                                 (static_cast<uint32_t>(regionEntry[3]) << 24);
+
+    // Sanity cap: a ChunkColumn with 16 fully-filled sections serializes well under 1 MB.
+    constexpr uint32_t MAX_UNCOMPRESSED_SIZE = 4 * 1024 * 1024; // 4 MB
+    if (uncompressedSize > MAX_UNCOMPRESSED_SIZE)
+    {
+        return std::unexpected(core::EngineError{
+            core::ErrorCode::InvalidFormat,
+            "Uncompressed size exceeds sanity limit (" + std::to_string(uncompressedSize) + " bytes)"});
+    }
 
     int compressedSize = static_cast<int>(regionEntry.size()) - 4;
 
