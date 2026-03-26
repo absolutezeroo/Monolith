@@ -1,6 +1,6 @@
 # Story 4.4: 3D Caves and Overhangs
 
-Status: review
+Status: done
 
 ## Story
 
@@ -297,3 +297,4 @@ Modified files:
 ## Change Log
 
 - 2026-03-26: Implemented Story 4.4 — 3D Caves and Overhangs. Created CaveCarver with cheese + spaghetti noise layers, depth-dependent threshold with surface protection, integrated into WorldGenerator as a post-pass. Added 8 new tests, updated 3 existing tests for cave-awareness. All 105 tests pass.
+- 2026-03-26: Code review fixes — added spaghetti elongation test (directional correlation proves Y-stretch anisotropy); extended depth distribution test to compare near-surface band. All tests pass.
