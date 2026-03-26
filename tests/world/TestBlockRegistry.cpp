@@ -592,7 +592,8 @@ TEST_CASE("BlockState - totalStateCount", "[world][state]")
 
         BlockDefinition stone;
         stone.stringId = "base:stone";
-        registry.registerBlock(stone);
+        auto stoneResult = registry.registerBlock(stone);
+        REQUIRE(stoneResult.has_value());
         REQUIRE(registry.totalStateCount() == 2);
 
         // Register a block with 2 properties: facing(4) x half(2) = 8 states
@@ -602,12 +603,14 @@ TEST_CASE("BlockState - totalStateCount", "[world][state]")
             {.name = "facing", .values = {"north", "south", "east", "west"}},
             {.name = "half", .values = {"top", "bottom"}}
         };
-        registry.registerBlock(slab);
+        auto slabResult = registry.registerBlock(slab);
+        REQUIRE(slabResult.has_value());
         REQUIRE(registry.totalStateCount() == 10); // 1 + 1 + 8
 
         BlockDefinition dirt;
         dirt.stringId = "base:dirt";
-        registry.registerBlock(dirt);
+        auto dirtResult = registry.registerBlock(dirt);
+        REQUIRE(dirtResult.has_value());
         REQUIRE(registry.totalStateCount() == 11); // 1 + 1 + 8 + 1
     }
 

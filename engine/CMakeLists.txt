@@ -21,6 +21,8 @@ add_library(VoxelEngine STATIC
         src/world/BlockRegistry.cpp
         src/world/ChunkManager.cpp
         src/world/PaletteCompression.cpp
+        src/world/RegionFile.cpp
+        src/world/ChunkSerializer.cpp
         src/input/InputManager.cpp
 )
 
@@ -44,6 +46,7 @@ find_package(vk-bootstrap CONFIG REQUIRED)
 find_package(VulkanMemoryAllocator CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
+find_package(lz4 CONFIG REQUIRED)
 find_package(Stb REQUIRED)
 
 target_link_libraries(VoxelEngine
@@ -57,6 +60,7 @@ target_link_libraries(VoxelEngine
         PUBLIC GPUOpen::VulkanMemoryAllocator
         PRIVATE imgui::imgui
         PRIVATE nlohmann_json::nlohmann_json
+        PRIVATE lz4::lz4
 )
 target_include_directories(VoxelEngine PRIVATE ${Stb_INCLUDE_DIR})
 

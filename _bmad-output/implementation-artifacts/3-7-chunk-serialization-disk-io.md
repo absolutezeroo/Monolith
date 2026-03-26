@@ -1,6 +1,6 @@
 # Story 3.6: Chunk Serialization (Disk I/O)
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -21,30 +21,30 @@ so that **the world persists between sessions and modified chunks are not lost o
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Create `RegionFile` helper class (AC: #1, #5, #6)
-  - [ ] 1.1 Define region constants (REGION_SIZE=32, HEADER_ENTRIES=1024, HEADER_BYTES=8192)
-  - [ ] 1.2 Implement `RegionFile::writeChunk(localIndex, span<const uint8_t> data)`
-  - [ ] 1.3 Implement `RegionFile::readChunk(localIndex) → Result<vector<uint8_t>>`
-  - [ ] 1.4 Implement header read/write with proper offset bookkeeping
-- [ ] Task 2: Create `ChunkSerializer` with binary serialization (AC: #2, #4, #7)
-  - [ ] 2.1 Implement `serializeColumn(const ChunkColumn&, const BlockRegistry&) → vector<uint8_t>` (pre-LZ4 binary)
-  - [ ] 2.2 Implement per-section binary format: bitsPerEntry + string palette + packed data
-  - [ ] 2.3 Implement section bitmask for null-section skipping
-- [ ] Task 3: Implement `ChunkSerializer::save()` (AC: #2)
-  - [ ] 3.1 Palette-compress each non-null section via `PaletteCompression::compress()`
-  - [ ] 3.2 Serialize to binary, LZ4-compress, write via `RegionFile`
-- [ ] Task 4: Implement deserialization and `ChunkSerializer::load()` (AC: #3, #4, #6)
-  - [ ] 4.1 Implement `deserializeColumn(span<const uint8_t>, const BlockRegistry&) → Result<ChunkColumn>`
-  - [ ] 4.2 Resolve string IDs → numeric IDs, substitute BLOCK_AIR for unknown blocks
-  - [ ] 4.3 LZ4-decompress, deserialize, palette-decompress
-- [ ] Task 5: Write unit tests (AC: #8)
-  - [ ] 5.1 Roundtrip test: fill chunk → save → load → verify block-identical
-  - [ ] 5.2 Empty chunk test: all-air column serializes minimally and roundtrips
-  - [ ] 5.3 Corrupt data test: truncated/garbage data returns InvalidFormat
-  - [ ] 5.4 Missing file test: non-existent region returns FileNotFound
-  - [ ] 5.5 Missing chunk test: valid region but unwritten chunk returns ChunkNotLoaded
-  - [ ] 5.6 ID remapping test: save with IDs [0,1,2], load with different numeric IDs for same string names
-- [ ] Task 6: Update CMakeLists.txt (link LZ4, add source/test files)
+- [x] Task 1: Create `RegionFile` helper class (AC: #1, #5, #6)
+  - [x] 1.1 Define region constants (REGION_SIZE=32, HEADER_ENTRIES=1024, HEADER_BYTES=8192)
+  - [x] 1.2 Implement `RegionFile::writeChunk(localIndex, span<const uint8_t> data)`
+  - [x] 1.3 Implement `RegionFile::readChunk(localIndex) → Result<vector<uint8_t>>`
+  - [x] 1.4 Implement header read/write with proper offset bookkeeping
+- [x] Task 2: Create `ChunkSerializer` with binary serialization (AC: #2, #4, #7)
+  - [x] 2.1 Implement `serializeColumn(const ChunkColumn&, const BlockRegistry&) → vector<uint8_t>` (pre-LZ4 binary)
+  - [x] 2.2 Implement per-section binary format: bitsPerEntry + string palette + packed data
+  - [x] 2.3 Implement section bitmask for null-section skipping
+- [x] Task 3: Implement `ChunkSerializer::save()` (AC: #2)
+  - [x] 3.1 Palette-compress each non-null section via `PaletteCompression::compress()`
+  - [x] 3.2 Serialize to binary, LZ4-compress, write via `RegionFile`
+- [x] Task 4: Implement deserialization and `ChunkSerializer::load()` (AC: #3, #4, #6)
+  - [x] 4.1 Implement `deserializeColumn(span<const uint8_t>, const BlockRegistry&) → Result<ChunkColumn>`
+  - [x] 4.2 Resolve string IDs → numeric IDs, substitute BLOCK_AIR for unknown blocks
+  - [x] 4.3 LZ4-decompress, deserialize, palette-decompress
+- [x] Task 5: Write unit tests (AC: #8)
+  - [x] 5.1 Roundtrip test: fill chunk → save → load → verify block-identical
+  - [x] 5.2 Empty chunk test: all-air column serializes minimally and roundtrips
+  - [x] 5.3 Corrupt data test: truncated/garbage data returns InvalidFormat
+  - [x] 5.4 Missing file test: non-existent region returns FileNotFound
+  - [x] 5.5 Missing chunk test: valid region but unwritten chunk returns ChunkNotLoaded
+  - [x] 5.6 ID remapping test: save with IDs [0,1,2], load with different numeric IDs for same string names
+- [x] Task 6: Update CMakeLists.txt (link LZ4, add source/test files)
 
 ## Dev Notes
 
@@ -345,8 +345,37 @@ TEST_CASE("ChunkSerializer", "[world][serialization]") {
 
 ### Agent Model Used
 
+Claude Opus 4.6
+
 ### Debug Log References
+
+- SIGSEGV in "unknown block" test: `VX_LOG_WARN` called with null logger (tests don't call `Log::init()`). Fixed by guarding log call with `if (core::Log::getLogger())`.
+- Missing `#include <fstream>` in test file caused MSVC C2079. Fixed.
+- Pre-existing `[[nodiscard]]` warnings-as-errors in TestBlockRegistry.cpp (lines 595, 605, 610) — fixed by capturing `registerBlock()` return values.
 
 ### Completion Notes List
 
+- **RegionFile**: Static helper class with `writeChunk`/`readChunk`. Creates region files on demand with 8192-byte empty header. Appends new chunk data at EOF and updates header entry (no in-place overwrite). Uses `std::fstream` with RAII.
+- **ChunkSerializer::serializeColumn**: Builds section bitmask, palette-compresses each non-null section via `PaletteCompression::compress()`, writes string IDs from `BlockRegistry::getBlockType()` for cross-session persistence. Little-endian binary format matching spec exactly.
+- **ChunkSerializer::save**: Serializes → LZ4 compresses (with uint32_t uncompressed size prefix) → writes via RegionFile. Creates directories as needed.
+- **ChunkSerializer::load**: Reads from RegionFile → LZ4 decompresses → deserializes with string ID→numeric ID remapping via `BlockRegistry::getIdByName()`. Unknown blocks substituted with BLOCK_AIR (logged when logger available).
+- **BinaryWriter/BinaryReader**: Internal helper classes for safe little-endian serialization with bounds checking. Reader returns `Result<T>` for truncation detection.
+- **Tests**: 10 test sections across 5 TEST_CASEs covering all 8 ACs. RAII TempDir for cleanup.
+
+### Change Log
+
+- 2026-03-26: Initial implementation — all tasks complete, all tests passing.
+
 ### File List
+
+**New files:**
+- `engine/include/voxel/world/RegionFile.h`
+- `engine/src/world/RegionFile.cpp`
+- `engine/include/voxel/world/ChunkSerializer.h`
+- `engine/src/world/ChunkSerializer.cpp`
+- `tests/world/TestChunkSerializer.cpp`
+
+**Modified files:**
+- `engine/CMakeLists.txt` — added RegionFile.cpp, ChunkSerializer.cpp, linked lz4::lz4
+- `tests/CMakeLists.txt` — added TestChunkSerializer.cpp
+- `tests/world/TestBlockRegistry.cpp` — fixed pre-existing [[nodiscard]] warnings
