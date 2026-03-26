@@ -13,6 +13,12 @@
 #include <ctime>
 #include <filesystem>
 
+#ifdef _WIN32
+#include <process.h>
+#else
+#include <unistd.h>
+#endif
+
 static constexpr int HOTBAR_SLOTS = 9;
 static constexpr float CROSSHAIR_SIZE = 12.0f;
 static constexpr float CROSSHAIR_THICKNESS = 2.0f;
@@ -48,15 +54,72 @@ GameApp::~GameApp()
     }
 }
 
-voxel::core::Result<void> GameApp::init(const std::string& shaderDir)
+static int64_t generateRandomSeed()
+{
+    auto now = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+#ifdef _WIN32
+    auto pid = static_cast<int64_t>(_getpid());
+#else
+    auto pid = static_cast<int64_t>(getpid());
+#endif
+    return static_cast<int64_t>(now) ^ (pid << 16);
+}
+
+voxel::core::Result<void> GameApp::init(const std::string& shaderDir, std::optional<int64_t> cliSeed)
 {
     // Load config
     m_configPath = "config.json";
     auto loadResult = m_config.load(m_configPath);
-    if (!loadResult.has_value())
+    bool hadConfigFile = loadResult.has_value();
+    if (!hadConfigFile)
     {
         VX_LOG_WARN("Config load returned error — using defaults");
     }
+
+    // Seed resolution: CLI > config.json > random
+    if (cliSeed.has_value())
+    {
+        m_config.setSeed(*cliSeed);
+        VX_LOG_INFO("Seed from CLI: {}", *cliSeed);
+    }
+    else if (!hadConfigFile)
+    {
+        int64_t randomSeed = generateRandomSeed();
+        m_config.setSeed(randomSeed);
+        VX_LOG_INFO("Generated random seed: {}", randomSeed);
+    }
+    else
+    {
+        VX_LOG_INFO("Seed from config: {}", m_config.getSeed());
+    }
+
+    // Persist seed to config
+    m_config.save(m_configPath);
+
+    // Register basic terrain blocks
+    using voxel::world::BlockDefinition;
+    auto registerBlock = [this](const std::string& id, bool solid)
+    {
+        BlockDefinition def;
+        def.stringId = id;
+        def.isSolid = solid;
+        auto result = m_blockRegistry.registerBlock(std::move(def));
+        if (!result.has_value())
+        {
+            VX_LOG_WARN("Failed to register block '{}': {}", id, result.error().message);
+        }
+    };
+    registerBlock("voxelforge:stone", true);
+    registerBlock("voxelforge:dirt", true);
+    registerBlock("voxelforge:grass_block", true);
+    registerBlock("voxelforge:bedrock", true);
+
+    // Create WorldGenerator
+    m_worldGen = std::make_unique<voxel::world::WorldGenerator>(
+        static_cast<uint64_t>(m_config.getSeed()), m_blockRegistry);
+
+    // Inject WorldGenerator into ChunkManager
+    m_chunkManager.setWorldGenerator(m_worldGen.get());
 
     // Apply config to camera
     m_camera.setFov(m_config.getFov());
@@ -241,7 +304,8 @@ void GameApp::buildDebugOverlay()
         {
             ImGui::Text("Gigabuffer: N/A");
         }
-        ImGui::Text("Chunks: No ChunkManager active");
+        ImGui::Text("Chunks: %zu loaded, %zu dirty", m_chunkManager.loadedChunkCount(), m_chunkManager.dirtyChunkCount());
+        ImGui::Text("Seed: %lld", static_cast<long long>(m_config.getSeed()));
 
         ImGui::Separator();
 

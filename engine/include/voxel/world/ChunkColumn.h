@@ -18,6 +18,8 @@ class ChunkColumn
     static constexpr int32_t COLUMN_HEIGHT = SECTIONS_PER_COLUMN * ChunkSection::SIZE; // 256
 
     explicit ChunkColumn(glm::ivec2 chunkCoord);
+    ChunkColumn(ChunkColumn&&) = default;
+    ChunkColumn& operator=(ChunkColumn&&) = default;
 
     [[nodiscard]] glm::ivec2 getChunkCoord() const;
 

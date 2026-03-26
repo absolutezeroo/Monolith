@@ -5,7 +5,7 @@
 project: VoxelForge
 methodology: BMAD v6 + Game Dev Studio
 created: 2026-03-24
-last_updated: 2026-03-26  # Story 4.5 (Tree and Decoration Placement) — ready-for-dev
+last_updated: 2026-03-26  # Story 4.1 (FastNoiseLite Integration + Basic Heightmap) — review
 
 # Status values: backlog | ready | in-progress | review | done | blocked
 
@@ -137,7 +137,7 @@ epics:
     stories:
       - id: "4.1"
         title: "FastNoiseLite Integration + Basic Heightmap"
-        status: ready-for-dev
+        status: review
         assigned_to: dev-agent
       - id: "4.2"
         title: "Spline Remapping + Elevation Distribution"

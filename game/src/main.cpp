@@ -5,9 +5,34 @@
 
 #include "GameApp.h"
 
-int main()
+#include <cstdint>
+#include <cstdlib>
+#include <optional>
+#include <string_view>
+
+/// Scan argv for --seed <value> and return it if found.
+static std::optional<int64_t> parseSeedArg(int argc, char* argv[])
+{
+    for (int i = 1; i < argc - 1; ++i)
+    {
+        if (std::string_view(argv[i]) == "--seed")
+        {
+            char* end = nullptr;
+            int64_t seed = std::strtoll(argv[i + 1], &end, 10);
+            if (end != argv[i + 1])
+            {
+                return seed;
+            }
+        }
+    }
+    return std::nullopt;
+}
+
+int main(int argc, char* argv[])
 {
     voxel::core::Log::init();
+
+    std::optional<int64_t> cliSeed = parseSeedArg(argc, argv);
 
     auto windowResult = voxel::game::Window::create(1280, 720, "VoxelForge");
     if (!windowResult.has_value())
@@ -30,7 +55,7 @@ int main()
     {
         GameApp app(window, vulkanContext);
 
-        auto initResult = app.init(VX_SHADER_DIR);
+        auto initResult = app.init(VX_SHADER_DIR, cliSeed);
         if (!initResult.has_value())
         {
             VX_FATAL("Failed to initialize renderer");

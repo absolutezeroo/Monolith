@@ -6,8 +6,13 @@
 #include "voxel/input/InputManager.h"
 #include "voxel/renderer/Camera.h"
 #include "voxel/renderer/Renderer.h"
+#include "voxel/world/BlockRegistry.h"
+#include "voxel/world/ChunkManager.h"
+#include "voxel/world/WorldGenerator.h"
 
+#include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 
 struct GLFWwindow;
@@ -28,7 +33,7 @@ class GameApp : public voxel::game::GameLoop
     GameApp(voxel::game::Window& window, voxel::renderer::VulkanContext& vulkanContext);
     ~GameApp();
 
-    voxel::core::Result<void> init(const std::string& shaderDir);
+    voxel::core::Result<void> init(const std::string& shaderDir, std::optional<int64_t> cliSeed = std::nullopt);
 
   protected:
     void tick(double dt) override;
@@ -49,6 +54,11 @@ class GameApp : public voxel::game::GameLoop
     voxel::core::ConfigManager m_config;
 
     std::unique_ptr<voxel::input::InputManager> m_input;
+
+    // World systems
+    voxel::world::BlockRegistry m_blockRegistry;
+    std::unique_ptr<voxel::world::WorldGenerator> m_worldGen;
+    voxel::world::ChunkManager m_chunkManager;
 
     // HUD state
     int m_hotbarSlot = 0;

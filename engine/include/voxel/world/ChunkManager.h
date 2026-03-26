@@ -48,10 +48,15 @@ struct ChunkCoordHash
     }
 };
 
+class WorldGenerator;
+
 class ChunkManager
 {
   public:
     ChunkManager() = default;
+
+    /// Set the world generator used for creating new chunks. Non-owning pointer.
+    void setWorldGenerator(WorldGenerator* worldGen) { m_worldGen = worldGen; }
 
     /// Returns the ChunkColumn at the given coordinate, or nullptr if not loaded.
     [[nodiscard]] ChunkColumn* getChunk(glm::ivec2 coord);
@@ -77,6 +82,7 @@ class ChunkManager
 
   private:
     std::unordered_map<glm::ivec2, std::unique_ptr<ChunkColumn>, ChunkCoordHash> m_chunks;
+    WorldGenerator* m_worldGen = nullptr;
 };
 
 } // namespace voxel::world

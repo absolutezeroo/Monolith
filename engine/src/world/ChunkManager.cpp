@@ -2,6 +2,7 @@
 
 #include "voxel/core/Assert.h"
 #include "voxel/world/Block.h"
+#include "voxel/world/WorldGenerator.h"
 
 namespace voxel::world
 {
@@ -51,7 +52,14 @@ void ChunkManager::loadChunk(glm::ivec2 coord)
     auto [it, inserted] = m_chunks.try_emplace(coord, nullptr);
     if (inserted)
     {
-        it->second = std::make_unique<ChunkColumn>(coord);
+        if (m_worldGen != nullptr)
+        {
+            it->second = std::make_unique<ChunkColumn>(m_worldGen->generateChunkColumn(coord));
+        }
+        else
+        {
+            it->second = std::make_unique<ChunkColumn>(coord);
+        }
     }
 }
 

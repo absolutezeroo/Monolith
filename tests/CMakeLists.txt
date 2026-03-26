@@ -17,6 +17,7 @@ add_executable(VoxelTests
     world/TestChunkManager.cpp
     world/TestPaletteCompression.cpp
     world/TestChunkSerializer.cpp
+    world/TestWorldGenerator.cpp
 )
 
 target_link_libraries(VoxelTests

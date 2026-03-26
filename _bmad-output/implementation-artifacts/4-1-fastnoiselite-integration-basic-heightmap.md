@@ -1,6 +1,6 @@
 # Story 4.1: FastNoiseLite Integration + Basic Heightmap
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -21,52 +21,52 @@ so that exploration reveals hills, valleys, and distinct surface layers instead 
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: Vendor FastNoiseLite** (AC: 1)
-  - [ ] Download `FastNoiseLite.h` v1.1.1 into `engine/include/voxel/world/FastNoiseLite.h`
-  - [ ] Add MSVC warning suppression wrapper if needed (push/pop `#pragma warning`)
-  - [ ] Verify it compiles in both Debug and Release presets from CLion
+- [x] **Task 1: Vendor FastNoiseLite** (AC: 1)
+  - [x] Download `FastNoiseLite.h` v1.1.1 into `engine/include/voxel/world/FastNoiseLite.h`
+  - [x] Add MSVC warning suppression wrapper if needed (push/pop `#pragma warning`)
+  - [x] Verify it compiles in both Debug and Release presets from CLion
 
-- [ ] **Task 2: Create WorldGenerator class** (AC: 2, 3, 4)
-  - [ ] Create `engine/include/voxel/world/WorldGenerator.h`
-  - [ ] Create `engine/src/world/WorldGenerator.cpp`
-  - [ ] Constructor: `explicit WorldGenerator(uint64_t seed)`
-  - [ ] Method: `ChunkColumn generateChunkColumn(glm::ivec2 chunkCoord)`
-  - [ ] Internal: configure `FastNoiseLite` with seed, Simplex type, FBm fractal, 6 octaves, freq 0.01
-  - [ ] Height mapping: `noise(worldX, worldZ)` remapped from [-1,1] to [40,120]
-  - [ ] Surface fill: iterate (x,z) per column, compute height, fill bedrock(y=0), stone(y=1..h-4), dirt(h-3..h-1), grass(h)
-  - [ ] Register required blocks (stone, dirt, grass, bedrock) in BlockRegistry or assume pre-registered
+- [x] **Task 2: Create WorldGenerator class** (AC: 2, 3, 4)
+  - [x] Create `engine/include/voxel/world/WorldGenerator.h`
+  - [x] Create `engine/src/world/WorldGenerator.cpp`
+  - [x] Constructor: `explicit WorldGenerator(uint64_t seed)`
+  - [x] Method: `ChunkColumn generateChunkColumn(glm::ivec2 chunkCoord)`
+  - [x] Internal: configure `FastNoiseLite` with seed, Simplex type, FBm fractal, 6 octaves, freq 0.01
+  - [x] Height mapping: `noise(worldX, worldZ)` remapped from [-1,1] to [40,120]
+  - [x] Surface fill: iterate (x,z) per column, compute height, fill bedrock(y=0), stone(y=1..h-4), dirt(h-3..h-1), grass(h)
+  - [x] Register required blocks (stone, dirt, grass, bedrock) in BlockRegistry or assume pre-registered
 
-- [ ] **Task 3: Seed management** (AC: 5)
-  - [ ] Add CLI argument parsing for `--seed <value>` in `main.cpp`
-  - [ ] Extend `ConfigManager` seed flow: CLI > config.json > random
-  - [ ] Random seed: `std::chrono::high_resolution_clock` XOR `getpid()` (or `GetCurrentProcessId()` on Windows)
-  - [ ] Persist chosen seed back to config.json via `ConfigManager::save()`
-  - [ ] Display seed in F3 debug overlay (`buildDebugOverlay()` in `GameApp`)
+- [x] **Task 3: Seed management** (AC: 5)
+  - [x] Add CLI argument parsing for `--seed <value>` in `main.cpp`
+  - [x] Extend `ConfigManager` seed flow: CLI > config.json > random
+  - [x] Random seed: `std::chrono::high_resolution_clock` XOR `getpid()` (or `GetCurrentProcessId()` on Windows)
+  - [x] Persist chosen seed back to config.json via `ConfigManager::save()`
+  - [x] Display seed in F3 debug overlay (`buildDebugOverlay()` in `GameApp`)
 
-- [ ] **Task 4: Spawn point calculation** (AC: 6)
-  - [ ] Method: `glm::dvec3 findSpawnPoint()` on `WorldGenerator`
-  - [ ] Start at world (0,0), compute heightmap, take highest solid +2
-  - [ ] Spiral-walk outward if height < 1 or > 200 (unsuitable)
-  - [ ] Return `glm::dvec3{x + 0.5, spawnY, z + 0.5}` (block center)
+- [x] **Task 4: Spawn point calculation** (AC: 6)
+  - [x] Method: `glm::dvec3 findSpawnPoint()` on `WorldGenerator`
+  - [x] Start at world (0,0), compute heightmap, take highest solid +2
+  - [x] Spiral-walk outward if height < 1 or > 200 (unsuitable)
+  - [x] Return `glm::dvec3{x + 0.5, spawnY, z + 0.5}` (block center)
 
-- [ ] **Task 5: ChunkManager integration** (AC: 7)
-  - [ ] Add `WorldGenerator*` member to `ChunkManager` (nullable, injected via setter or constructor param)
-  - [ ] Modify `ChunkManager::loadChunk(glm::ivec2)` to call `m_worldGen->generateChunkColumn(coord)` when generator is set, instead of creating empty `ChunkColumn`
-  - [ ] `GameApp` creates `WorldGenerator` with resolved seed, passes pointer to `ChunkManager`
-  - [ ] Generation is synchronous on main thread (async deferred to Story 5.6)
+- [x] **Task 5: ChunkManager integration** (AC: 7)
+  - [x] Add `WorldGenerator*` member to `ChunkManager` (nullable, injected via setter or constructor param)
+  - [x] Modify `ChunkManager::loadChunk(glm::ivec2)` to call `m_worldGen->generateChunkColumn(coord)` when generator is set, instead of creating empty `ChunkColumn`
+  - [x] `GameApp` creates `WorldGenerator` with resolved seed, passes pointer to `ChunkManager`
+  - [x] Generation is synchronous on main thread (async deferred to Story 5.6)
 
-- [ ] **Task 6: Unit tests** (AC: 8)
-  - [ ] Create `tests/world/TestWorldGenerator.cpp`
-  - [ ] Test: determinism — generate same chunk twice with same seed, compare block-by-block
-  - [ ] Test: height bounds — all surface blocks within [40, 120]
-  - [ ] Test: surface composition — grass on top, dirt below, stone further, bedrock at y=0
-  - [ ] Test: spawn point — returns valid Y above ground
-  - [ ] Test: different seeds produce different terrain
+- [x] **Task 6: Unit tests** (AC: 8)
+  - [x] Create `tests/world/TestWorldGenerator.cpp`
+  - [x] Test: determinism — generate same chunk twice with same seed, compare block-by-block
+  - [x] Test: height bounds — all surface blocks within [40, 120]
+  - [x] Test: surface composition — grass on top, dirt below, stone further, bedrock at y=0
+  - [x] Test: spawn point — returns valid Y above ground
+  - [x] Test: different seeds produce different terrain
 
-- [ ] **Task 7: CMake wiring** (AC: 1, 2)
-  - [ ] Add `src/world/WorldGenerator.cpp` to `engine/CMakeLists.txt` source list
-  - [ ] Add `tests/world/TestWorldGenerator.cpp` to `tests/CMakeLists.txt`
-  - [ ] No new vcpkg dependency — FastNoiseLite is header-only, vendored
+- [x] **Task 7: CMake wiring** (AC: 1, 2)
+  - [x] Add `src/world/WorldGenerator.cpp` to `engine/CMakeLists.txt` source list
+  - [x] Add `tests/world/TestWorldGenerator.cpp` to `tests/CMakeLists.txt`
+  - [x] No new vcpkg dependency — FastNoiseLite is header-only, vendored
 
 ## Dev Notes
 
@@ -206,14 +206,46 @@ Edge case: if `h < 4`, clamp dirt layers. Minimum: bedrock at 0, stone fills min
 - [Source: engine/CMakeLists.txt — explicit source list, find_package patterns]
 - [Source: CLAUDE.md — naming conventions, project structure, critical rules]
 
+## Change Log
+
+- **2026-03-26**: Story 4.1 implemented — FastNoiseLite vendored, WorldGenerator class created with heightmap generation, seed management (CLI/config/random), spawn point calculation, ChunkManager integration, and 5 Catch2 unit tests.
+
 ## Dev Agent Record
 
 ### Agent Model Used
 
-(to be filled by dev agent)
+Claude Opus 4.6
 
 ### Debug Log References
 
+- Initial build: FastNoiseLite include path used `<FastNoiseLite.h>` (angle brackets) but file is vendored in project — fixed to `"voxel/world/FastNoiseLite.h"`.
+- Test: `registerBlock()` returns `[[nodiscard]] Result<uint16_t>` — MSVC `/WX` flagged discarded return. Fixed with `(void)` cast.
+- Test: `dirtCount == 3` assertion failed — `stoneTop` was `h - 3` instead of `h - 4`, producing only 2 dirt layers. Fixed to `height - DIRT_LAYERS - 1`.
+
 ### Completion Notes List
 
+- AC-1: FastNoiseLite.h v1.1.1 vendored into `engine/include/voxel/world/`. MSVC warning suppression via `#pragma warning(push, 0)` in WorldGenerator.cpp. Compiles clean under `/W4 /WX`.
+- AC-2: `WorldGenerator` class in `voxel::world` namespace. Constructor takes `uint64_t seed` + `const BlockRegistry&`. Method `generateChunkColumn(glm::ivec2) -> ChunkColumn`.
+- AC-3: 2D OpenSimplex2 FBm noise (6 octaves, freq 0.01) mapped to height [40, 120]. Surface: bedrock(y=0), stone(1..h-4), dirt(h-3..h-1), grass(h).
+- AC-4: Determinism verified — same seed+coord produces byte-identical columns. Unit test compares all 256*16*16 blocks.
+- AC-5: Seed priority: `--seed` CLI arg > config.json > random (high_resolution_clock XOR pid). Persisted to config.json. Displayed in F3 overlay.
+- AC-6: `findSpawnPoint()` computes height at (0,0), spiral-walks up to 256 attempts if unsuitable. Returns block center `(x+0.5, h+2, z+0.5)`.
+- AC-7: `ChunkManager::setWorldGenerator()` injection. `loadChunk()` calls `generateChunkColumn()` when generator is set. `GameApp` owns WorldGenerator and injects into ChunkManager.
+- AC-8: 5 Catch2 tests: determinism, height bounds [40,120], surface composition, spawn point validity, different seeds diverge.
+- ChunkColumn: added explicit move ctor/assignment (`= default`) to support return-by-value from WorldGenerator.
+- GameApp: registers 4 terrain blocks (stone, dirt, grass_block, bedrock) in BlockRegistry during init.
+
 ### File List
+
+- `engine/include/voxel/world/FastNoiseLite.h` (new — vendored third-party header)
+- `engine/include/voxel/world/WorldGenerator.h` (new)
+- `engine/src/world/WorldGenerator.cpp` (new)
+- `engine/include/voxel/world/ChunkColumn.h` (modified — added move ctor/assignment)
+- `engine/include/voxel/world/ChunkManager.h` (modified — added WorldGenerator* member, setWorldGenerator(), forward decl)
+- `engine/src/world/ChunkManager.cpp` (modified — loadChunk uses WorldGenerator)
+- `engine/CMakeLists.txt` (modified — added WorldGenerator.cpp)
+- `game/src/main.cpp` (modified — argc/argv, --seed parsing, pass cliSeed to init)
+- `game/src/GameApp.h` (modified — added BlockRegistry, WorldGenerator, ChunkManager members; init signature)
+- `game/src/GameApp.cpp` (modified — seed resolution, block registration, WorldGenerator creation, overlay seed display)
+- `tests/world/TestWorldGenerator.cpp` (new)
+- `tests/CMakeLists.txt` (modified — added TestWorldGenerator.cpp)
