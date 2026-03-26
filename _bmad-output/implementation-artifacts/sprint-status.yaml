@@ -122,11 +122,11 @@ epics:
         assigned_to: dev-agent
       - id: "3.6"
         title: "Palette Compression Codec"
-        status: backlog
+        status: ready-for-dev
         assigned_to: null
       - id: "3.7"
         title: "Chunk Serialization (Disk I/O)"
-        status: backlog
+        status: ready-for-dev
         assigned_to: null
 
   - id: 4
@@ -373,7 +373,7 @@ summary:
     backlog: 49
     ready-for-dev: 0
     in_progress: 0
-    review: 1
+    review: 0
     done: 17
     blocked: 0
   implementation_order: "3.3b (ready) → 3.4 → 3.6 → 3.7 → Epic 4..."
