@@ -1,6 +1,6 @@
 # Story 3.5: Palette Compression Codec
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -20,33 +20,33 @@ so that **serialization (Story 3.6) and distant chunk storage use minimal memory
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Create `CompressedSection` struct (AC: #1, #5)
-  - [ ] 1.1 Define struct in `PaletteCompression.h` with `palette`, `data`, `bitsPerEntry`
-  - [ ] 1.2 Implement `memoryUsage()` method
-- [ ] Task 2: Implement `compress()` (AC: #2, #3, #4)
-  - [ ] 2.1 Scan ChunkSection to build unique block set and local palette mapping
-  - [ ] 2.2 Select bits-per-entry tier from unique count
-  - [ ] 2.3 Handle tier 0 (single value) — store palette only, empty data vector
-  - [ ] 2.4 Handle tier 16 (direct) — copy raw `uint16_t` blocks packed into `uint64_t` words
-  - [ ] 2.5 Handle tiers 1/2/4/8 — pack palette indices into `uint64_t` words at the chosen bit width
-- [ ] Task 3: Implement `decompress()` (AC: #2, #6)
-  - [ ] 3.1 Handle tier 0 — fill section with single palette value
-  - [ ] 3.2 Handle tier 16 — unpack raw `uint16_t` values from `uint64_t` words
-  - [ ] 3.3 Handle tiers 1/2/4/8 — extract palette indices from packed data, map back through palette
-- [ ] Task 4: Write unit tests (AC: #7)
-  - [ ] 4.1 Roundtrip: random fill → compress → decompress → compare all 4096 blocks
-  - [ ] 4.2 Tier 0: uniform section (all stone) → bitsPerEntry == 0, palette size 1
-  - [ ] 4.3 Tier 1: two-type section (air + stone) → bitsPerEntry == 1
-  - [ ] 4.4 Tier 2: 3 or 4 types → bitsPerEntry == 2
-  - [ ] 4.5 Tier 4: 5-16 types → bitsPerEntry == 4
-  - [ ] 4.6 Tier 8: 17-256 types → bitsPerEntry == 8
-  - [ ] 4.7 Tier 16: 257+ types → bitsPerEntry == 16, palette empty (direct)
-  - [ ] 4.8 Memory usage matches expected values from architecture table
-  - [ ] 4.9 Edge: empty section (all AIR) → tier 0
-  - [ ] 4.10 Edge: every block unique (4096 unique IDs) → tier 16
-- [ ] Task 5: Update CMakeLists.txt
-  - [ ] 5.1 Add `src/world/PaletteCompression.cpp` to `engine/CMakeLists.txt`
-  - [ ] 5.2 Add `world/TestPaletteCompression.cpp` to `tests/CMakeLists.txt`
+- [x] Task 1: Create `CompressedSection` struct (AC: #1, #5)
+  - [x] 1.1 Define struct in `PaletteCompression.h` with `palette`, `data`, `bitsPerEntry`
+  - [x] 1.2 Implement `memoryUsage()` method
+- [x] Task 2: Implement `compress()` (AC: #2, #3, #4)
+  - [x] 2.1 Scan ChunkSection to build unique block set and local palette mapping
+  - [x] 2.2 Select bits-per-entry tier from unique count
+  - [x] 2.3 Handle tier 0 (single value) — store palette only, empty data vector
+  - [x] 2.4 Handle tier 16 (direct) — copy raw `uint16_t` blocks packed into `uint64_t` words
+  - [x] 2.5 Handle tiers 1/2/4/8 — pack palette indices into `uint64_t` words at the chosen bit width
+- [x] Task 3: Implement `decompress()` (AC: #2, #6)
+  - [x] 3.1 Handle tier 0 — fill section with single palette value
+  - [x] 3.2 Handle tier 16 — unpack raw `uint16_t` values from `uint64_t` words
+  - [x] 3.3 Handle tiers 1/2/4/8 — extract palette indices from packed data, map back through palette
+- [x] Task 4: Write unit tests (AC: #7)
+  - [x] 4.1 Roundtrip: random fill → compress → decompress → compare all 4096 blocks
+  - [x] 4.2 Tier 0: uniform section (all stone) → bitsPerEntry == 0, palette size 1
+  - [x] 4.3 Tier 1: two-type section (air + stone) → bitsPerEntry == 1
+  - [x] 4.4 Tier 2: 3 or 4 types → bitsPerEntry == 2
+  - [x] 4.5 Tier 4: 5-16 types → bitsPerEntry == 4
+  - [x] 4.6 Tier 8: 17-256 types → bitsPerEntry == 8
+  - [x] 4.7 Tier 16: 257+ types → bitsPerEntry == 16, palette empty (direct)
+  - [x] 4.8 Memory usage matches expected values from architecture table
+  - [x] 4.9 Edge: empty section (all AIR) → tier 0
+  - [x] 4.10 Edge: every block unique (4096 unique IDs) → tier 16
+- [x] Task 5: Update CMakeLists.txt
+  - [x] 5.1 Add `src/world/PaletteCompression.cpp` to `engine/CMakeLists.txt`
+  - [x] 5.2 Add `world/TestPaletteCompression.cpp` to `tests/CMakeLists.txt`
 
 ## Dev Notes
 
@@ -315,9 +315,26 @@ Recent commit patterns:
 ## Dev Agent Record
 
 ### Agent Model Used
+Claude Opus 4.6
 
 ### Debug Log References
+No issues encountered during implementation.
 
 ### Completion Notes List
+- Implemented `CompressedSection` struct with `palette`, `data`, `bitsPerEntry` fields and `memoryUsage()` method
+- Implemented `PaletteCompression::compress()` with full tier selection (0/1/2/4/8/16) and bit packing into `uint64_t` words
+- Implemented `PaletteCompression::decompress()` with all tier handling and palette index mapping
+- `selectBitsPerEntry()` helper in anonymous namespace for tier selection logic
+- `VX_ASSERT` used for debug-mode invariant checks in decompress (valid bitsPerEntry, palette bounds)
+- 20 test cases covering: roundtrip identity (random), all 6 tier selections, 6 memory usage validations, 6 edge cases (boundary counts 3/5/17/257, all-air, all-unique)
+- Header ~28 lines, implementation ~120 lines, tests ~260 lines — well within 500-line limits
+
+### Change Log
+- 2026-03-26: Implemented palette compression codec — all tasks complete (pending user build verification)
 
 ### File List
+- `engine/include/voxel/world/PaletteCompression.h` (new)
+- `engine/src/world/PaletteCompression.cpp` (new)
+- `tests/world/TestPaletteCompression.cpp` (new)
+- `engine/CMakeLists.txt` (modified — added PaletteCompression.cpp)
+- `tests/CMakeLists.txt` (modified — added TestPaletteCompression.cpp)

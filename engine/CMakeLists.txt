@@ -20,6 +20,7 @@ add_library(VoxelEngine STATIC
         src/world/ChunkColumn.cpp
         src/world/BlockRegistry.cpp
         src/world/ChunkManager.cpp
+        src/world/PaletteCompression.cpp
         src/input/InputManager.cpp
 )
 

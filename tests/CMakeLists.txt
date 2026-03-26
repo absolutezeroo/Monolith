@@ -15,6 +15,7 @@ add_executable(VoxelTests
     world/TestChunkColumn.cpp
     world/TestBlockRegistry.cpp
     world/TestChunkManager.cpp
+    world/TestPaletteCompression.cpp
 )
 
 target_link_libraries(VoxelTests
