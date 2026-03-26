@@ -22,7 +22,7 @@ class InputManager
 public:
     explicit InputManager(GLFWwindow* window);
 
-    /// Call once per frame at the start of tick. Clears edge flags and updates hold timers.
+    /// Call once per frame at the end of tick (after reading input). Clears edge flags and updates hold timers.
     void update(float dt);
 
     // --- Key state ---

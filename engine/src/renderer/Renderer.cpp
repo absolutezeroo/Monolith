@@ -386,7 +386,7 @@ void Renderer::transitionImage(
     vkCmdPipelineBarrier2(cmd, &depInfo);
 }
 
-bool Renderer::beginFrame(game::Window& window, DebugOverlayState& overlay)
+bool Renderer::beginFrame(game::Window& window, const DebugOverlayState& overlay)
 {
     m_frameActive = false;
 

@@ -76,7 +76,7 @@ public:
      * Must be followed by endFrame().
      * @return true if frame is active and caller should build ImGui. false if frame was skipped.
      */
-    bool beginFrame(game::Window& window, DebugOverlayState& overlay);
+    bool beginFrame(game::Window& window, const DebugOverlayState& overlay);
 
     /**
      * @brief Ends the frame: renders ImGui, submits commands, presents.
@@ -88,6 +88,7 @@ public:
     /// Waits for GPU idle and destroys all owned resources.
     void shutdown();
 
+private:
     /// Configuration for graphics pipeline creation.
     struct PipelineConfig
     {
@@ -95,8 +96,6 @@ public:
         std::string vertShaderPath;
         std::string fragShaderPath;
     };
-
-private:
     core::Result<void> createFrameResources();
     core::Result<VkPipeline> buildPipeline(const PipelineConfig& config);
     core::Result<VkShaderModule> loadShaderModule(const std::string& path);
