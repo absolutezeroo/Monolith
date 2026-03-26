@@ -8,6 +8,8 @@
 #include "voxel/renderer/StagingBuffer.h"
 #include "voxel/renderer/VulkanContext.h"
 
+#include <stb_image_write.h>
+
 #include <fstream>
 #include <vector>
 
@@ -518,8 +520,8 @@ bool Renderer::beginFrame(game::Window& window, const DebugOverlayState& overlay
 
     vkWaitForFences(device, 1, &frame.renderFence, VK_TRUE, UINT64_MAX);
 
-    // Handle deferred swapchain recreation (flag set by present or window resize)
-    if (m_needsSwapchainRecreate || window.wasResized())
+    // Handle deferred swapchain recreation (flag set by present on VK_ERROR_OUT_OF_DATE_KHR)
+    if (m_needsSwapchainRecreate)
     {
         vkDeviceWaitIdle(device);
         auto recreateResult = m_vulkanContext.recreateSwapchain(window);
@@ -739,6 +741,13 @@ void Renderer::endFrame()
         VX_LOG_ERROR("Failed to present swapchain image: {}", static_cast<int>(presentResult));
     }
 
+    // Capture screenshot after present (swapchain image in PRESENT_SRC layout)
+    if (!m_screenshotPath.empty())
+    {
+        vkWaitForFences(m_vulkanContext.getDevice(), 1, &frame.renderFence, VK_TRUE, UINT64_MAX);
+        captureScreenshot(swapchainImage, m_vulkanContext.getSwapchainExtent());
+    }
+
     m_frameIndex = (m_frameIndex + 1) % FRAMES_IN_FLIGHT;
 }
 
@@ -810,6 +819,201 @@ void Renderer::shutdown()
 
     m_isInitialized = false;
     VX_LOG_INFO("Renderer shut down");
+}
+
+void Renderer::requestScreenshot(const std::string& outputPath)
+{
+    m_screenshotPath = outputPath;
+}
+
+void Renderer::captureScreenshot(VkImage swapchainImage, VkExtent2D extent)
+{
+    VkDevice device = m_vulkanContext.getDevice();
+    VmaAllocator allocator = m_vulkanContext.getAllocator();
+
+    // Create a host-visible staging image to copy the swapchain image into
+    VkImageCreateInfo imageCI{};
+    imageCI.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    imageCI.imageType = VK_IMAGE_TYPE_2D;
+    imageCI.format = VK_FORMAT_R8G8B8A8_UNORM;
+    imageCI.extent = {extent.width, extent.height, 1};
+    imageCI.mipLevels = 1;
+    imageCI.arrayLayers = 1;
+    imageCI.samples = VK_SAMPLE_COUNT_1_BIT;
+    imageCI.tiling = VK_IMAGE_TILING_LINEAR;
+    imageCI.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    imageCI.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+    VmaAllocationCreateInfo allocCI{};
+    allocCI.usage = VMA_MEMORY_USAGE_AUTO;
+    allocCI.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT;
+    allocCI.requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+
+    VkImage stagingImage = VK_NULL_HANDLE;
+    VmaAllocation stagingAlloc = VK_NULL_HANDLE;
+    VkResult result = vmaCreateImage(allocator, &imageCI, &allocCI, &stagingImage, &stagingAlloc, nullptr);
+    if (result != VK_SUCCESS)
+    {
+        VX_LOG_ERROR("Screenshot: failed to create staging image: {}", static_cast<int>(result));
+        return;
+    }
+
+    // Create a one-shot command buffer for the copy
+    VkCommandPool tempPool = VK_NULL_HANDLE;
+    VkCommandPoolCreateInfo poolCI{};
+    poolCI.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    poolCI.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+    poolCI.queueFamilyIndex = m_vulkanContext.getGraphicsQueueFamily();
+    vkCreateCommandPool(device, &poolCI, nullptr, &tempPool);
+
+    VkCommandBuffer cmd = VK_NULL_HANDLE;
+    VkCommandBufferAllocateInfo cmdAI{};
+    cmdAI.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    cmdAI.commandPool = tempPool;
+    cmdAI.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    cmdAI.commandBufferCount = 1;
+    vkAllocateCommandBuffers(device, &cmdAI, &cmd);
+
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    vkBeginCommandBuffer(cmd, &beginInfo);
+
+    // Transition swapchain image: PRESENT_SRC → TRANSFER_SRC
+    VkImageMemoryBarrier2 srcBarrier{};
+    srcBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+    srcBarrier.image = swapchainImage;
+    srcBarrier.oldLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    srcBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    srcBarrier.srcStageMask = VK_PIPELINE_STAGE_2_NONE;
+    srcBarrier.srcAccessMask = VK_ACCESS_2_NONE;
+    srcBarrier.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+    srcBarrier.dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
+    srcBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    srcBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    srcBarrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+    // Transition staging image: UNDEFINED → TRANSFER_DST
+    VkImageMemoryBarrier2 dstBarrier{};
+    dstBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+    dstBarrier.image = stagingImage;
+    dstBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    dstBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    dstBarrier.srcStageMask = VK_PIPELINE_STAGE_2_NONE;
+    dstBarrier.srcAccessMask = VK_ACCESS_2_NONE;
+    dstBarrier.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+    dstBarrier.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+    dstBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    dstBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    dstBarrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+    std::array<VkImageMemoryBarrier2, 2> preCopyBarriers = {srcBarrier, dstBarrier};
+    VkDependencyInfo preDep{};
+    preDep.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+    preDep.imageMemoryBarrierCount = static_cast<uint32_t>(preCopyBarriers.size());
+    preDep.pImageMemoryBarriers = preCopyBarriers.data();
+    vkCmdPipelineBarrier2(cmd, &preDep);
+
+    // Blit swapchain image (B8G8R8A8_SRGB) → staging image (R8G8B8A8_UNORM)
+    // Blit handles format conversion and also the B/R channel swap
+    VkImageBlit2 blitRegion{};
+    blitRegion.sType = VK_STRUCTURE_TYPE_IMAGE_BLIT_2;
+    blitRegion.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    blitRegion.srcOffsets[0] = {0, 0, 0};
+    blitRegion.srcOffsets[1] = {
+        static_cast<int32_t>(extent.width), static_cast<int32_t>(extent.height), 1};
+    blitRegion.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    blitRegion.dstOffsets[0] = {0, 0, 0};
+    blitRegion.dstOffsets[1] = {
+        static_cast<int32_t>(extent.width), static_cast<int32_t>(extent.height), 1};
+
+    VkBlitImageInfo2 blitInfo{};
+    blitInfo.sType = VK_STRUCTURE_TYPE_BLIT_IMAGE_INFO_2;
+    blitInfo.srcImage = swapchainImage;
+    blitInfo.srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    blitInfo.dstImage = stagingImage;
+    blitInfo.dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    blitInfo.regionCount = 1;
+    blitInfo.pRegions = &blitRegion;
+    blitInfo.filter = VK_FILTER_NEAREST;
+    vkCmdBlitImage2(cmd, &blitInfo);
+
+    // Transition staging image: TRANSFER_DST → GENERAL (for host read)
+    VkImageMemoryBarrier2 readBarrier{};
+    readBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+    readBarrier.image = stagingImage;
+    readBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    readBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+    readBarrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+    readBarrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+    readBarrier.dstStageMask = VK_PIPELINE_STAGE_2_HOST_BIT;
+    readBarrier.dstAccessMask = VK_ACCESS_2_HOST_READ_BIT;
+    readBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    readBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    readBarrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+    VkDependencyInfo postDep{};
+    postDep.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+    postDep.imageMemoryBarrierCount = 1;
+    postDep.pImageMemoryBarriers = &readBarrier;
+    vkCmdPipelineBarrier2(cmd, &postDep);
+
+    vkEndCommandBuffer(cmd);
+
+    // Submit and wait
+    VkSubmitInfo submitInfo{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &cmd;
+
+    VkFence fence = VK_NULL_HANDLE;
+    VkFenceCreateInfo fenceCI{};
+    fenceCI.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    vkCreateFence(device, &fenceCI, nullptr, &fence);
+
+    vkQueueSubmit(m_vulkanContext.getGraphicsQueue(), 1, &submitInfo, fence);
+    vkWaitForFences(device, 1, &fence, VK_TRUE, UINT64_MAX);
+
+    // Map and read pixels
+    void* mapped = nullptr;
+    vmaMapMemory(allocator, stagingAlloc, &mapped);
+
+    // Get the actual row pitch of the staging image (may have padding)
+    VkImageSubresource subResource{VK_IMAGE_ASPECT_COLOR_BIT, 0, 0};
+    VkSubresourceLayout layout{};
+    vkGetImageSubresourceLayout(device, stagingImage, &subResource, &layout);
+
+    // Copy pixel data row-by-row (respecting rowPitch which may differ from width*4)
+    auto w = static_cast<int>(extent.width);
+    auto h = static_cast<int>(extent.height);
+    std::vector<uint8_t> pixels(static_cast<size_t>(w) * static_cast<size_t>(h) * 4);
+    auto* srcBytes = static_cast<uint8_t*>(mapped) + layout.offset;
+    for (int row = 0; row < h; ++row)
+    {
+        std::memcpy(
+            pixels.data() + static_cast<size_t>(row) * static_cast<size_t>(w) * 4,
+            srcBytes + static_cast<size_t>(row) * layout.rowPitch,
+            static_cast<size_t>(w) * 4);
+    }
+
+    vmaUnmapMemory(allocator, stagingAlloc);
+
+    // Write PNG
+    int writeResult = stbi_write_png(m_screenshotPath.c_str(), w, h, 4, pixels.data(), w * 4);
+    if (writeResult != 0)
+    {
+        VX_LOG_INFO("Screenshot saved: {}", m_screenshotPath);
+    }
+    else
+    {
+        VX_LOG_ERROR("Screenshot: failed to write PNG to {}", m_screenshotPath);
+    }
+
+    // Cleanup
+    vkDestroyFence(device, fence, nullptr);
+    vkDestroyCommandPool(device, tempPool, nullptr);
+    vmaDestroyImage(allocator, stagingImage, stagingAlloc);
+    m_screenshotPath.clear();
 }
 
 } // namespace voxel::renderer

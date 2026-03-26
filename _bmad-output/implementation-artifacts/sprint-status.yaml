@@ -5,7 +5,7 @@
 project: VoxelForge
 methodology: BMAD v6 + Game Dev Studio
 created: 2026-03-24
-last_updated: 2026-03-26  # Story 3.0b dev-complete, ready for review
+last_updated: 2026-03-26  # Story 3.3b in-progress
 
 # Status values: backlog | ready | in-progress | review | done | blocked
 
@@ -102,15 +102,15 @@ epics:
         title: "Renderer Fixes + Missing Features"
         status: review
         assigned_to: dev-agent
-        notes: "4 parts: Wire Gigabuffer, Swapchain fix, Depth buffer, HUD/Config/Screenshot. Depends on 3.0a."
+        notes: "4 parts: Wire Gigabuffer, Swapchain fix, Depth buffer, HUD/Config/Screenshot. Depends on 3.0a. Review fixes applied (10 findings, all resolved). Pending build verification."
       - id: "3.3"
         title: "BlockRegistry + JSON Loading"
         status: done
         assigned_to: dev-agent
       - id: "3.3b"
         title: "Expand BlockDefinition to Full Property Set"
-        status: ready-for-dev
-        assigned_to: null
+        status: in-progress
+        assigned_to: dev-agent
         notes: "Expands Block.h from 10 to 35+ fields. Zero API changes to BlockRegistry. All new fields have defaults — backward compatible."
       - id: "3.4"
         title: "Block State System"
@@ -371,8 +371,8 @@ summary:
     P2: 4
   by_status:
     backlog: 49
-    ready-for-dev: 1
-    in_progress: 0
+    ready-for-dev: 0
+    in_progress: 1
     review: 1
     done: 16
     blocked: 0

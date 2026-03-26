@@ -22,7 +22,7 @@ Result<void> ConfigManager::load(const std::string& path)
     if (j.is_discarded())
     {
         VX_LOG_WARN("Failed to parse config '{}' — using defaults", path);
-        return {};
+        return std::unexpected(EngineError{ErrorCode::InvalidFormat, "Malformed JSON in config: " + path});
     }
 
     // Window

@@ -8,7 +8,9 @@
 #include <imgui.h>
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <ctime>
 #include <filesystem>
 
 static constexpr int HOTBAR_SLOTS = 9;
@@ -16,6 +18,8 @@ static constexpr float CROSSHAIR_SIZE = 12.0f;
 static constexpr float CROSSHAIR_THICKNESS = 2.0f;
 static constexpr float HOTBAR_SLOT_SIZE = 48.0f;
 static constexpr float HOTBAR_PADDING = 4.0f;
+static constexpr const char* HOTBAR_BLOCK_NAMES[HOTBAR_SLOTS] = {
+    "Stone", "Dirt", "Grass", "Sand", "Wood", "Leaves", "Glass", "Torch", "Cobble"};
 
 GameApp::GameApp(voxel::game::Window& window, voxel::renderer::VulkanContext& vulkanContext)
     : GameLoop(window), m_window(window), m_renderer(vulkanContext)
@@ -24,11 +28,22 @@ GameApp::GameApp(voxel::game::Window& window, voxel::renderer::VulkanContext& vu
 
 GameApp::~GameApp()
 {
-    // Save config on exit
+    // Save config on exit — sync all persisted settings back before writing
     if (!m_configPath.empty())
     {
         m_config.setFov(m_camera.getFov());
         m_config.setSensitivity(m_camera.getSensitivity());
+        m_config.setLastPlayerPosition(m_camera.getPosition());
+
+        int w = 0;
+        int h = 0;
+        m_window.getFramebufferSize(w, h);
+        if (w > 0 && h > 0 && !m_config.isFullscreen())
+        {
+            m_config.setWindowWidth(w);
+            m_config.setWindowHeight(h);
+        }
+
         m_config.save(m_configPath);
     }
 }
@@ -276,56 +291,72 @@ void GameApp::drawHotbar()
         ImVec2 p0(x, startY);
         ImVec2 p1(x + HOTBAR_SLOT_SIZE, startY + HOTBAR_SLOT_SIZE);
 
-        // Background
-        draw->AddRectFilled(p0, p1, IM_COL32(40, 40, 40, 180), 4.0f);
+        // Background (60% alpha black per UX spec)
+        draw->AddRectFilled(p0, p1, IM_COL32(0, 0, 0, 153), 4.0f);
 
         // Border
         auto borderCol = (i == m_hotbarSlot) ? IM_COL32(255, 255, 255, 255) : IM_COL32(120, 120, 120, 180);
         float borderThickness = (i == m_hotbarSlot) ? 2.0f : 1.0f;
         draw->AddRect(p0, p1, borderCol, 4.0f, 0, borderThickness);
 
-        // Slot number
-        char label[4];
-        snprintf(label, sizeof(label), "%d", i + 1);
-        draw->AddText(ImVec2(x + 4.0f, startY + 2.0f), IM_COL32(200, 200, 200, 180), label);
+        // Block name label
+        ImVec2 textSize = ImGui::CalcTextSize(HOTBAR_BLOCK_NAMES[i]);
+        float textX = x + (HOTBAR_SLOT_SIZE - textSize.x) * 0.5f;
+        float textY = startY + (HOTBAR_SLOT_SIZE - textSize.y) * 0.5f;
+        draw->AddText(ImVec2(textX, textY), IM_COL32(200, 200, 200, 220), HOTBAR_BLOCK_NAMES[i]);
     }
 }
 
 void GameApp::toggleFullscreen()
 {
     GLFWwindow* handle = m_window.getHandle();
-    GLFWmonitor* monitor = glfwGetWindowMonitor(handle);
 
-    if (monitor != nullptr)
+    if (m_config.isFullscreen())
     {
-        // Currently fullscreen → go windowed
+        // Currently borderless fullscreen → go windowed
         int w = m_config.getWindowWidth();
         int h = m_config.getWindowHeight();
+        glfwSetWindowAttrib(handle, GLFW_DECORATED, GLFW_TRUE);
         glfwSetWindowMonitor(handle, nullptr, 100, 100, w, h, GLFW_DONT_CARE);
         m_config.setFullscreen(false);
     }
     else
     {
-        // Currently windowed → go fullscreen on primary monitor
+        // Currently windowed → go borderless fullscreen
         int w = 0;
         int h = 0;
         m_window.getFramebufferSize(w, h);
-        m_config.setWindowWidth(w);
-        m_config.setWindowHeight(h);
+        if (w > 0 && h > 0)
+        {
+            m_config.setWindowWidth(w);
+            m_config.setWindowHeight(h);
+        }
 
         GLFWmonitor* primary = glfwGetPrimaryMonitor();
         const GLFWvidmode* mode = glfwGetVideoMode(primary);
-        glfwSetWindowMonitor(handle, primary, 0, 0, mode->width, mode->height, mode->refreshRate);
+        glfwSetWindowAttrib(handle, GLFW_DECORATED, GLFW_FALSE);
+        glfwSetWindowMonitor(handle, nullptr, 0, 0, mode->width, mode->height, GLFW_DONT_CARE);
         m_config.setFullscreen(true);
     }
 }
 
 void GameApp::captureScreenshot()
 {
-    // Screenshot capturing requires reading back from a VkImage with TRANSFER_SRC.
-    // This will be implemented when swapchain images have TRANSFER_SRC usage flag.
-    // For now, just log that the key was pressed.
-    VX_LOG_INFO("[F2] Screenshot requested — not yet implemented (requires TRANSFER_SRC on swapchain)");
+    std::filesystem::create_directories("screenshots");
+
+    auto now = std::chrono::system_clock::now();
+    auto timeT = std::chrono::system_clock::to_time_t(now);
+    std::tm tm{};
+#ifdef _WIN32
+    localtime_s(&tm, &timeT);
+#else
+    localtime_r(&timeT, &tm);
+#endif
+    char buf[64];
+    std::strftime(buf, sizeof(buf), "screenshots/screenshot_%Y-%m-%d_%H-%M-%S.png", &tm);
+
+    m_renderer.requestScreenshot(std::string(buf));
+    VX_LOG_INFO("[F2] Screenshot queued: {}", buf);
 }
 
 void GameApp::render(double /*alpha*/)
@@ -349,7 +380,10 @@ void GameApp::render(double /*alpha*/)
     if (m_renderer.beginFrame(m_window, m_overlayState))
     {
         buildDebugOverlay();
-        drawCrosshair();
+        if (m_input->isCursorCaptured())
+        {
+            drawCrosshair();
+        }
         drawHotbar();
         m_renderer.endFrame();
     }

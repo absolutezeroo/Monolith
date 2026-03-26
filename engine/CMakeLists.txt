@@ -15,6 +15,7 @@ add_library(VoxelEngine STATIC
         src/renderer/ImGuiBackend.cpp
         src/renderer/ImGuiImpl.cpp
         src/renderer/ImGuiImplGlfw.cpp
+        src/renderer/StbImageWriteImpl.cpp
         src/world/ChunkSection.cpp
         src/world/ChunkColumn.cpp
         src/world/BlockRegistry.cpp
@@ -42,6 +43,7 @@ find_package(vk-bootstrap CONFIG REQUIRED)
 find_package(VulkanMemoryAllocator CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
+find_package(Stb REQUIRED)
 
 target_link_libraries(VoxelEngine
         PUBLIC glm::glm
@@ -55,6 +57,7 @@ target_link_libraries(VoxelEngine
         PRIVATE imgui::imgui
         PRIVATE nlohmann_json::nlohmann_json
 )
+target_include_directories(VoxelEngine PRIVATE ${Stb_INCLUDE_DIR})
 
 # spdlog: disable exceptions (project uses -fno-exceptions)
 target_compile_definitions(VoxelEngine PUBLIC SPDLOG_NO_EXCEPTIONS)
@@ -137,5 +140,16 @@ if (MSVC)
             APPEND_STRING PROPERTY COMPILE_FLAGS " /w")
 else ()
     set_property(SOURCE src/renderer/ImGuiImpl.cpp src/renderer/ImGuiImplGlfw.cpp
+            APPEND_STRING PROPERTY COMPILE_FLAGS " -w")
+endif ()
+
+# StbImageWriteImpl.cpp — single-header implementation; skip PCH and suppress warnings.
+set_source_files_properties(src/renderer/StbImageWriteImpl.cpp
+        PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
+if (MSVC)
+    set_property(SOURCE src/renderer/StbImageWriteImpl.cpp
+            APPEND_STRING PROPERTY COMPILE_FLAGS " /w")
+else ()
+    set_property(SOURCE src/renderer/StbImageWriteImpl.cpp
             APPEND_STRING PROPERTY COMPILE_FLAGS " -w")
 endif ()

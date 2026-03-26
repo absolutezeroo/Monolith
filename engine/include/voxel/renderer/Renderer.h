@@ -93,6 +93,9 @@ class Renderer
     /// Returns the Gigabuffer (non-owning, for stats queries). May be null before init.
     [[nodiscard]] const Gigabuffer* getGigabuffer() const { return m_gigabuffer.get(); }
 
+    /// Requests a screenshot to be captured after the next present. Saved as PNG to the given path.
+    void requestScreenshot(const std::string& outputPath);
+
   private:
     /// Extent-dependent resources that must be recreated on swapchain resize.
     struct SwapchainResources
@@ -139,8 +142,11 @@ class Renderer
 
     SwapchainResources m_swapchainResources{};
 
+    void captureScreenshot(VkImage swapchainImage, VkExtent2D extent);
+
     bool m_isInitialized = false;
     bool m_needsSwapchainRecreate = false;
+    std::string m_screenshotPath;
 
     // Per-frame state (set by beginFrame, used by endFrame)
     game::Window* m_currentWindow = nullptr;
