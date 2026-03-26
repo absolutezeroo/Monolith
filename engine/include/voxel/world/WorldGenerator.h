@@ -1,5 +1,7 @@
 #pragma once
 
+#include "voxel/world/BiomeSystem.h"
+#include "voxel/world/BiomeTypes.h"
 #include "voxel/world/BlockRegistry.h"
 #include "voxel/world/ChunkColumn.h"
 #include "voxel/world/SplineCurve.h"
@@ -11,6 +13,7 @@
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
 
+#include <array>
 #include <cstdint>
 
 namespace voxel::world
@@ -30,8 +33,11 @@ class WorldGenerator
     [[nodiscard]] uint64_t getSeed() const { return m_seed; }
 
   private:
-    /// Compute terrain height at a world (x, z) position via spline-remapped continent noise + detail noise.
-    [[nodiscard]] int computeHeight(int worldX, int worldZ) const;
+    /// Compute base terrain height at a world (x, z) position via spline-remapped continent noise.
+    [[nodiscard]] float computeBaseHeight(int worldX, int worldZ) const;
+
+    /// Get detail noise value at a world (x, z) position.
+    [[nodiscard]] float getDetailNoise(int worldX, int worldZ) const;
 
     static constexpr float DETAIL_AMPLITUDE = 7.0f;
 
@@ -40,8 +46,18 @@ class WorldGenerator
     // Cached block IDs resolved at construction time
     uint16_t m_bedrockId;
     uint16_t m_stoneId;
-    uint16_t m_dirtId;
-    uint16_t m_grassId;
+
+    // Per-biome cached block IDs
+    struct BiomeBlockIds
+    {
+        uint16_t surface;
+        uint16_t subSurface;
+        uint16_t filler;
+    };
+    std::array<BiomeBlockIds, static_cast<size_t>(BiomeType::Count)> m_biomeBlockIds;
+
+    // Biome system for climate-based biome selection and blending
+    BiomeSystem m_biomeSystem;
 
     // Spline curve mapping continent noise to terrain height
     SplineCurve m_spline;

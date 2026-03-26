@@ -122,6 +122,42 @@
     "groups": {"cracky": 3}
   },
   {
+    "stringId": "base:bedrock",
+    "isSolid": true,
+    "isTransparent": false,
+    "hasCollision": true,
+    "lightEmission": 0,
+    "lightFilter": 15,
+    "hardness": -1.0,
+    "textureIndices": [13, 13, 13, 13, 13, 13],
+    "dropItem": "",
+    "groups": {}
+  },
+  {
+    "stringId": "base:sandstone",
+    "isSolid": true,
+    "isTransparent": false,
+    "hasCollision": true,
+    "lightEmission": 0,
+    "lightFilter": 15,
+    "hardness": 0.8,
+    "textureIndices": [14, 14, 14, 14, 14, 14],
+    "dropItem": "base:sandstone",
+    "groups": {"cracky": 3, "stone": 1}
+  },
+  {
+    "stringId": "base:snow_block",
+    "isSolid": true,
+    "isTransparent": false,
+    "hasCollision": true,
+    "lightEmission": 0,
+    "lightFilter": 15,
+    "hardness": 0.2,
+    "textureIndices": [15, 15, 15, 15, 15, 15],
+    "dropItem": "base:snow_block",
+    "groups": {"crumbly": 3}
+  },
+  {
     "stringId": "base:torch",
     "isSolid": false,
     "isTransparent": true,

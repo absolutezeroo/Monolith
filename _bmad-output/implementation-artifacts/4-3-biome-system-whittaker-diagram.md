@@ -1,6 +1,6 @@
 # Story 4.3: Biome System (Whittaker Diagram)
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -32,11 +32,11 @@ so that different areas of the world have distinct surface blocks and features.
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: Create BiomeTypes header** (AC: 2, 4)
-    - [ ] Create `engine/include/voxel/world/BiomeTypes.h`
-    - [ ] Define
+- [x] **Task 1: Create BiomeTypes header** (AC: 2, 4)
+    - [x] Create `engine/include/voxel/world/BiomeTypes.h`
+    - [x] Define
       `enum class BiomeType : uint8_t { Desert, Savanna, Plains, Forest, Jungle, Taiga, Tundra, IcePlains, Count }`
-    - [ ] Define `struct BiomeDefinition` with fields:
+    - [x] Define `struct BiomeDefinition` with fields:
         - `BiomeType type`
         - `std::string_view surfaceBlock` — string ID, e.g. `"base:sand"`
         - `std::string_view subSurfaceBlock` — e.g. `"base:sand"` or `"base:dirt"`
@@ -44,25 +44,25 @@ so that different areas of the world have distinct surface blocks and features.
         - `int surfaceDepth` — how many sub-surface layers (default 3)
         - `float heightModifier` — additive offset to blended terrain height
         - `float heightScale` — multiplicative factor on detail noise amplitude per biome
-    - [ ] Define `const BiomeDefinition& getBiomeDefinition(BiomeType type)` — returns from static array
+    - [x] Define `const BiomeDefinition& getBiomeDefinition(BiomeType type)` — returns from static array
 
-- [ ] **Task 2: Create BiomeSystem class** (AC: 1, 3, 5)
-    - [ ] Create `engine/include/voxel/world/BiomeSystem.h`
-    - [ ] Create `engine/src/world/BiomeSystem.cpp`
-    - [ ] Constructor: `explicit BiomeSystem(uint64_t seed)`
-    - [ ] Members: `FastNoiseLite m_temperatureNoise`, `FastNoiseLite m_humidityNoise`
-    - [ ] Temperature noise config: `NoiseType_OpenSimplex2`, `FractalType_FBm`, freq 0.005, octaves 4, seed =
+- [x] **Task 2: Create BiomeSystem class** (AC: 1, 3, 5)
+    - [x] Create `engine/include/voxel/world/BiomeSystem.h`
+    - [x] Create `engine/src/world/BiomeSystem.cpp`
+    - [x] Constructor: `explicit BiomeSystem(uint64_t seed)`
+    - [x] Members: `FastNoiseLite m_temperatureNoise`, `FastNoiseLite m_humidityNoise`
+    - [x] Temperature noise config: `NoiseType_OpenSimplex2`, `FractalType_FBm`, freq 0.005, octaves 4, seed =
       `static_cast<int>(seed + 2)` (offset from continent=seed, detail=seed+1)
-    - [ ] Humidity noise config: same params, seed = `static_cast<int>(seed + 3)`
-    - [ ] Method: `BiomeType getBiomeAt(float worldX, float worldZ) const` — samples temperature + humidity, calls
+    - [x] Humidity noise config: same params, seed = `static_cast<int>(seed + 3)`
+    - [x] Method: `BiomeType getBiomeAt(float worldX, float worldZ) const` — samples temperature + humidity, calls
       Whittaker lookup
-    - [ ] Method: `BiomeType classifyBiome(float temperature, float humidity) const` — pure Whittaker diagram function
-    - [ ] Method: `BlendedBiome getBlendedBiomeAt(float worldX, float worldZ) const` — 5x5 sampling + distance-weighted
+    - [x] Method: `BiomeType classifyBiome(float temperature, float humidity) const` — pure Whittaker diagram function
+    - [x] Method: `BlendedBiome getBlendedBiomeAt(float worldX, float worldZ) const` — 5x5 sampling + distance-weighted
       blending
 
-- [ ] **Task 3: Implement Whittaker diagram lookup** (AC: 3)
-    - [ ] Both temperature and humidity noise return [-1, 1] — remap to [0, 1] for lookup: `t = (raw + 1) * 0.5f`
-    - [ ] Discretized lookup table approach (rectangular grid, not triangle):
+- [x] **Task 3: Implement Whittaker diagram lookup** (AC: 3)
+    - [x] Both temperature and humidity noise return [-1, 1] — remap to [0, 1] for lookup: `t = (raw + 1) * 0.5f`
+    - [x] Discretized lookup table approach (rectangular grid, not triangle):
       ```
       Humidity →  Low (0–0.25)    Med-Low (0.25–0.5)  Med-High (0.5–0.75)  High (0.75–1.0)
       Temp ↓
@@ -71,17 +71,17 @@ so that different areas of the world have distinct surface blocks and features.
       Warm  (0.5–0.75)  Desert           Savanna             Plains              Forest
       Hot   (0.75–1.0)  Desert           Savanna             Jungle              Jungle
       ```
-    - [ ] Implement as `static constexpr BiomeType WHITTAKER_TABLE[4][4]` — index by `int(temp * 3.99f)` and
+    - [x] Implement as `static constexpr BiomeType WHITTAKER_TABLE[4][4]` — index by `int(temp * 3.99f)` and
       `int(humidity * 3.99f)`, clamped to [0,3]
-    - [ ] This ensures all 8 biome types are reachable from some (temp, humidity) combination
+    - [x] This ensures all 8 biome types are reachable from some (temp, humidity) combination
 
-- [ ] **Task 4: Implement biome blending** (AC: 5)
-    - [ ] Define `struct BlendedBiome`:
+- [x] **Task 4: Implement biome blending** (AC: 5)
+    - [x] Define `struct BlendedBiome`:
         - `BiomeType primaryBiome` — biome with highest weight (for surface block selection)
         - `float blendedHeightModifier` — weighted average of height modifiers
         - `float blendedHeightScale` — weighted average of height scales
         - `float blendedSurfaceDepth` — weighted average of surface depths (round to int when applied)
-    - [ ] `getBlendedBiomeAt(worldX, worldZ)` algorithm:
+    - [x] `getBlendedBiomeAt(worldX, worldZ)` algorithm:
         1. Sample 5x5 grid of biomes centered on (worldX, worldZ), step size = 4 blocks (covers ~20-block radius)
         2. For each sample: get `BiomeType`, fetch `BiomeDefinition`, compute weight = `1.0f / (distSq + 1.0f)` where
            `distSq` = squared distance from center
@@ -89,10 +89,10 @@ so that different areas of the world have distinct surface blocks and features.
         4. Normalize all weights so they sum to 1.0
         5. Compute weighted averages of `heightModifier`, `heightScale`, `surfaceDepth`
         6. `primaryBiome` = biome type with highest total accumulated weight
-    - [ ] Center sample dominates (weight 1.0 vs ~0.06 for corners) — transitions are gradual, not jumpy
+    - [x] Center sample dominates (weight 1.0 vs ~0.06 for corners) — transitions are gradual, not jumpy
 
-- [ ] **Task 5: Define per-biome block palettes** (AC: 4)
-    - [ ] Static array `BIOME_DEFINITIONS[static_cast<size_t>(BiomeType::Count)]`:
+- [x] **Task 5: Define per-biome block palettes** (AC: 4)
+    - [x] Static array `BIOME_DEFINITIONS[static_cast<size_t>(BiomeType::Count)]`:
       ```
       Desert:    surface=sand,       subSurface=sand,       filler=sandstone, depth=4, heightMod=-5, heightScale=0.5
       Savanna:   surface=grass_block, subSurface=dirt,       filler=stone,     depth=3, heightMod=0,  heightScale=0.8
@@ -103,13 +103,13 @@ so that different areas of the world have distinct surface blocks and features.
       Tundra:    surface=snow_block,  subSurface=dirt,       filler=stone,     depth=2, heightMod=-2, heightScale=0.6
       IcePlains: surface=snow_block,  subSurface=snow_block, filler=stone,     depth=3, heightMod=-3, heightScale=0.4
       ```
-    - [ ] Block string IDs use `base:` namespace prefix — must match what's registered in BlockRegistry
-    - [ ] New block types needed (if not already registered): `base:sand`, `base:sandstone`, `base:snow_block`
-    - [ ] Add JSON block definitions for any missing blocks in `assets/blocks/`
+    - [x] Block string IDs use `base:` namespace prefix — must match what's registered in BlockRegistry
+    - [x] New block types needed (if not already registered): `base:sand`, `base:sandstone`, `base:snow_block`
+    - [x] Add JSON block definitions for any missing blocks in `assets/blocks/`
 
-- [ ] **Task 6: Integrate BiomeSystem into WorldGenerator** (AC: 6, 7)
-    - [ ] Add `BiomeSystem m_biomeSystem` member to `WorldGenerator`, initialized with same seed
-    - [ ] In `generateChunkColumn()`, for each (x, z) column:
+- [x] **Task 6: Integrate BiomeSystem into WorldGenerator** (AC: 6, 7)
+    - [x] Add `BiomeSystem m_biomeSystem` member to `WorldGenerator`, initialized with same seed
+    - [x] In `generateChunkColumn()`, for each (x, z) column:
         1. Compute world coords: `worldX = chunkCoord.x * 16 + x`, `worldZ = chunkCoord.y * 16 + z`
         2. Call `m_biomeSystem.getBlendedBiomeAt(worldX, worldZ)` → `BlendedBiome`
         3. Existing pipeline: `continentNoise → spline → baseHeight`, `detailNoise → variation`
@@ -119,37 +119,37 @@ so that different areas of the world have distinct surface blocks and features.
         6. Surface fill: use `primaryBiome`'s surface/subSurface/filler blocks instead of hardcoded grass/dirt/stone
         7. Surface depth: use `blendedSurfaceDepth` (rounded to int) instead of hardcoded 3
         8. Bedrock at y=0 unchanged
-    - [ ] Cache biome block IDs at WorldGenerator construction: resolve all biome string IDs to numeric IDs via
+    - [x] Cache biome block IDs at WorldGenerator construction: resolve all biome string IDs to numeric IDs via
       `BlockRegistry::getIdByName()`. Store in a lookup array indexed by `BiomeType`.
-    - [ ] Keep `m_stoneId`, `m_bedrockId` from Story 4.1 — these are still used for filler/bedrock
-    - [ ] Add per-biome cached IDs: `struct BiomeBlockIds { uint16_t surface; uint16_t subSurface; uint16_t filler; };`
+    - [x] Keep `m_stoneId`, `m_bedrockId` from Story 4.1 — these are still used for filler/bedrock
+    - [x] Add per-biome cached IDs: `struct BiomeBlockIds { uint16_t surface; uint16_t subSurface; uint16_t filler; };`
       array of size `BiomeType::Count`
 
-- [ ] **Task 7: Register new block types** (AC: 4, 6)
-    - [ ] Create `assets/blocks/sand.json`, `assets/blocks/sandstone.json`, `assets/blocks/snow_block.json` if not
+- [x] **Task 7: Register new block types** (AC: 4, 6)
+    - [x] Create `assets/blocks/sand.json`, `assets/blocks/sandstone.json`, `assets/blocks/snow_block.json` if not
       already present
-    - [ ] Minimal JSON: `{ "stringId": "base:sand", "isSolid": true, "hasCollision": true, "hardness": 0.5 }` (follow
+    - [x] Minimal JSON: `{ "stringId": "base:sand", "isSolid": true, "hasCollision": true, "hardness": 0.5 }` (follow
       existing block JSON patterns)
-    - [ ] These blocks need to exist before WorldGenerator resolves IDs — BlockRegistry loaded before WorldGenerator
+    - [x] These blocks need to exist before WorldGenerator resolves IDs — BlockRegistry loaded before WorldGenerator
       construction
 
-- [ ] **Task 8: Unit tests** (AC: 8)
-    - [ ] Create `tests/world/TestBiomeSystem.cpp`
-    - [ ] Test: `classifyBiome()` returns all 8 biome types for appropriate (temp, humidity) values
-    - [ ] Test: `getBiomeAt()` determinism — same seed + coords = same biome, always
-    - [ ] Test: `getBlendedBiomeAt()` weights sum to ~1.0 (within float tolerance)
-    - [ ] Test: blended height modifier is within range of defined biome modifiers
-    - [ ] Test: different seeds produce different biome maps
-    - [ ] Add to `tests/world/TestWorldGenerator.cpp`:
+- [x] **Task 8: Unit tests** (AC: 8)
+    - [x] Create `tests/world/TestBiomeSystem.cpp`
+    - [x] Test: `classifyBiome()` returns all 8 biome types for appropriate (temp, humidity) values
+    - [x] Test: `getBiomeAt()` determinism — same seed + coords = same biome, always
+    - [x] Test: `getBlendedBiomeAt()` weights sum to ~1.0 (within float tolerance)
+    - [x] Test: blended height modifier is within range of defined biome modifiers
+    - [x] Test: different seeds produce different biome maps
+    - [x] Add to `tests/world/TestWorldGenerator.cpp`:
         - Test: surface blocks match expected biome (generate columns at known biome locations, verify top block type)
         - Test: terrain determinism preserved with biome system
         - Test: biome boundaries produce smooth height transitions (sample across a boundary, verify no height jumps > ~
           5 blocks between adjacent columns)
-    - [ ] Tag all biome tests with `[world][biome]`
+    - [x] Tag all biome tests with `[world][biome]`
 
-- [ ] **Task 9: CMake wiring** (AC: all)
-    - [ ] Add `src/world/BiomeSystem.cpp` to `engine/CMakeLists.txt` source list
-    - [ ] Add `tests/world/TestBiomeSystem.cpp` to `tests/CMakeLists.txt`
+- [x] **Task 9: CMake wiring** (AC: all)
+    - [x] Add `src/world/BiomeSystem.cpp` to `engine/CMakeLists.txt` source list
+    - [x] Add `tests/world/TestBiomeSystem.cpp` to `tests/CMakeLists.txt`
 
 ## Dev Notes
 
@@ -319,10 +319,42 @@ No new directories needed. All files fit the existing `voxel::world` module stru
 
 ### Agent Model Used
 
-(to be filled by dev agent)
+Claude Opus 4.6
 
 ### Debug Log References
 
+N/A — no build issues encountered during implementation.
+
 ### Completion Notes List
 
+- Created `BiomeTypes.h` as header-only with `BiomeType` enum (8 biomes + Count) and `BiomeDefinition` struct with all specified fields (surfaceBlock, subSurfaceBlock, fillerBlock, surfaceDepth, heightModifier, heightScale). Inline `getBiomeDefinition()` returns from static constexpr array.
+- Created `BiomeSystem` class with temperature/humidity noise (OpenSimplex2, FBm, freq 0.005, 4 octaves, seed offsets +2/+3). Implements `classifyBiome()` as static method using 4x4 Whittaker table, `getBiomeAt()` for raw biome lookup, and `getBlendedBiomeAt()` with 5x5 distance-weighted sampling.
+- Whittaker table implemented as `static constexpr BiomeType[4][4]` with `* 3.99f` trick to avoid OOB at 1.0. All 8 biomes reachable by construction.
+- Biome blending uses inverse-distance weighting `w = 1/(d^2 + 1)` over 25 samples at 4-block spacing. Center dominates with weight 1.0. Outputs weighted averages for heightModifier, heightScale, and surfaceDepth.
+- WorldGenerator refactored: split `computeHeight()` into `computeBaseHeight()` and `getDetailNoise()`. Height formula now: `baseHeight + blendedHeightModifier + detailNoise * DETAIL_AMPLITUDE * blendedHeightScale`. Surface fill uses biome-specific blocks (surface/subSurface/filler) with blended surface depth.
+- Removed `m_dirtId` and `m_grassId` from WorldGenerator — replaced by per-biome `BiomeBlockIds` array cached at construction. Each biome's string IDs resolved to numeric IDs via `BlockRegistry::getIdByName()` with fallback to `m_stoneId`.
+- Added `base:bedrock`, `base:sandstone`, `base:snow_block` to `assets/scripts/base/blocks.json` (`base:sand` already existed).
+- Adapted `findSpawnPoint()` to use biome-influenced height computation for consistency.
+- Created comprehensive `TestBiomeSystem.cpp` with 7 test cases: Whittaker coverage (all 8 biomes), specific value checks, boundary clamping, determinism, different seeds, blended value ranges, and BiomeDefinition validation.
+- Updated `TestWorldGenerator.cpp`: adapted all existing tests for biome-aware terrain, added 4 new biome integration tests (surface block matching, determinism, smooth transitions, height distribution).
+
 ### File List
+
+New files:
+- `engine/include/voxel/world/BiomeTypes.h`
+- `engine/include/voxel/world/BiomeSystem.h`
+- `engine/src/world/BiomeSystem.cpp`
+- `tests/world/TestBiomeSystem.cpp`
+
+Modified files:
+- `engine/include/voxel/world/WorldGenerator.h`
+- `engine/src/world/WorldGenerator.cpp`
+- `engine/CMakeLists.txt`
+- `tests/CMakeLists.txt`
+- `tests/world/TestWorldGenerator.cpp`
+- `assets/scripts/base/blocks.json`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+
+### Change Log
+
+- 2026-03-26: Implemented Story 4.3 — Biome System (Whittaker Diagram). Added BiomeTypes enum, BiomeSystem class with climate noise + Whittaker lookup + 5x5 blending, integrated into WorldGenerator with per-biome surface blocks and height modifiers. Added 3 new block definitions and comprehensive Catch2 test suite.

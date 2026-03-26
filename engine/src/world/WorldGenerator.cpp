@@ -4,11 +4,11 @@
 #include "voxel/world/Block.h"
 
 #include <algorithm>
+#include <cmath>
 
 namespace voxel::world
 {
 
-static constexpr int DIRT_LAYERS = 3;
 static constexpr float CONTINENT_FREQUENCY = 0.001f;
 static constexpr int CONTINENT_OCTAVES = 4;
 static constexpr float DETAIL_FREQUENCY = 0.02f;
@@ -32,12 +32,10 @@ WorldGenerator::WorldGenerator(uint64_t seed, const BlockRegistry& registry)
     : m_seed(seed)
     , m_bedrockId(resolveBlockId(registry, "base:bedrock", 1))
     , m_stoneId(resolveBlockId(registry, "base:stone", 1))
-    , m_dirtId(resolveBlockId(registry, "base:dirt", 1))
-    , m_grassId(resolveBlockId(registry, "base:grass_block", 1))
+    , m_biomeSystem(seed)
     , m_spline(SplineCurve::createDefault())
 {
     // FNL accepts int (32-bit) seeds; mask to 31 bits for positive range.
-    // Upper 33 bits of the uint64_t seed are unused — this is an FNL API limitation.
     int baseSeed = static_cast<int>(seed & 0x7FFFFFFF);
 
     // Continent noise: large-scale continental shapes
@@ -53,25 +51,32 @@ WorldGenerator::WorldGenerator(uint64_t seed, const BlockRegistry& registry)
     m_detailNoise.SetFractalType(FastNoiseLite::FractalType_FBm);
     m_detailNoise.SetFractalOctaves(DETAIL_OCTAVES);
     m_detailNoise.SetFrequency(DETAIL_FREQUENCY);
+
+    // Cache per-biome block IDs, resolving string names to numeric IDs
+    for (size_t i = 0; i < static_cast<size_t>(BiomeType::Count); ++i)
+    {
+        const BiomeDefinition& def = getBiomeDefinition(static_cast<BiomeType>(i));
+        m_biomeBlockIds[i].surface = resolveBlockId(registry, def.surfaceBlock, m_stoneId);
+        m_biomeBlockIds[i].subSurface = resolveBlockId(registry, def.subSurfaceBlock, m_stoneId);
+        m_biomeBlockIds[i].filler = resolveBlockId(registry, def.fillerBlock, m_stoneId);
+    }
 }
 
-int WorldGenerator::computeHeight(int worldX, int worldZ) const
+float WorldGenerator::computeBaseHeight(int worldX, int worldZ) const
 {
     float wx = static_cast<float>(worldX);
     float wz = static_cast<float>(worldZ);
 
     // Continent noise → spline-remapped base height
     float continentNoise = m_continentNoise.GetNoise(wx, wz);
-    float baseHeight = m_spline.evaluate(continentNoise);
+    return m_spline.evaluate(continentNoise);
+}
 
-    // Detail noise → local terrain variation
-    float detailNoise = m_detailNoise.GetNoise(wx, wz);
-    float finalHeight = baseHeight + detailNoise * DETAIL_AMPLITUDE;
-
-    // Clamp to valid column bounds
-    finalHeight = std::clamp(finalHeight, MIN_TERRAIN_HEIGHT, MAX_TERRAIN_HEIGHT);
-
-    return static_cast<int>(finalHeight);
+float WorldGenerator::getDetailNoise(int worldX, int worldZ) const
+{
+    float wx = static_cast<float>(worldX);
+    float wz = static_cast<float>(worldZ);
+    return m_detailNoise.GetNoise(wx, wz);
 }
 
 ChunkColumn WorldGenerator::generateChunkColumn(glm::ivec2 chunkCoord) const
@@ -84,27 +89,53 @@ ChunkColumn WorldGenerator::generateChunkColumn(glm::ivec2 chunkCoord) const
         {
             int worldX = chunkCoord.x * ChunkSection::SIZE + lx;
             int worldZ = chunkCoord.y * ChunkSection::SIZE + lz;
-            int height = computeHeight(worldX, worldZ);
+
+            // Get blended biome data for this column
+            BlendedBiome blended =
+                m_biomeSystem.getBlendedBiomeAt(static_cast<float>(worldX), static_cast<float>(worldZ));
+
+            // Height computation: base + biome modifier + detail * amplitude * biome scale
+            float baseHeight = computeBaseHeight(worldX, worldZ);
+            float detailNoise = getDetailNoise(worldX, worldZ);
+            float finalHeight =
+                baseHeight + blended.blendedHeightModifier + detailNoise * DETAIL_AMPLITUDE * blended.blendedHeightScale;
+
+            finalHeight = std::clamp(finalHeight, MIN_TERRAIN_HEIGHT, MAX_TERRAIN_HEIGHT);
+            int height = static_cast<int>(finalHeight);
+
+            // Surface depth from blended biome, clamped to valid range
+            int surfaceDepth = static_cast<int>(std::round(blended.blendedSurfaceDepth));
+            if (height < surfaceDepth + 1)
+            {
+                surfaceDepth = std::max(0, height - 1);
+            }
+            surfaceDepth = std::max(1, surfaceDepth);
+
+            // Resolve biome block IDs
+            size_t biomeIdx = static_cast<size_t>(blended.primaryBiome);
+            uint16_t surfaceId = m_biomeBlockIds[biomeIdx].surface;
+            uint16_t subSurfaceId = m_biomeBlockIds[biomeIdx].subSurface;
+            uint16_t fillerId = m_biomeBlockIds[biomeIdx].filler;
 
             // Bedrock at y=0
             column.setBlock(lx, 0, lz, m_bedrockId);
 
-            // Stone from y=1 up to (height - DIRT_LAYERS - 1)
-            int stoneTop = std::max(0, height - DIRT_LAYERS - 1);
-            for (int y = 1; y <= stoneTop; ++y)
+            // Filler block from y=1 up to (height - surfaceDepth - 1)
+            int fillerTop = std::max(0, height - surfaceDepth - 1);
+            for (int y = 1; y <= fillerTop; ++y)
             {
-                column.setBlock(lx, y, lz, m_stoneId);
+                column.setBlock(lx, y, lz, fillerId);
             }
 
-            // Dirt layers
-            int dirtStart = stoneTop + 1;
-            for (int y = dirtStart; y < height; ++y)
+            // Sub-surface layers
+            int subSurfaceStart = fillerTop + 1;
+            for (int y = subSurfaceStart; y < height; ++y)
             {
-                column.setBlock(lx, y, lz, m_dirtId);
+                column.setBlock(lx, y, lz, subSurfaceId);
             }
 
-            // Grass on top
-            column.setBlock(lx, height, lz, m_grassId);
+            // Surface block on top
+            column.setBlock(lx, height, lz, surfaceId);
         }
     }
 
@@ -128,7 +159,14 @@ glm::dvec3 WorldGenerator::findSpawnPoint() const
 
     for (int attempt = 0; attempt < MAX_ATTEMPTS; ++attempt)
     {
-        int height = computeHeight(x, z);
+        // Compute height with biome influence
+        float baseHeight = computeBaseHeight(x, z);
+        BlendedBiome blended = m_biomeSystem.getBlendedBiomeAt(static_cast<float>(x), static_cast<float>(z));
+        float detailNoise = getDetailNoise(x, z);
+        float finalHeight =
+            baseHeight + blended.blendedHeightModifier + detailNoise * DETAIL_AMPLITUDE * blended.blendedHeightScale;
+        finalHeight = std::clamp(finalHeight, MIN_TERRAIN_HEIGHT, MAX_TERRAIN_HEIGHT);
+        int height = static_cast<int>(finalHeight);
 
         if (height >= MIN_SPAWN_HEIGHT && height <= MAX_SPAWN_HEIGHT)
         {
@@ -157,8 +195,13 @@ glm::dvec3 WorldGenerator::findSpawnPoint() const
     }
 
     // Fallback: just use origin with computed height
-    int fallbackHeight = computeHeight(0, 0);
-    return {0.5, static_cast<double>(fallbackHeight) + 2.0, 0.5};
+    float baseHeight = computeBaseHeight(0, 0);
+    BlendedBiome blended = m_biomeSystem.getBlendedBiomeAt(0.0f, 0.0f);
+    float detailNoise = getDetailNoise(0, 0);
+    float finalHeight =
+        baseHeight + blended.blendedHeightModifier + detailNoise * DETAIL_AMPLITUDE * blended.blendedHeightScale;
+    finalHeight = std::clamp(finalHeight, MIN_TERRAIN_HEIGHT, MAX_TERRAIN_HEIGHT);
+    return {0.5, static_cast<double>(static_cast<int>(finalHeight)) + 2.0, 0.5};
 }
 
 } // namespace voxel::world
