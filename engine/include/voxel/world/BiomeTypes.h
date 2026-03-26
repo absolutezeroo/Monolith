@@ -1,5 +1,7 @@
 #pragma once
 
+#include "voxel/core/Assert.h"
+
 #include <cstdint>
 #include <string_view>
 
@@ -46,7 +48,7 @@ inline const BiomeDefinition& getBiomeDefinition(BiomeType type)
     };
 
     auto index = static_cast<size_t>(type);
-    // Caller must provide a valid BiomeType (not Count or out of range)
+    VX_ASSERT(index < static_cast<size_t>(BiomeType::Count), "Invalid BiomeType passed to getBiomeDefinition");
     return BIOME_DEFINITIONS[index];
 }
 

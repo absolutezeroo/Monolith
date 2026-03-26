@@ -1,6 +1,6 @@
 # Story 4.3: Biome System (Whittaker Diagram)
 
-Status: review
+Status: done
 
 ## Story
 
@@ -332,7 +332,7 @@ N/A — no build issues encountered during implementation.
 - Whittaker table implemented as `static constexpr BiomeType[4][4]` with `* 3.99f` trick to avoid OOB at 1.0. All 8 biomes reachable by construction.
 - Biome blending uses inverse-distance weighting `w = 1/(d^2 + 1)` over 25 samples at 4-block spacing. Center dominates with weight 1.0. Outputs weighted averages for heightModifier, heightScale, and surfaceDepth.
 - WorldGenerator refactored: split `computeHeight()` into `computeBaseHeight()` and `getDetailNoise()`. Height formula now: `baseHeight + blendedHeightModifier + detailNoise * DETAIL_AMPLITUDE * blendedHeightScale`. Surface fill uses biome-specific blocks (surface/subSurface/filler) with blended surface depth.
-- Removed `m_dirtId` and `m_grassId` from WorldGenerator — replaced by per-biome `BiomeBlockIds` array cached at construction. Each biome's string IDs resolved to numeric IDs via `BlockRegistry::getIdByName()` with fallback to `m_stoneId`.
+- Removed `m_dirtId` and `m_grassId` from WorldGenerator — replaced by per-biome `BiomeBlockIds` array cached at construction. Each biome's string IDs resolved to numeric IDs via `BlockRegistry::getIdByName()` with type-appropriate fallbacks (grass for surface, dirt for sub-surface, stone for filler).
 - Added `base:bedrock`, `base:sandstone`, `base:snow_block` to `assets/scripts/base/blocks.json` (`base:sand` already existed).
 - Adapted `findSpawnPoint()` to use biome-influenced height computation for consistency.
 - Created comprehensive `TestBiomeSystem.cpp` with 7 test cases: Whittaker coverage (all 8 biomes), specific value checks, boundary clamping, determinism, different seeds, blended value ranges, and BiomeDefinition validation.
@@ -358,3 +358,4 @@ Modified files:
 ### Change Log
 
 - 2026-03-26: Implemented Story 4.3 — Biome System (Whittaker Diagram). Added BiomeTypes enum, BiomeSystem class with climate noise + Whittaker lookup + 5x5 blending, integrated into WorldGenerator with per-biome surface blocks and height modifiers. Added 3 new block definitions and comprehensive Catch2 test suite.
+- 2026-03-26: Code review fixes — Added VX_ASSERT bounds check in getBiomeDefinition() to catch invalid BiomeType (was UB). Fixed biome block fallbacks in WorldGenerator to use type-appropriate defaults (grass/dirt/stone) instead of stone for all.

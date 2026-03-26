@@ -52,12 +52,16 @@ WorldGenerator::WorldGenerator(uint64_t seed, const BlockRegistry& registry)
     m_detailNoise.SetFractalOctaves(DETAIL_OCTAVES);
     m_detailNoise.SetFrequency(DETAIL_FREQUENCY);
 
+    // Resolve type-appropriate fallback IDs for biome block caching
+    uint16_t grassFallback = resolveBlockId(registry, "base:grass_block", m_stoneId);
+    uint16_t dirtFallback = resolveBlockId(registry, "base:dirt", m_stoneId);
+
     // Cache per-biome block IDs, resolving string names to numeric IDs
     for (size_t i = 0; i < static_cast<size_t>(BiomeType::Count); ++i)
     {
         const BiomeDefinition& def = getBiomeDefinition(static_cast<BiomeType>(i));
-        m_biomeBlockIds[i].surface = resolveBlockId(registry, def.surfaceBlock, m_stoneId);
-        m_biomeBlockIds[i].subSurface = resolveBlockId(registry, def.subSurfaceBlock, m_stoneId);
+        m_biomeBlockIds[i].surface = resolveBlockId(registry, def.surfaceBlock, grassFallback);
+        m_biomeBlockIds[i].subSurface = resolveBlockId(registry, def.subSurfaceBlock, dirtFallback);
         m_biomeBlockIds[i].filler = resolveBlockId(registry, def.fillerBlock, m_stoneId);
     }
 }
