@@ -63,16 +63,20 @@ BlockRegistry::BlockRegistry()
 {
     BlockDefinition air;
     air.stringId = "base:air";
-    air.numericId = BLOCK_AIR;
+    air.numericId = 0;
     air.isSolid = false;
     air.isTransparent = true;
     air.hasCollision = false;
     air.lightEmission = 0;
     air.lightFilter = 0;
     air.hardness = 0.0f;
+    air.baseStateId = 0;
+    air.stateCount = 1;
 
     m_blocks.push_back(std::move(air));
-    m_nameToId["base:air"] = BLOCK_AIR;
+    m_nameToId["base:air"] = 0;
+    m_stateToBlockIndex.push_back(0);
+    m_nextStateId = 1;
 }
 
 core::Result<uint16_t> BlockRegistry::registerBlock(BlockDefinition def)
@@ -89,14 +93,35 @@ core::Result<uint16_t> BlockRegistry::registerBlock(BlockDefinition def)
             core::EngineError{core::ErrorCode::InvalidArgument, "Duplicate block ID: " + def.stringId});
     }
 
-    VX_ASSERT(m_blocks.size() < UINT16_MAX, "Block registry capacity exceeded (max 65535)");
-    auto id = static_cast<uint16_t>(m_blocks.size());
-    def.numericId = id;
+    auto typeIndex = static_cast<uint16_t>(m_blocks.size());
+    def.numericId = typeIndex;
 
-    m_nameToId[def.stringId] = id;
+    // Compute stateCount from properties
+    uint16_t stateCount = 1;
+    for (const auto& prop : def.properties)
+    {
+        VX_ASSERT(!prop.values.empty(), "BlockStateProperty must have at least one value");
+        stateCount *= static_cast<uint16_t>(prop.values.size());
+    }
+    def.stateCount = stateCount;
+    def.baseStateId = m_nextStateId;
+
+    VX_ASSERT(
+        static_cast<uint32_t>(m_nextStateId) + stateCount <= UINT16_MAX,
+        "Block state ID space exhausted");
+
+    // Map all state IDs to this type
+    for (uint16_t s = 0; s < stateCount; ++s)
+    {
+        m_stateToBlockIndex.push_back(typeIndex);
+    }
+    m_nextStateId += stateCount;
+
+    uint16_t baseStateId = def.baseStateId;
+    m_nameToId[def.stringId] = typeIndex;
     m_blocks.push_back(std::move(def));
 
-    return id;
+    return baseStateId;
 }
 
 const BlockDefinition& BlockRegistry::getBlock(uint16_t id) const
@@ -118,6 +143,67 @@ uint16_t BlockRegistry::getIdByName(std::string_view name) const
 uint16_t BlockRegistry::blockCount() const
 {
     return static_cast<uint16_t>(m_blocks.size());
+}
+
+const BlockDefinition& BlockRegistry::getBlockType(uint16_t stateId) const
+{
+    VX_ASSERT(stateId < m_stateToBlockIndex.size(), "State ID out of range");
+    uint16_t typeIndex = m_stateToBlockIndex[stateId];
+    return m_blocks[typeIndex];
+}
+
+StateMap BlockRegistry::getStateValues(uint16_t stateId) const
+{
+    const auto& def = getBlockType(stateId);
+    StateMap result;
+    if (def.properties.empty())
+    {
+        return result;
+    }
+
+    uint16_t offset = stateId - def.baseStateId;
+    for (int i = static_cast<int>(def.properties.size()) - 1; i >= 0; --i)
+    {
+        const auto& prop = def.properties[static_cast<size_t>(i)];
+        auto valueCount = static_cast<uint16_t>(prop.values.size());
+        uint16_t valueIndex = offset % valueCount;
+        offset /= valueCount;
+        result[prop.name] = prop.values[valueIndex];
+    }
+    return result;
+}
+
+uint16_t BlockRegistry::getStateId(uint16_t baseStateId, const StateMap& stateMap) const
+{
+    VX_ASSERT(baseStateId < m_stateToBlockIndex.size(), "Base state ID out of range");
+    uint16_t typeIndex = m_stateToBlockIndex[baseStateId];
+    const auto& def = m_blocks[typeIndex];
+    VX_ASSERT(baseStateId == def.baseStateId, "baseStateId does not match block's actual base state ID");
+
+    uint16_t offset = 0;
+    for (const auto& prop : def.properties)
+    {
+        auto it = stateMap.find(prop.name);
+        VX_ASSERT(it != stateMap.end(), "Missing property in StateMap");
+        auto valIt = std::find(prop.values.begin(), prop.values.end(), it->second);
+        VX_ASSERT(valIt != prop.values.end(), "Invalid property value");
+        auto valueIndex = static_cast<uint16_t>(std::distance(prop.values.begin(), valIt));
+        offset = offset * static_cast<uint16_t>(prop.values.size()) + valueIndex;
+    }
+    return baseStateId + offset;
+}
+
+uint16_t BlockRegistry::withProperty(uint16_t stateId, std::string_view propName, std::string_view value) const
+{
+    const auto& def = getBlockType(stateId);
+    StateMap current = getStateValues(stateId);
+    current[std::string(propName)] = std::string(value);
+    return getStateId(def.baseStateId, current);
+}
+
+uint16_t BlockRegistry::totalStateCount() const
+{
+    return m_nextStateId;
 }
 
 core::Result<uint16_t> BlockRegistry::loadFromJson(const std::filesystem::path& filePath)
@@ -258,6 +344,30 @@ core::Result<uint16_t> BlockRegistry::loadFromJson(const std::filesystem::path& 
         def.powerOutput = entry.value("powerOutput", static_cast<uint8_t>(0));
         def.isPowerSource = entry.value("isPowerSource", false);
         def.isPowerConductor = entry.value("isPowerConductor", true);
+
+        // --- Block state properties ---
+        if (entry.contains("properties") && entry["properties"].is_array())
+        {
+            for (const auto& propEntry : entry["properties"])
+            {
+                if (!propEntry.is_object())
+                    continue;
+                BlockStateProperty prop;
+                prop.name = propEntry.value("name", std::string(""));
+                if (prop.name.empty())
+                    continue;
+                if (propEntry.contains("values") && propEntry["values"].is_array())
+                {
+                    for (const auto& val : propEntry["values"])
+                    {
+                        if (val.is_string())
+                            prop.values.push_back(val.get<std::string>());
+                    }
+                }
+                if (!prop.values.empty())
+                    def.properties.push_back(std::move(prop));
+            }
+        }
 
         std::string blockName = def.stringId;
         auto result = registerBlock(std::move(def));

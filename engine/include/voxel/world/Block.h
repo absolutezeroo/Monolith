@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 namespace voxel::world
 {
@@ -42,6 +43,16 @@ enum class PushReaction : uint8_t
     Destroy,
     Block
 };
+
+/// A single block state property (e.g., facing with values [north, south, east, west]).
+struct BlockStateProperty
+{
+    std::string name;
+    std::vector<std::string> values;
+};
+
+/// Maps property names to their current string values.
+using StateMap = std::unordered_map<std::string, std::string>;
 
 struct BlockDefinition
 {
@@ -103,6 +114,11 @@ struct BlockDefinition
     uint8_t powerOutput = 0;
     bool isPowerSource = false;
     bool isPowerConductor = true;
+
+    // --- Block states ---
+    std::vector<BlockStateProperty> properties;
+    uint16_t baseStateId = 0;
+    uint16_t stateCount = 1;
 };
 
 } // namespace voxel::world
