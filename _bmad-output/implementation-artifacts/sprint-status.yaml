@@ -5,7 +5,7 @@
 project: VoxelForge
 methodology: BMAD v6 + Game Dev Studio
 created: 2026-03-24
-last_updated: 2026-03-26  # Story 3.0b dev-complete, ready for review
+last_updated: 2026-03-26  # Story 3.3 marked done
 
 # Status values: backlog | ready | in-progress | review | done | blocked
 
@@ -105,8 +105,8 @@ epics:
         notes: "4 parts: Wire Gigabuffer, Swapchain fix, Depth buffer, HUD/Config/Screenshot. Depends on 3.0a."
       - id: "3.3"
         title: "BlockRegistry + JSON Loading"
-        status: backlog
-        assigned_to: null
+        status: done
+        assigned_to: dev-agent
       - id: "3.4"
         title: "Block State System"
         status: backlog
@@ -365,10 +365,10 @@ summary:
     P1: 21
     P2: 4
   by_status:
-    backlog: 45
+    backlog: 44
     ready-for-dev: 1
     in_progress: 0
     review: 1
-    done: 15
+    done: 16
     blocked: 0
   implementation_order: "3.2 (review) → 3.0a → 3.0b → 3.3 → 3.4 → 3.6 → ..."
