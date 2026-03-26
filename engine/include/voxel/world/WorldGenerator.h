@@ -3,6 +3,10 @@
 #include "voxel/world/BlockRegistry.h"
 #include "voxel/world/ChunkColumn.h"
 
+#pragma warning(push, 0)
+#include "voxel/world/FastNoiseLite.h"
+#pragma warning(pop)
+
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
 
@@ -36,17 +40,9 @@ class WorldGenerator
     uint16_t m_dirtId;
     uint16_t m_grassId;
 
-    // FastNoiseLite is configured per-call since GetNoise is const-qualified
-    // but the object itself is mutable (SetSeed etc.). We store config params
-    // and create a thread-local instance as needed, or just use mutable.
-    // For simplicity in synchronous single-threaded gen (Story 4.1), use mutable.
-    struct NoiseConfig
-    {
-        int seed;
-        float frequency;
-        int octaves;
-    };
-    NoiseConfig m_noiseConfig;
+    // FastNoiseLite configured once at construction. GetNoise() is const,
+    // so all post-construction usage is read-only.
+    FastNoiseLite m_noise;
 };
 
 } // namespace voxel::world

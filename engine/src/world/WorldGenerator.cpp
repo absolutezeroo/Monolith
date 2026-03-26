@@ -3,10 +3,6 @@
 #include "voxel/core/Log.h"
 #include "voxel/world/Block.h"
 
-#pragma warning(push, 0)
-#include "voxel/world/FastNoiseLite.h"
-#pragma warning(pop)
-
 #include <algorithm>
 #include <cmath>
 
@@ -37,20 +33,19 @@ WorldGenerator::WorldGenerator(uint64_t seed, const BlockRegistry& registry)
     , m_stoneId(resolveBlockId(registry, "voxelforge:stone", 1))
     , m_dirtId(resolveBlockId(registry, "voxelforge:dirt", 1))
     , m_grassId(resolveBlockId(registry, "voxelforge:grass_block", 1))
-    , m_noiseConfig{static_cast<int>(seed & 0x7FFFFFFF), NOISE_FREQUENCY, NOISE_OCTAVES}
 {
+    // FNL accepts int (32-bit) seeds; mask to 31 bits for positive range.
+    // Upper 33 bits of the uint64_t seed are unused — this is an FNL API limitation.
+    m_noise.SetSeed(static_cast<int>(seed & 0x7FFFFFFF));
+    m_noise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
+    m_noise.SetFractalType(FastNoiseLite::FractalType_FBm);
+    m_noise.SetFractalOctaves(NOISE_OCTAVES);
+    m_noise.SetFrequency(NOISE_FREQUENCY);
 }
 
 int WorldGenerator::computeHeight(int worldX, int worldZ) const
 {
-    FastNoiseLite fnl;
-    fnl.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
-    fnl.SetFractalType(FastNoiseLite::FractalType_FBm);
-    fnl.SetFractalOctaves(m_noiseConfig.octaves);
-    fnl.SetFrequency(m_noiseConfig.frequency);
-    fnl.SetSeed(m_noiseConfig.seed);
-
-    float rawNoise = fnl.GetNoise(static_cast<float>(worldX), static_cast<float>(worldZ));
+    float rawNoise = m_noise.GetNoise(static_cast<float>(worldX), static_cast<float>(worldZ));
     float normalized = (rawNoise + 1.0f) * 0.5f;
     int height = static_cast<int>(static_cast<float>(MIN_HEIGHT) + normalized * static_cast<float>(HEIGHT_RANGE));
     return std::clamp(height, MIN_HEIGHT, MAX_HEIGHT);

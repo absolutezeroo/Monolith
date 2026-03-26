@@ -1,6 +1,6 @@
 # Story 4.1: FastNoiseLite Integration + Basic Heightmap
 
-Status: review
+Status: done
 
 ## Story
 
@@ -209,6 +209,11 @@ Edge case: if `h < 4`, clamp dirt layers. Minimum: bedrock at 0, stone fills min
 ## Change Log
 
 - **2026-03-26**: Story 4.1 implemented — FastNoiseLite vendored, WorldGenerator class created with heightmap generation, seed management (CLI/config/random), spawn point calculation, ChunkManager integration, and 5 Catch2 unit tests.
+- **2026-03-26**: Code review (AI) — 0 HIGH, 2 MEDIUM, 2 LOW findings. All fixed:
+  - Refactored FastNoiseLite from per-call construction to single member configured at construction (performance)
+  - Added inline comment documenting 64→31 bit seed truncation (FNL API limitation)
+  - Completed ChunkColumn Rule of Five (explicit copy deletion + destructor)
+  - Fixed sprint-status.yaml summary counters
 
 ## Dev Agent Record
 
@@ -240,7 +245,7 @@ Claude Opus 4.6
 - `engine/include/voxel/world/FastNoiseLite.h` (new — vendored third-party header)
 - `engine/include/voxel/world/WorldGenerator.h` (new)
 - `engine/src/world/WorldGenerator.cpp` (new)
-- `engine/include/voxel/world/ChunkColumn.h` (modified — added move ctor/assignment)
+- `engine/include/voxel/world/ChunkColumn.h` (modified — added move ctor/assignment, explicit copy deletion per Rule of Five)
 - `engine/include/voxel/world/ChunkManager.h` (modified — added WorldGenerator* member, setWorldGenerator(), forward decl)
 - `engine/src/world/ChunkManager.cpp` (modified — loadChunk uses WorldGenerator)
 - `engine/CMakeLists.txt` (modified — added WorldGenerator.cpp)
