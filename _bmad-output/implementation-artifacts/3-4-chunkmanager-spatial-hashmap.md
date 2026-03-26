@@ -1,6 +1,6 @@
 # Story 3.4: ChunkManager + Spatial HashMap
 
-Status: review
+Status: done
 
 ## Story
 
@@ -41,7 +41,7 @@ so that **all higher-level systems (terrain gen, meshing, physics, rendering) ca
 - [x] Task 4: Write unit tests (AC: #10)
   - [x] 4.1 Load/unload lifecycle (load → verify present → unload → verify absent)
   - [x] 4.2 getBlock returns AIR for unloaded chunks
-  - [x] 4.3 setBlock on unloaded chunk — silently no-ops (VX_ASSERT in debug)
+  - [x] 4.3 setBlock on unloaded chunk — silently no-ops (VX_ASSERT in debug) — *no Catch2 test: VX_ASSERT aborts, verified via code inspection*
   - [x] 4.4 Cross-chunk-boundary getBlock (e.g., worldX=15 vs worldX=16)
   - [x] 4.5 setBlock marks correct section dirty
   - [x] 4.6 Negative coordinate translation (-1 → chunk -1, local 15)
@@ -233,5 +233,16 @@ N/A — no build/runtime issues encountered.
 - `engine/CMakeLists.txt` (modified) — added ChunkManager.cpp to sources
 - `tests/CMakeLists.txt` (modified) — added TestChunkManager.cpp to test sources
 
+### Architectural Note
+Two coordinate conversion systems coexist:
+- `voxel::math::CoordUtils.h` (Story 1.5) — `DVec3` (doubles) for player/camera float positions, uses `std::floor` + bitmask
+- `voxel::world::ChunkManager.h` (Story 3.4) — `glm::ivec3` (integers) for block positions, uses `floorDiv` + `euclideanMod`
+
+Both are correct for their domain. Future stories should be aware of this duality if extracting coordinate helpers to a shared location.
+
+### Git History Note
+ChunkManager files were committed in `a595b79` ("PaletteCompression codec skeleton") rather than `6614d2f` ("ChunkManager and spatial hash map foundations"), which actually contained BlockRegistry code. Commits were cross-labeled during multi-story dev session.
+
 ### Change Log
 - 2026-03-25: Story 3.4 implemented — ChunkManager with spatial hash map, coordinate translation, and comprehensive unit tests
+- 2026-03-26: Code review passed — 0 HIGH, 1 MEDIUM (git history), 2 LOW (task 4.3 docs, dual coord systems). All ACs verified implemented. Status → done

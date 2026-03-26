@@ -5,7 +5,7 @@
 project: VoxelForge
 methodology: BMAD v6 + Game Dev Studio
 created: 2026-03-24
-last_updated: 2026-03-25  # Story 3.3 ready-for-dev
+last_updated: 2026-03-26  # Story 3.5 (ChunkManager) code review passed → done
 
 # Status values: backlog | ready | in-progress | review | done | blocked
 
@@ -113,8 +113,8 @@ epics:
         assigned_to: null
       - id: "3.5"
         title: "ChunkManager + Spatial HashMap"
-        status: backlog
-        assigned_to: null
+        status: done
+        assigned_to: dev-agent
       - id: "3.6"
         title: "Palette Compression Codec"
         status: backlog
@@ -365,10 +365,10 @@ summary:
     P1: 21
     P2: 4
   by_status:
-    backlog: 46
+    backlog: 45
     ready-for-dev: 2
     in_progress: 0
     review: 1
-    done: 13
+    done: 14
     blocked: 0
-  implementation_order: "3.2 (review) → 3.0a → 3.0b → 3.3 → 3.4 → 3.5 → ..."
+  implementation_order: "3.2 (review) → 3.0a → 3.0b → 3.3 → 3.4 → 3.6 → ..."
