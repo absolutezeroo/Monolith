@@ -24,7 +24,7 @@ public:
      * @param width  Initial framebuffer width in pixels.
      * @param height Initial framebuffer height in pixels.
      * @param title  Window title string.
-     * @return The created Window, or EngineError::VulkanError on failure.
+     * @return The created Window, or EngineError (ErrorCode::VulkanError) on failure.
      */
     static core::Result<std::unique_ptr<Window>> create(int width, int height, const char* title);
 

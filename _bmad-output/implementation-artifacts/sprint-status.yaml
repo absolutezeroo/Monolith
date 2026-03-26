@@ -95,12 +95,12 @@ epics:
         assigned_to: dev-agent
       - id: "3.0a"
         title: "Structural Refactoring (Code Organization)"
-        status: ready-for-dev
-        assigned_to: null
+        status: in-progress
+        assigned_to: dev-agent
         notes: "6 parts: InputManager, Pipeline dedup, Overlay split, Config files, EngineError, ChunkSection O(1). No GPU changes."
       - id: "3.0b"
         title: "Renderer Fixes + Missing Features"
-        status: backlog
+        status: ready-for-dev
         assigned_to: null
         notes: "4 parts: Wire Gigabuffer, Swapchain fix, Depth buffer, HUD/Config/Screenshot. Depends on 3.0a."
       - id: "3.3"

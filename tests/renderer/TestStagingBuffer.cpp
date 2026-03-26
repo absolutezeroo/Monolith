@@ -93,7 +93,7 @@ struct RingBufferSim
     {
         if (size == 0)
         {
-            return std::unexpected(voxel::core::EngineError::InvalidArgument);
+            return std::unexpected(voxel::core::EngineError{voxel::core::ErrorCode::InvalidArgument});
         }
 
         if (pendingTransfers.size() >= maxUploadsPerFrame)
@@ -106,7 +106,7 @@ struct RingBufferSim
 
         if (usedBytes + alignedSize > frameRegionSize)
         {
-            return std::unexpected(voxel::core::EngineError::OutOfMemory);
+            return std::unexpected(voxel::core::EngineError{voxel::core::ErrorCode::OutOfMemory});
         }
 
         pendingTransfers.push_back(PendingTransfer{
@@ -227,7 +227,7 @@ TEST_CASE("Zero-size upload rejected", "[renderer][staging]")
 
     auto result = sim.upload(0, 0);
     REQUIRE_FALSE(result.has_value());
-    REQUIRE(result.error() == voxel::core::EngineError::InvalidArgument);
+    REQUIRE(result.error().code == voxel::core::ErrorCode::InvalidArgument);
 }
 
 TEST_CASE("Out-of-memory when frame region is full", "[renderer][staging]")
@@ -242,7 +242,7 @@ TEST_CASE("Out-of-memory when frame region is full", "[renderer][staging]")
     // Try to upload more than remaining space (128 - 112 = 16 bytes left)
     auto result = sim.upload(32, 200);
     REQUIRE_FALSE(result.has_value());
-    REQUIRE(result.error() == voxel::core::EngineError::OutOfMemory);
+    REQUIRE(result.error().code == voxel::core::ErrorCode::OutOfMemory);
 }
 
 TEST_CASE("Frame regions do not overlap", "[renderer][staging]")

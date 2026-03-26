@@ -28,7 +28,7 @@ core::Result<std::unique_ptr<Gigabuffer>> Gigabuffer::create(VulkanContext& cont
     if (result != VK_SUCCESS)
     {
         VX_LOG_ERROR("Gigabuffer: vmaCreateBuffer failed: {}", static_cast<int>(result));
-        return std::unexpected(core::EngineError::VulkanError);
+        return std::unexpected(core::EngineError::vulkan(static_cast<int32_t>(result), "Gigabuffer: vmaCreateBuffer failed"));
     }
 
     // Step 2: Get buffer device address
@@ -49,7 +49,7 @@ core::Result<std::unique_ptr<Gigabuffer>> Gigabuffer::create(VulkanContext& cont
         vmaDestroyBuffer(gb->m_allocator, gb->m_buffer, gb->m_allocation);
         gb->m_buffer = VK_NULL_HANDLE;
         gb->m_allocation = VK_NULL_HANDLE;
-        return std::unexpected(core::EngineError::VulkanError);
+        return std::unexpected(core::EngineError::vulkan(static_cast<int32_t>(result), "Gigabuffer: vmaCreateVirtualBlock failed"));
     }
 
     VX_LOG_INFO("Gigabuffer created: {} MB, BDA: 0x{:X}", size / (1024 * 1024), gb->m_bufferAddress);
@@ -71,7 +71,7 @@ core::Result<GigabufferAllocation> Gigabuffer::allocate(VkDeviceSize size, VkDev
     if (result != VK_SUCCESS)
     {
         VX_LOG_DEBUG("Gigabuffer: allocation failed for {} bytes (alignment {})", size, alignment);
-        return std::unexpected(core::EngineError::OutOfMemory);
+        return std::unexpected(core::EngineError{core::ErrorCode::OutOfMemory, "Gigabuffer: allocation failed"});
     }
 
     VX_LOG_DEBUG("Gigabuffer: allocated {} bytes at offset {}, total used: {}", size, offset, usedBytes());

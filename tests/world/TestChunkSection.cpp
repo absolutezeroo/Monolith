@@ -86,6 +86,57 @@ TEST_CASE("ChunkSection", "[world]")
     // Bounds checking is verified by code inspection: getBlock/setBlock both assert
     // x/y/z in [0, SIZE) via VX_ASSERT in debug builds (see ChunkSection.cpp:15-17, 23-25).
 
+    SECTION("isFull returns true when all blocks are non-air")
+    {
+        REQUIRE_FALSE(section.isFull());
+
+        section.fill(7);
+        REQUIRE(section.isFull());
+        REQUIRE(section.countNonAir() == ChunkSection::VOLUME);
+
+        section.fill(BLOCK_AIR);
+        REQUIRE_FALSE(section.isFull());
+        REQUIRE(section.isEmpty());
+    }
+
+    SECTION("set-then-unset counter correctness")
+    {
+        section.setBlock(0, 0, 0, 1);
+        section.setBlock(1, 0, 0, 2);
+        section.setBlock(2, 0, 0, 3);
+        section.setBlock(3, 0, 0, 4);
+        section.setBlock(4, 0, 0, 5);
+        REQUIRE(section.countNonAir() == 5);
+        REQUIRE_FALSE(section.isEmpty());
+
+        section.setBlock(2, 0, 0, BLOCK_AIR);
+        REQUIRE(section.countNonAir() == 4);
+
+        // Setting same block to same value should not change count
+        section.setBlock(0, 0, 0, 1);
+        REQUIRE(section.countNonAir() == 4);
+
+        // Setting air to air should not change count
+        section.setBlock(2, 0, 0, BLOCK_AIR);
+        REQUIRE(section.countNonAir() == 4);
+    }
+
+    SECTION("fill resets counter correctly")
+    {
+        section.setBlock(5, 5, 5, 42);
+        section.setBlock(6, 6, 6, 43);
+        REQUIRE(section.countNonAir() == 2);
+
+        section.fill(10);
+        REQUIRE(section.countNonAir() == ChunkSection::VOLUME);
+        REQUIRE(section.isFull());
+
+        section.fill(BLOCK_AIR);
+        REQUIRE(section.countNonAir() == 0);
+        REQUIRE(section.isEmpty());
+        REQUIRE_FALSE(section.isFull());
+    }
+
     SECTION("index calculation correctness y*256 + z*16 + x")
     {
         // Set block at (x=3, y=5, z=7) -> index = 5*256 + 7*16 + 3 = 1395

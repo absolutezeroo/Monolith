@@ -18,6 +18,7 @@ add_library(VoxelEngine STATIC
     src/world/ChunkColumn.cpp
     src/world/BlockRegistry.cpp
     src/world/ChunkManager.cpp
+    src/input/InputManager.cpp
 )
 
 target_include_directories(VoxelEngine

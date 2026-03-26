@@ -16,8 +16,14 @@ GameApp::GameApp(
 
 voxel::core::Result<void> GameApp::init(const std::string& shaderDir)
 {
-    // Set up GLFW callbacks BEFORE ImGui init (ImGui chains on top)
-    setupInputCallbacks();
+    // Create InputManager — registers GLFW callbacks.
+    // Must happen BEFORE renderer init (ImGui chains on top of existing callbacks).
+    m_input = std::make_unique<voxel::input::InputManager>(m_window.getHandle());
+
+    // InputManager now owns the GLFW user pointer, so Window's original framebuffer
+    // callback (which casts user pointer to Window*) would crash. Remove it.
+    // Swapchain recreation is handled by VK_ERROR_OUT_OF_DATE_KHR in Renderer::draw().
+    glfwSetFramebufferSizeCallback(m_window.getHandle(), nullptr);
 
     auto result = m_renderer.init(shaderDir, m_window);
     if (!result.has_value())
@@ -26,7 +32,7 @@ voxel::core::Result<void> GameApp::init(const std::string& shaderDir)
     }
 
     // Start with cursor captured for FPS camera
-    glfwSetInputMode(m_window.getHandle(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    m_input->setCursorCaptured(true);
     if (glfwRawMouseMotionSupported())
     {
         glfwSetInputMode(m_window.getHandle(), GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
@@ -35,131 +41,59 @@ voxel::core::Result<void> GameApp::init(const std::string& shaderDir)
     return {};
 }
 
-void GameApp::setupInputCallbacks()
+void GameApp::handleInputToggles()
 {
-    // Override Window's user pointer with GameApp — we handle all callbacks.
-    glfwSetWindowUserPointer(m_window.getHandle(), this);
-    glfwSetKeyCallback(m_window.getHandle(), &GameApp::keyCallback);
-    glfwSetCursorPosCallback(m_window.getHandle(), &GameApp::cursorPosCallback);
-    glfwSetMouseButtonCallback(m_window.getHandle(), &GameApp::mouseButtonCallback);
-
-    // Re-register framebuffer resize callback to forward to our Window reference
-    glfwSetFramebufferSizeCallback(m_window.getHandle(), [](GLFWwindow* w, int /*width*/, int /*height*/) {
-        auto* app = static_cast<GameApp*>(glfwGetWindowUserPointer(w));
-        if (app)
-        {
-            app->m_window.setResized();
-        }
-    });
-}
-
-void GameApp::keyCallback(GLFWwindow* w, int key, int /*scancode*/, int action, int /*mods*/)
-{
-    auto* app = static_cast<GameApp*>(glfwGetWindowUserPointer(w));
-    if (!app) return;
-
-    if (key >= 0 && key < static_cast<int>(app->m_keyStates.size()))
+    if (m_input->wasKeyPressed(GLFW_KEY_F3))
     {
-        if (action == GLFW_PRESS)
-        {
-            app->m_keyStates[static_cast<size_t>(key)] = true;
-        }
-        else if (action == GLFW_RELEASE)
-        {
-            app->m_keyStates[static_cast<size_t>(key)] = false;
-        }
+        m_overlayState.showOverlay = !m_overlayState.showOverlay;
     }
-
-    // Toggle keys on press only
-    if (action == GLFW_PRESS)
+    if (m_input->wasKeyPressed(GLFW_KEY_F4))
     {
-        switch (key)
-        {
-        case GLFW_KEY_F3:
-            app->m_overlayState.showOverlay = !app->m_overlayState.showOverlay;
-            break;
-        case GLFW_KEY_F4:
-            app->m_overlayState.wireframeMode = !app->m_overlayState.wireframeMode;
-            break;
-        case GLFW_KEY_F5:
-            app->m_overlayState.showChunkBorders = !app->m_overlayState.showChunkBorders;
-            break;
-        case GLFW_KEY_ESCAPE:
-            app->m_cursorCaptured = false;
-            glfwSetInputMode(w, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-            break;
-        default:
-            break;
-        }
+        m_overlayState.wireframeMode = !m_overlayState.wireframeMode;
     }
-}
-
-void GameApp::cursorPosCallback(GLFWwindow* w, double xpos, double ypos)
-{
-    auto* app = static_cast<GameApp*>(glfwGetWindowUserPointer(w));
-    if (!app) return;
-
-    if (app->m_firstMouse)
+    if (m_input->wasKeyPressed(GLFW_KEY_F5))
     {
-        app->m_lastCursorX = xpos;
-        app->m_lastCursorY = ypos;
-        app->m_firstMouse = false;
-        return;
+        m_overlayState.showChunkBorders = !m_overlayState.showChunkBorders;
     }
-
-    if (app->m_cursorCaptured)
+    if (m_input->wasKeyPressed(GLFW_KEY_ESCAPE))
     {
-        app->m_mouseDeltaX += static_cast<float>(xpos - app->m_lastCursorX);
-        app->m_mouseDeltaY += static_cast<float>(ypos - app->m_lastCursorY);
-    }
-
-    app->m_lastCursorX = xpos;
-    app->m_lastCursorY = ypos;
-}
-
-void GameApp::mouseButtonCallback(GLFWwindow* w, int button, int action, int /*mods*/)
-{
-    // Let ImGui handle clicks when it wants mouse
-    ImGuiIO& io = ImGui::GetIO();
-    if (io.WantCaptureMouse)
-    {
-        return;
-    }
-
-    auto* app = static_cast<GameApp*>(glfwGetWindowUserPointer(w));
-    if (!app) return;
-
-    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS && !app->m_cursorCaptured)
-    {
-        app->m_cursorCaptured = true;
-        app->m_firstMouse = true;
-        glfwSetInputMode(w, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        m_input->setCursorCaptured(false);
     }
 }
 
 void GameApp::tick(double dt)
 {
+    auto fdt = static_cast<float>(dt);
+
+    // Read edge flags set by GLFW callbacks (fired during pollEvents, before tick)
+    handleInputToggles();
+
     ImGuiIO& io = ImGui::GetIO();
 
-    // Camera mouse look — only when cursor is captured and ImGui doesn't want input
-    if (m_cursorCaptured && !io.WantCaptureMouse)
+    // Recapture cursor on left-click when released and ImGui doesn't want mouse
+    if (!m_input->isCursorCaptured() && m_input->wasMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT) && !io.WantCaptureMouse)
     {
-        m_camera.processMouseDelta(m_mouseDeltaX, m_mouseDeltaY);
+        m_input->setCursorCaptured(true);
     }
-    m_mouseDeltaX = 0.0f;
-    m_mouseDeltaY = 0.0f;
+
+    // Camera mouse look — only when cursor is captured and ImGui doesn't want input
+    if (m_input->isCursorCaptured() && !io.WantCaptureMouse)
+    {
+        glm::vec2 delta = m_input->getMouseDelta();
+        m_camera.processMouseDelta(delta.x, delta.y);
+    }
 
     // Camera movement — only when ImGui doesn't want keyboard
     if (!io.WantCaptureKeyboard)
     {
         m_camera.update(
-            static_cast<float>(dt),
-            m_keyStates[GLFW_KEY_W],
-            m_keyStates[GLFW_KEY_S],
-            m_keyStates[GLFW_KEY_A],
-            m_keyStates[GLFW_KEY_D],
-            m_keyStates[GLFW_KEY_SPACE],
-            m_keyStates[GLFW_KEY_LEFT_SHIFT]);
+            fdt,
+            m_input->isKeyDown(GLFW_KEY_W),
+            m_input->isKeyDown(GLFW_KEY_S),
+            m_input->isKeyDown(GLFW_KEY_A),
+            m_input->isKeyDown(GLFW_KEY_D),
+            m_input->isKeyDown(GLFW_KEY_SPACE),
+            m_input->isKeyDown(GLFW_KEY_LEFT_SHIFT));
     }
 
     // Sync overlay sliders back to camera
@@ -178,9 +112,90 @@ void GameApp::tick(double dt)
     // Sync camera state to overlay for display
     m_overlayState.fov = m_camera.getFov();
     m_overlayState.sensitivity = m_camera.getSensitivity();
+
+    // Clear edge flags and update hold timers at end of tick.
+    // Edge flags were set by pollEvents callbacks, read above, and now cleared
+    // so subsequent ticks in the same frame won't see stale presses.
+    m_input->update(fdt);
+}
+
+void GameApp::buildDebugOverlay()
+{
+    if (!m_overlayState.showOverlay)
+    {
+        return;
+    }
+
+    ImGui::SetNextWindowPos(ImVec2(10.0f, 10.0f), ImGuiCond_Always);
+    ImGui::SetNextWindowBgAlpha(0.5f);
+
+    constexpr ImGuiWindowFlags flags =
+        ImGuiWindowFlags_NoDecoration |
+        ImGuiWindowFlags_AlwaysAutoResize |
+        ImGuiWindowFlags_NoFocusOnAppearing |
+        ImGuiWindowFlags_NoNav;
+
+    if (ImGui::Begin("##DebugOverlay", nullptr, flags))
+    {
+        ImGui::Text("VoxelForge v0.1.0");
+        ImGui::Separator();
+
+        ImGui::Text("FPS: %d (%.1f ms)", m_displayFps, m_displayFps > 0 ? 1000.0f / static_cast<float>(m_displayFps) : 0.0f);
+
+        const auto& pos = m_camera.getPosition();
+        ImGui::Text("Position: %.2f, %.2f, %.2f", pos.x, pos.y, pos.z);
+        ImGui::Text("Yaw: %.1f  Pitch: %.1f", m_camera.getYaw(), m_camera.getPitch());
+
+        float yaw = m_camera.getYaw();
+        float normalizedYaw = yaw - 360.0f * std::floor(yaw / 360.0f);
+        const char* facing = "North (+Z)";
+        if (normalizedYaw >= 45.0f && normalizedYaw < 135.0f)
+            facing = "East (+X)";
+        else if (normalizedYaw >= 135.0f && normalizedYaw < 225.0f)
+            facing = "South (-Z)";
+        else if (normalizedYaw >= 225.0f && normalizedYaw < 315.0f)
+            facing = "West (-X)";
+        ImGui::Text("Facing: %s", facing);
+
+        ImGui::Separator();
+
+        ImGui::Text("Gigabuffer: N/A");
+        ImGui::Text("Chunks: No ChunkManager active");
+
+        ImGui::Separator();
+
+        ImGui::Text("[F4] Wireframe: %s", m_overlayState.wireframeMode ? "ON" : "OFF");
+        ImGui::Text("[F5] Chunk borders: %s", m_overlayState.showChunkBorders ? "ON" : "OFF");
+
+        ImGui::Separator();
+
+        ImGui::SliderFloat("FOV", &m_overlayState.fov, 50.0f, 110.0f, "%.0f");
+        ImGui::SliderFloat("Sensitivity", &m_overlayState.sensitivity, 0.01f, 0.5f, "%.3f");
+    }
+    ImGui::End();
 }
 
 void GameApp::render(double /*alpha*/)
 {
-    m_renderer.draw(m_window, m_camera, m_overlayState);
+    // FPS tracking
+    double now = glfwGetTime();
+    if (m_lastFrameTime < 0.0)
+    {
+        m_lastFrameTime = now;
+    }
+    m_fpsTimer += now - m_lastFrameTime;
+    m_lastFrameTime = now;
+    ++m_fpsCount;
+    if (m_fpsTimer >= 1.0)
+    {
+        m_displayFps = m_fpsCount;
+        m_fpsCount = 0;
+        m_fpsTimer -= 1.0;
+    }
+
+    if (m_renderer.beginFrame(m_window, m_overlayState))
+    {
+        buildDebugOverlay();
+        m_renderer.endFrame();
+    }
 }

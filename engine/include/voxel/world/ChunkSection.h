@@ -22,9 +22,12 @@ struct ChunkSection
     void setBlock(int x, int y, int z, uint16_t id);
     void fill(uint16_t id);
     [[nodiscard]] bool isEmpty() const;
+    [[nodiscard]] bool isFull() const;
     [[nodiscard]] int32_t countNonAir() const;
 
 private:
+    int32_t m_nonAirCount = 0;
+
     [[nodiscard]] static constexpr int toIndex(int x, int y, int z)
     {
         return y * 256 + z * 16 + x;

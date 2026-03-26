@@ -31,12 +31,12 @@ core::Result<uint16_t> BlockRegistry::registerBlock(BlockDefinition def)
 {
     if (!isValidNamespace(def.stringId))
     {
-        return std::unexpected(core::EngineError::InvalidArgument);
+        return std::unexpected(core::EngineError{core::ErrorCode::InvalidArgument, "Invalid block namespace: " + def.stringId});
     }
 
     if (m_nameToId.contains(def.stringId))
     {
-        return std::unexpected(core::EngineError::InvalidArgument);
+        return std::unexpected(core::EngineError{core::ErrorCode::InvalidArgument, "Duplicate block ID: " + def.stringId});
     }
 
     VX_ASSERT(m_blocks.size() < UINT16_MAX, "Block registry capacity exceeded (max 65535)");
@@ -74,19 +74,19 @@ core::Result<uint16_t> BlockRegistry::loadFromJson(const std::filesystem::path& 
 {
     if (!std::filesystem::exists(filePath))
     {
-        return std::unexpected(core::EngineError::FileNotFound);
+        return std::unexpected(core::EngineError::file(filePath.string()));
     }
 
     std::ifstream file(filePath);
     if (!file.is_open())
     {
-        return std::unexpected(core::EngineError::FileNotFound);
+        return std::unexpected(core::EngineError::file(filePath.string()));
     }
 
     auto json = nlohmann::json::parse(file, nullptr, false);
     if (json.is_discarded() || !json.is_array())
     {
-        return std::unexpected(core::EngineError::InvalidFormat);
+        return std::unexpected(core::EngineError{core::ErrorCode::InvalidFormat, "Invalid JSON format: " + filePath.string()});
     }
 
     uint16_t count = 0;

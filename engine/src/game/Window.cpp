@@ -31,7 +31,7 @@ core::Result<std::unique_ptr<Window>> Window::create(int width, int height, cons
     if (glfwInit() == GLFW_FALSE)
     {
         VX_LOG_ERROR("Failed to initialize GLFW");
-        return std::unexpected(core::EngineError::VulkanError);
+        return std::unexpected(core::EngineError{core::ErrorCode::VulkanError, "Failed to initialize GLFW"});
     }
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
@@ -42,7 +42,7 @@ core::Result<std::unique_ptr<Window>> Window::create(int width, int height, cons
     {
         VX_LOG_ERROR("Failed to create GLFW window");
         glfwTerminate();
-        return std::unexpected(core::EngineError::VulkanError);
+        return std::unexpected(core::EngineError{core::ErrorCode::VulkanError, "Failed to create GLFW window"});
     }
 
     auto window = std::unique_ptr<Window>(new Window(handle));

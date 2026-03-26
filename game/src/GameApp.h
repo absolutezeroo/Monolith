@@ -2,10 +2,11 @@
 
 #include "voxel/core/Result.h"
 #include "voxel/game/GameLoop.h"
+#include "voxel/input/InputManager.h"
 #include "voxel/renderer/Camera.h"
 #include "voxel/renderer/Renderer.h"
 
-#include <array>
+#include <memory>
 #include <string>
 
 struct GLFWwindow;
@@ -34,23 +35,19 @@ protected:
     void render(double alpha) override;
 
 private:
-    static void keyCallback(GLFWwindow* w, int key, int scancode, int action, int mods);
-    static void cursorPosCallback(GLFWwindow* w, double xpos, double ypos);
-    static void mouseButtonCallback(GLFWwindow* w, int button, int action, int mods);
-
-    void setupInputCallbacks();
+    void handleInputToggles();
+    void buildDebugOverlay();
 
     voxel::game::Window& m_window;
     voxel::renderer::Renderer m_renderer;
     voxel::renderer::Camera m_camera;
     voxel::renderer::DebugOverlayState m_overlayState;
 
-    // Input state
-    std::array<bool, 512> m_keyStates{};
-    double m_lastCursorX = 0.0;
-    double m_lastCursorY = 0.0;
-    float m_mouseDeltaX = 0.0f;
-    float m_mouseDeltaY = 0.0f;
-    bool m_cursorCaptured = true;
-    bool m_firstMouse = true;
+    std::unique_ptr<voxel::input::InputManager> m_input;
+
+    // FPS tracking
+    double m_lastFrameTime = -1.0;
+    int m_fpsCount = 0;
+    double m_fpsTimer = 0.0;
+    int m_displayFps = 0;
 };

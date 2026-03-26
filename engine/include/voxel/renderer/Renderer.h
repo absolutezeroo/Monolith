@@ -70,25 +70,38 @@ public:
     core::Result<void> init(const std::string& shaderDir, game::Window& window);
 
     /**
-     * @brief Renders one frame: acquire image, record commands, submit, present.
-     * @param window Reference to the window for resize handling.
-     * @param camera Camera for overlay display.
-     * @param overlay Debug overlay state (F3/F4/F5 toggles).
+     * @brief Begins a frame: acquires swapchain image, starts command recording, draws scene.
+     *
+     * After this returns true, the caller may issue ImGui calls (e.g. overlay building).
+     * Must be followed by endFrame().
+     * @return true if frame is active and caller should build ImGui. false if frame was skipped.
      */
-    void draw(game::Window& window, const Camera& camera, DebugOverlayState& overlay);
+    bool beginFrame(game::Window& window, DebugOverlayState& overlay);
+
+    /**
+     * @brief Ends the frame: renders ImGui, submits commands, presents.
+     *
+     * Must only be called after beginFrame() returned true.
+     */
+    void endFrame();
 
     /// Waits for GPU idle and destroys all owned resources.
     void shutdown();
 
+    /// Configuration for graphics pipeline creation.
+    struct PipelineConfig
+    {
+        VkPolygonMode polygonMode = VK_POLYGON_MODE_FILL;
+        std::string vertShaderPath;
+        std::string fragShaderPath;
+    };
+
 private:
     core::Result<void> createFrameResources();
-    core::Result<void> createPipeline(const std::string& shaderDir);
-    core::Result<void> createWireframePipeline(const std::string& shaderDir);
+    core::Result<VkPipeline> buildPipeline(const PipelineConfig& config);
     core::Result<VkShaderModule> loadShaderModule(const std::string& path);
 
     void recreateRenderFinishedSemaphores();
-
-    void buildDebugOverlay(const Camera& camera, DebugOverlayState& overlay);
 
     void transitionImage(
         VkCommandBuffer cmd,
@@ -112,11 +125,10 @@ private:
     bool m_isInitialized = false;
     bool m_framebufferResized = false;
 
-    // FPS tracking (initialized to -1 to detect first frame)
-    double m_lastFrameTime = -1.0;
-    int m_fpsCount = 0;
-    double m_fpsTimer = 0.0;
-    int m_displayFps = 0;
+    // Per-frame state (set by beginFrame, used by endFrame)
+    game::Window* m_currentWindow = nullptr;
+    uint32_t m_currentImageIndex = 0;
+    bool m_frameActive = false;
 };
 
 } // namespace voxel::renderer

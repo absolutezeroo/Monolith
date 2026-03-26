@@ -43,7 +43,7 @@ core::Result<std::unique_ptr<StagingBuffer>> StagingBuffer::create(
     if (result != VK_SUCCESS)
     {
         VX_LOG_ERROR("Failed to create staging buffer: {}", static_cast<int>(result));
-        return std::unexpected(core::EngineError::VulkanError);
+        return std::unexpected(core::EngineError::vulkan(static_cast<int32_t>(result), "Failed to create staging buffer"));
     }
 
     staging->m_mappedData = allocInfo.pMappedData;
@@ -60,7 +60,7 @@ core::Result<std::unique_ptr<StagingBuffer>> StagingBuffer::create(
     {
         VX_LOG_ERROR("Failed to create transfer command pool: {}", static_cast<int>(result));
         vmaDestroyBuffer(allocator, staging->m_buffer, staging->m_allocation);
-        return std::unexpected(core::EngineError::VulkanError);
+        return std::unexpected(core::EngineError::vulkan(static_cast<int32_t>(result), "Failed to create transfer command pool"));
     }
 
     // Allocate FRAMES_IN_FLIGHT transfer command buffers
@@ -76,7 +76,7 @@ core::Result<std::unique_ptr<StagingBuffer>> StagingBuffer::create(
         VX_LOG_ERROR("Failed to allocate transfer command buffers: {}", static_cast<int>(result));
         vkDestroyCommandPool(device, staging->m_transferCommandPool, nullptr);
         vmaDestroyBuffer(allocator, staging->m_buffer, staging->m_allocation);
-        return std::unexpected(core::EngineError::VulkanError);
+        return std::unexpected(core::EngineError::vulkan(static_cast<int32_t>(result), "Failed to allocate transfer command buffers"));
     }
 
     // Create per-frame transfer fences (signaled initially)
@@ -97,7 +97,7 @@ core::Result<std::unique_ptr<StagingBuffer>> StagingBuffer::create(
             }
             vkDestroyCommandPool(device, staging->m_transferCommandPool, nullptr);
             vmaDestroyBuffer(allocator, staging->m_buffer, staging->m_allocation);
-            return std::unexpected(core::EngineError::VulkanError);
+            return std::unexpected(core::EngineError::vulkan(static_cast<int32_t>(result), "Failed to create transfer fence"));
         }
     }
 
@@ -115,7 +115,7 @@ core::Result<std::unique_ptr<StagingBuffer>> StagingBuffer::create(
         }
         vkDestroyCommandPool(device, staging->m_transferCommandPool, nullptr);
         vmaDestroyBuffer(allocator, staging->m_buffer, staging->m_allocation);
-        return std::unexpected(core::EngineError::VulkanError);
+        return std::unexpected(core::EngineError::vulkan(static_cast<int32_t>(result), "Failed to create transfer semaphore"));
     }
 
     VX_LOG_INFO("StagingBuffer created — {} MB, {} frames, transfer queue family {}{}",
@@ -175,7 +175,7 @@ core::Result<void> StagingBuffer::uploadToGigabuffer(
     {
         VX_LOG_ERROR("uploadToGigabuffer: invalid arguments (data={}, size={})",
             data != nullptr ? "valid" : "null", size);
-        return std::unexpected(core::EngineError::InvalidArgument);
+        return std::unexpected(core::EngineError{core::ErrorCode::InvalidArgument, "uploadToGigabuffer: invalid arguments"});
     }
 
     // Rate limiting
@@ -194,7 +194,7 @@ core::Result<void> StagingBuffer::uploadToGigabuffer(
     {
         VX_LOG_ERROR("uploadToGigabuffer: out of staging memory (need {} bytes, {} available)",
             alignedSize, m_frameRegionSize - m_usedBytes);
-        return std::unexpected(core::EngineError::OutOfMemory);
+        return std::unexpected(core::EngineError{core::ErrorCode::OutOfMemory, "uploadToGigabuffer: out of staging memory"});
     }
 
     // Copy data into staging buffer
@@ -236,7 +236,7 @@ core::Result<void> StagingBuffer::flushTransfers(VkBuffer gigabuffer)
     if (result != VK_SUCCESS)
     {
         VX_LOG_ERROR("Failed to begin transfer command buffer: {}", static_cast<int>(result));
-        return std::unexpected(core::EngineError::VulkanError);
+        return std::unexpected(core::EngineError::vulkan(static_cast<int32_t>(result), "Failed to begin transfer command buffer"));
     }
 
     // Build copy regions from all pending transfers
@@ -259,7 +259,7 @@ core::Result<void> StagingBuffer::flushTransfers(VkBuffer gigabuffer)
     if (result != VK_SUCCESS)
     {
         VX_LOG_ERROR("Failed to end transfer command buffer: {}", static_cast<int>(result));
-        return std::unexpected(core::EngineError::VulkanError);
+        return std::unexpected(core::EngineError::vulkan(static_cast<int32_t>(result), "Failed to end transfer command buffer"));
     }
 
     // Submit via vkQueueSubmit2 — signal transfer semaphore
@@ -288,7 +288,7 @@ core::Result<void> StagingBuffer::flushTransfers(VkBuffer gigabuffer)
     if (result != VK_SUCCESS)
     {
         VX_LOG_ERROR("Failed to submit transfer commands: {}", static_cast<int>(result));
-        return std::unexpected(core::EngineError::VulkanError);
+        return std::unexpected(core::EngineError::vulkan(static_cast<int32_t>(result), "Failed to submit transfer commands"));
     }
 
     m_hasActiveTransfer = true;

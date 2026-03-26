@@ -75,7 +75,7 @@ TEST_CASE("BlockRegistry", "[world]")
         stoneDup.stringId = "base:stone";
         auto result = registry.registerBlock(stoneDup);
         REQUIRE_FALSE(result.has_value());
-        REQUIRE(result.error() == voxel::core::EngineError::InvalidArgument);
+        REQUIRE(result.error().code == voxel::core::ErrorCode::InvalidArgument);
     }
 
     SECTION("invalid namespace format rejected — no colon")
@@ -84,7 +84,7 @@ TEST_CASE("BlockRegistry", "[world]")
         bad.stringId = "nonamespace";
         auto result = registry.registerBlock(bad);
         REQUIRE_FALSE(result.has_value());
-        REQUIRE(result.error() == voxel::core::EngineError::InvalidArgument);
+        REQUIRE(result.error().code == voxel::core::ErrorCode::InvalidArgument);
     }
 
     SECTION("invalid namespace format rejected — empty namespace")
@@ -160,7 +160,7 @@ TEST_CASE("BlockRegistry JSON loading", "[world]")
     {
         auto result = registry.loadFromJson("nonexistent/path.json");
         REQUIRE_FALSE(result.has_value());
-        REQUIRE(result.error() == voxel::core::EngineError::FileNotFound);
+        REQUIRE(result.error().code == voxel::core::ErrorCode::FileNotFound);
     }
 
     SECTION("loadFromJson returns InvalidFormat for malformed JSON")
@@ -175,7 +175,7 @@ TEST_CASE("BlockRegistry JSON loading", "[world]")
 
         auto result = registry.loadFromJson(badJsonPath);
         REQUIRE_FALSE(result.has_value());
-        REQUIRE(result.error() == voxel::core::EngineError::InvalidFormat);
+        REQUIRE(result.error().code == voxel::core::ErrorCode::InvalidFormat);
 
         std::filesystem::remove(badJsonPath);
     }
@@ -191,7 +191,7 @@ TEST_CASE("BlockRegistry JSON loading", "[world]")
 
         auto result = registry.loadFromJson(objJsonPath);
         REQUIRE_FALSE(result.has_value());
-        REQUIRE(result.error() == voxel::core::EngineError::InvalidFormat);
+        REQUIRE(result.error().code == voxel::core::ErrorCode::InvalidFormat);
 
         std::filesystem::remove(objJsonPath);
     }

@@ -15,9 +15,9 @@ TEST_CASE("Result<T> success and error construction", "[core][result]")
 
     SECTION("Error construction via std::unexpected")
     {
-        Result<int> r = std::unexpected(EngineError::FileNotFound);
+        Result<int> r = std::unexpected(EngineError{ErrorCode::FileNotFound});
         REQUIRE_FALSE(r.has_value());
-        REQUIRE(r.error() == EngineError::FileNotFound);
+        REQUIRE(r.error().code == ErrorCode::FileNotFound);
     }
 }
 
@@ -33,7 +33,7 @@ TEST_CASE("Result<T> monadic operations", "[core][result]")
 
     SECTION(".and_then() short-circuits on error")
     {
-        Result<int> r = std::unexpected(EngineError::OutOfMemory);
+        Result<int> r = std::unexpected(EngineError{ErrorCode::OutOfMemory});
         bool called = false;
         auto result = r.and_then(
             [&](int v) -> Result<int>
@@ -42,13 +42,13 @@ TEST_CASE("Result<T> monadic operations", "[core][result]")
                 return v * 2;
             });
         REQUIRE_FALSE(called);
-        REQUIRE(result.error() == EngineError::OutOfMemory);
+        REQUIRE(result.error().code == ErrorCode::OutOfMemory);
     }
 
     SECTION(".or_else() invoked on error")
     {
-        Result<int> r = std::unexpected(EngineError::FileNotFound);
-        auto recovered = r.or_else([](EngineError) -> Result<int> { return 0; });
+        Result<int> r = std::unexpected(EngineError{ErrorCode::FileNotFound});
+        auto recovered = r.or_else([](const EngineError&) -> Result<int> { return 0; });
         REQUIRE(recovered.has_value());
         REQUIRE(recovered.value() == 0);
     }
@@ -58,7 +58,7 @@ TEST_CASE("Result<T> monadic operations", "[core][result]")
         Result<int> r = 42;
         bool called = false;
         auto result = r.or_else(
-            [&](EngineError) -> Result<int>
+            [&](const EngineError&) -> Result<int>
             {
                 called = true;
                 return 0;
@@ -84,7 +84,7 @@ TEST_CASE("std::unexpected propagation through chain", "[core][result]")
     };
     auto step2 = [](int) -> Result<int>
     {
-        return std::unexpected(EngineError::InvalidFormat);
+        return std::unexpected(EngineError{ErrorCode::InvalidFormat});
     };
     auto step3 = [](int v) -> Result<int>
     {
@@ -95,17 +95,44 @@ TEST_CASE("std::unexpected propagation through chain", "[core][result]")
     auto finalResult = r.and_then(step1).and_then(step2).and_then(step3);
 
     REQUIRE_FALSE(finalResult.has_value());
-    REQUIRE(finalResult.error() == EngineError::InvalidFormat);
+    REQUIRE(finalResult.error().code == ErrorCode::InvalidFormat);
 }
 
-TEST_CASE("EngineError covers all defined variants", "[core][result]")
+TEST_CASE("ErrorCode covers all defined variants", "[core][result]")
 {
     // Verify all enum values are distinct and constructable
-    REQUIRE(EngineError::FileNotFound != EngineError::InvalidFormat);
-    REQUIRE(EngineError::ShaderCompileError != EngineError::VulkanError);
-    REQUIRE(EngineError::ChunkNotLoaded != EngineError::OutOfMemory);
-    REQUIRE(EngineError::ScriptError != EngineError::FileNotFound);
+    REQUIRE(ErrorCode::FileNotFound != ErrorCode::InvalidFormat);
+    REQUIRE(ErrorCode::ShaderCompileError != ErrorCode::VulkanError);
+    REQUIRE(ErrorCode::ChunkNotLoaded != ErrorCode::OutOfMemory);
+    REQUIRE(ErrorCode::ScriptError != ErrorCode::FileNotFound);
 
     // Verify underlying type is uint8
-    REQUIRE(sizeof(EngineError) == sizeof(uint8));
+    REQUIRE(sizeof(ErrorCode) == sizeof(uint8));
+}
+
+TEST_CASE("EngineError struct carries context", "[core][result]")
+{
+    SECTION("vulkan factory stores VkResult and context")
+    {
+        auto err = EngineError::vulkan(-3, "vkCreateDevice failed");
+        REQUIRE(err.code == ErrorCode::VulkanError);
+        REQUIRE(err.nativeResult == -3);
+        REQUIRE(err.message.find("vkCreateDevice failed") != std::string::npos);
+        REQUIRE(err.message.find("-3") != std::string::npos);
+    }
+
+    SECTION("file factory stores path")
+    {
+        auto err = EngineError::file("assets/missing.json");
+        REQUIRE(err.code == ErrorCode::FileNotFound);
+        REQUIRE(err.message.find("assets/missing.json") != std::string::npos);
+    }
+
+    SECTION("direct construction with code and message")
+    {
+        EngineError err{ErrorCode::InvalidArgument, "bad input"};
+        REQUIRE(err.code == ErrorCode::InvalidArgument);
+        REQUIRE(err.message == "bad input");
+        REQUIRE(err.nativeResult == 0);
+    }
 }

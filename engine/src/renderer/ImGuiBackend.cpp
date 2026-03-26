@@ -29,7 +29,7 @@ core::Result<std::unique_ptr<ImGuiBackend>> ImGuiBackend::create(VulkanContext& 
     if (result != VK_SUCCESS)
     {
         VX_LOG_ERROR("Failed to create ImGui descriptor pool: {}", static_cast<int>(result));
-        return std::unexpected(core::EngineError::VulkanError);
+        return std::unexpected(core::EngineError::vulkan(static_cast<int32_t>(result), "Failed to create ImGui descriptor pool"));
     }
 
     // ImGui context
