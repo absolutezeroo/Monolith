@@ -5,7 +5,7 @@
 project: VoxelForge
 methodology: BMAD v6 + Game Dev Studio
 created: 2026-03-24
-last_updated: 2026-03-26  # Story 4.2 (Spline Remapping + Elevation Distribution) — review
+last_updated: 2026-03-26  # Story 4.2 (Spline Remapping + Elevation Distribution) — done
 
 # Status values: backlog | ready | in-progress | review | done | blocked
 
@@ -141,7 +141,7 @@ epics:
         assigned_to: dev-agent
       - id: "4.2"
         title: "Spline Remapping + Elevation Distribution"
-        status: review
+        status: done
         assigned_to: dev-agent
       - id: "4.3"
         title: "Biome System (Whittaker Diagram)"
@@ -373,7 +373,7 @@ summary:
     backlog: 41
     ready-for-dev: 3
     in_progress: 0
-    review: 1
-    done: 23
+    review: 0
+    done: 24
     blocked: 0
-  implementation_order: "4.2 (review) → 4.3 (ready) → 4.4 (ready) → 4.5 (ready) → Epic 5..."
+  implementation_order: "4.3 (ready) → 4.4 (ready) → 4.5 (ready) → Epic 5..."

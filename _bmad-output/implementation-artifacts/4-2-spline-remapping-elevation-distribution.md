@@ -1,6 +1,6 @@
 # Story 4.2: Spline Remapping + Elevation Distribution
 
-Status: review
+Status: done
 
 ## Story
 
@@ -223,6 +223,7 @@ Claude Opus 4.6
 - `engine/src/world/SplineCurve.cpp` (new)
 - `engine/include/voxel/world/WorldGenerator.h` (modified)
 - `engine/src/world/WorldGenerator.cpp` (modified)
+- `game/src/GameApp.cpp` (modified — block prefix `voxelforge:` → `base:` to match WorldGenerator lookups)
 - `engine/CMakeLists.txt` (modified)
 - `tests/world/TestSplineCurve.cpp` (new)
 - `tests/world/TestWorldGenerator.cpp` (modified)
