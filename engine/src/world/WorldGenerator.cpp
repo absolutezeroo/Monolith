@@ -9,12 +9,14 @@
 namespace voxel::world
 {
 
-static constexpr int MIN_HEIGHT = 40;
-static constexpr int MAX_HEIGHT = 120;
-static constexpr int HEIGHT_RANGE = MAX_HEIGHT - MIN_HEIGHT; // 80
 static constexpr int DIRT_LAYERS = 3;
-static constexpr float NOISE_FREQUENCY = 0.01f;
-static constexpr int NOISE_OCTAVES = 6;
+static constexpr float CONTINENT_FREQUENCY = 0.001f;
+static constexpr int CONTINENT_OCTAVES = 4;
+static constexpr float DETAIL_FREQUENCY = 0.02f;
+static constexpr int DETAIL_OCTAVES = 4;
+static constexpr int DETAIL_SEED_OFFSET = 0x12345;
+static constexpr float MIN_TERRAIN_HEIGHT = 1.0f;
+static constexpr float MAX_TERRAIN_HEIGHT = 254.0f;
 
 static uint16_t resolveBlockId(const BlockRegistry& registry, std::string_view name, uint16_t fallback)
 {
@@ -29,26 +31,48 @@ static uint16_t resolveBlockId(const BlockRegistry& registry, std::string_view n
 
 WorldGenerator::WorldGenerator(uint64_t seed, const BlockRegistry& registry)
     : m_seed(seed)
-    , m_bedrockId(resolveBlockId(registry, "voxelforge:bedrock", 1))
-    , m_stoneId(resolveBlockId(registry, "voxelforge:stone", 1))
-    , m_dirtId(resolveBlockId(registry, "voxelforge:dirt", 1))
-    , m_grassId(resolveBlockId(registry, "voxelforge:grass_block", 1))
+    , m_bedrockId(resolveBlockId(registry, "base:bedrock", 1))
+    , m_stoneId(resolveBlockId(registry, "base:stone", 1))
+    , m_dirtId(resolveBlockId(registry, "base:dirt", 1))
+    , m_grassId(resolveBlockId(registry, "base:grass_block", 1))
+    , m_spline(SplineCurve::createDefault())
 {
     // FNL accepts int (32-bit) seeds; mask to 31 bits for positive range.
     // Upper 33 bits of the uint64_t seed are unused — this is an FNL API limitation.
-    m_noise.SetSeed(static_cast<int>(seed & 0x7FFFFFFF));
-    m_noise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
-    m_noise.SetFractalType(FastNoiseLite::FractalType_FBm);
-    m_noise.SetFractalOctaves(NOISE_OCTAVES);
-    m_noise.SetFrequency(NOISE_FREQUENCY);
+    int baseSeed = static_cast<int>(seed & 0x7FFFFFFF);
+
+    // Continent noise: large-scale continental shapes
+    m_continentNoise.SetSeed(baseSeed);
+    m_continentNoise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
+    m_continentNoise.SetFractalType(FastNoiseLite::FractalType_FBm);
+    m_continentNoise.SetFractalOctaves(CONTINENT_OCTAVES);
+    m_continentNoise.SetFrequency(CONTINENT_FREQUENCY);
+
+    // Detail noise: local terrain variation (deterministic offset from continent seed)
+    m_detailNoise.SetSeed(baseSeed ^ DETAIL_SEED_OFFSET);
+    m_detailNoise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
+    m_detailNoise.SetFractalType(FastNoiseLite::FractalType_FBm);
+    m_detailNoise.SetFractalOctaves(DETAIL_OCTAVES);
+    m_detailNoise.SetFrequency(DETAIL_FREQUENCY);
 }
 
 int WorldGenerator::computeHeight(int worldX, int worldZ) const
 {
-    float rawNoise = m_noise.GetNoise(static_cast<float>(worldX), static_cast<float>(worldZ));
-    float normalized = (rawNoise + 1.0f) * 0.5f;
-    int height = static_cast<int>(static_cast<float>(MIN_HEIGHT) + normalized * static_cast<float>(HEIGHT_RANGE));
-    return std::clamp(height, MIN_HEIGHT, MAX_HEIGHT);
+    float wx = static_cast<float>(worldX);
+    float wz = static_cast<float>(worldZ);
+
+    // Continent noise → spline-remapped base height
+    float continentNoise = m_continentNoise.GetNoise(wx, wz);
+    float baseHeight = m_spline.evaluate(continentNoise);
+
+    // Detail noise → local terrain variation
+    float detailNoise = m_detailNoise.GetNoise(wx, wz);
+    float finalHeight = baseHeight + detailNoise * DETAIL_AMPLITUDE;
+
+    // Clamp to valid column bounds
+    finalHeight = std::clamp(finalHeight, MIN_TERRAIN_HEIGHT, MAX_TERRAIN_HEIGHT);
+
+    return static_cast<int>(finalHeight);
 }
 
 ChunkColumn WorldGenerator::generateChunkColumn(glm::ivec2 chunkCoord) const

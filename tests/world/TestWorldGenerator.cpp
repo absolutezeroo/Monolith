@@ -1,9 +1,8 @@
-#include "voxel/world/WorldGenerator.h"
-
 #include "voxel/world/Block.h"
 #include "voxel/world/BlockRegistry.h"
 #include "voxel/world/ChunkColumn.h"
 #include "voxel/world/ChunkSection.h"
+#include "voxel/world/WorldGenerator.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -20,19 +19,19 @@ BlockRegistry makeTerrainRegistry()
     BlockRegistry registry;
 
     BlockDefinition stone;
-    stone.stringId = "voxelforge:stone";
+    stone.stringId = "base:stone";
     (void)registry.registerBlock(std::move(stone));
 
     BlockDefinition dirt;
-    dirt.stringId = "voxelforge:dirt";
+    dirt.stringId = "base:dirt";
     (void)registry.registerBlock(std::move(dirt));
 
     BlockDefinition grass;
-    grass.stringId = "voxelforge:grass_block";
+    grass.stringId = "base:grass_block";
     (void)registry.registerBlock(std::move(grass));
 
     BlockDefinition bedrock;
-    bedrock.stringId = "voxelforge:bedrock";
+    bedrock.stringId = "base:bedrock";
     (void)registry.registerBlock(std::move(bedrock));
 
     return registry;
@@ -74,7 +73,7 @@ TEST_CASE("WorldGenerator: surface blocks are within [40, 120]", "[world][worldg
     BlockRegistry registry = makeTerrainRegistry();
     WorldGenerator gen(12345, registry);
 
-    uint16_t grassId = registry.getIdByName("voxelforge:grass_block");
+    uint16_t grassId = registry.getIdByName("base:grass_block");
     REQUIRE(grassId != BLOCK_AIR);
 
     // Check several chunks at different positions
@@ -110,10 +109,10 @@ TEST_CASE("WorldGenerator: surface composition is correct", "[world][worldgenera
     BlockRegistry registry = makeTerrainRegistry();
     WorldGenerator gen(99999, registry);
 
-    uint16_t stoneId = registry.getIdByName("voxelforge:stone");
-    uint16_t dirtId = registry.getIdByName("voxelforge:dirt");
-    uint16_t grassId = registry.getIdByName("voxelforge:grass_block");
-    uint16_t bedrockId = registry.getIdByName("voxelforge:bedrock");
+    uint16_t stoneId = registry.getIdByName("base:stone");
+    uint16_t dirtId = registry.getIdByName("base:dirt");
+    uint16_t grassId = registry.getIdByName("base:grass_block");
+    uint16_t bedrockId = registry.getIdByName("base:bedrock");
 
     ChunkColumn col = gen.generateChunkColumn({0, 0});
 

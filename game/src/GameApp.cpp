@@ -109,14 +109,14 @@ voxel::core::Result<void> GameApp::init(const std::string& shaderDir, std::optio
             VX_LOG_WARN("Failed to register block '{}': {}", id, result.error().message);
         }
     };
-    registerBlock("voxelforge:stone", true);
-    registerBlock("voxelforge:dirt", true);
-    registerBlock("voxelforge:grass_block", true);
-    registerBlock("voxelforge:bedrock", true);
+    registerBlock("base:stone", true);
+    registerBlock("base:dirt", true);
+    registerBlock("base:grass_block", true);
+    registerBlock("base:bedrock", true);
 
     // Create WorldGenerator
-    m_worldGen = std::make_unique<voxel::world::WorldGenerator>(
-        static_cast<uint64_t>(m_config.getSeed()), m_blockRegistry);
+    m_worldGen =
+        std::make_unique<voxel::world::WorldGenerator>(static_cast<uint64_t>(m_config.getSeed()), m_blockRegistry);
 
     // Inject WorldGenerator into ChunkManager
     m_chunkManager.setWorldGenerator(m_worldGen.get());
@@ -304,7 +304,8 @@ void GameApp::buildDebugOverlay()
         {
             ImGui::Text("Gigabuffer: N/A");
         }
-        ImGui::Text("Chunks: %zu loaded, %zu dirty", m_chunkManager.loadedChunkCount(), m_chunkManager.dirtyChunkCount());
+        ImGui::Text(
+            "Chunks: %zu loaded, %zu dirty", m_chunkManager.loadedChunkCount(), m_chunkManager.dirtyChunkCount());
         ImGui::Text("Seed: %lld", static_cast<long long>(m_config.getSeed()));
 
         ImGui::Separator();

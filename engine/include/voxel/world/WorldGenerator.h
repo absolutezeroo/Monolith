@@ -2,6 +2,7 @@
 
 #include "voxel/world/BlockRegistry.h"
 #include "voxel/world/ChunkColumn.h"
+#include "voxel/world/SplineCurve.h"
 
 #pragma warning(push, 0)
 #include "voxel/world/FastNoiseLite.h"
@@ -29,8 +30,10 @@ class WorldGenerator
     [[nodiscard]] uint64_t getSeed() const { return m_seed; }
 
   private:
-    /// Compute terrain height at a world (x, z) position. Returns value in [40, 120].
+    /// Compute terrain height at a world (x, z) position via spline-remapped continent noise + detail noise.
     [[nodiscard]] int computeHeight(int worldX, int worldZ) const;
+
+    static constexpr float DETAIL_AMPLITUDE = 7.0f;
 
     uint64_t m_seed;
 
@@ -40,9 +43,13 @@ class WorldGenerator
     uint16_t m_dirtId;
     uint16_t m_grassId;
 
-    // FastNoiseLite configured once at construction. GetNoise() is const,
+    // Spline curve mapping continent noise to terrain height
+    SplineCurve m_spline;
+
+    // FastNoiseLite instances configured once at construction. GetNoise() is const,
     // so all post-construction usage is read-only.
-    FastNoiseLite m_noise;
+    FastNoiseLite m_continentNoise;
+    FastNoiseLite m_detailNoise;
 };
 
 } // namespace voxel::world
