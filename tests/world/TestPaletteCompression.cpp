@@ -6,6 +6,15 @@
 
 using namespace voxel::world;
 
+// Helper: set block by linear index, routing through setBlock() to keep m_nonAirCount consistent
+static void setBlockByIndex(ChunkSection& section, int i, uint16_t id)
+{
+    int x = i % ChunkSection::SIZE;
+    int z = (i / ChunkSection::SIZE) % ChunkSection::SIZE;
+    int y = i / (ChunkSection::SIZE * ChunkSection::SIZE);
+    section.setBlock(x, y, z, id);
+}
+
 // Helper: verify all 4096 blocks match between two sections
 static void requireBlocksEqual(const ChunkSection& a, const ChunkSection& b)
 {
@@ -25,7 +34,7 @@ TEST_CASE("PaletteCompression: roundtrip identity with random fill", "[world][pa
 
     for (int i = 0; i < ChunkSection::VOLUME; ++i)
     {
-        section.blocks[i] = dist(rng);
+        setBlockByIndex(section, i, dist(rng));
     }
 
     CompressedSection compressed = PaletteCompression::compress(section);
@@ -57,14 +66,10 @@ TEST_CASE("PaletteCompression: tier selection", "[world][palette]")
     SECTION("two types (air + stone) -> tier 1")
     {
         ChunkSection section;
-        // First half air (0), second half stone (1)
-        for (int i = 0; i < ChunkSection::VOLUME / 2; ++i)
-        {
-            section.blocks[i] = 0;
-        }
+        // First half air (already default), second half stone (1)
         for (int i = ChunkSection::VOLUME / 2; i < ChunkSection::VOLUME; ++i)
         {
-            section.blocks[i] = 1;
+            setBlockByIndex(section, i, 1);
         }
 
         CompressedSection compressed = PaletteCompression::compress(section);
@@ -82,7 +87,7 @@ TEST_CASE("PaletteCompression: tier selection", "[world][palette]")
         ChunkSection section;
         for (int i = 0; i < ChunkSection::VOLUME; ++i)
         {
-            section.blocks[i] = static_cast<uint16_t>(i % 4); // 4 unique types
+            setBlockByIndex(section, i, static_cast<uint16_t>(i % 4));
         }
 
         CompressedSection compressed = PaletteCompression::compress(section);
@@ -100,7 +105,7 @@ TEST_CASE("PaletteCompression: tier selection", "[world][palette]")
         ChunkSection section;
         for (int i = 0; i < ChunkSection::VOLUME; ++i)
         {
-            section.blocks[i] = static_cast<uint16_t>(i % 16); // 16 unique types
+            setBlockByIndex(section, i, static_cast<uint16_t>(i % 16));
         }
 
         CompressedSection compressed = PaletteCompression::compress(section);
@@ -118,7 +123,7 @@ TEST_CASE("PaletteCompression: tier selection", "[world][palette]")
         ChunkSection section;
         for (int i = 0; i < ChunkSection::VOLUME; ++i)
         {
-            section.blocks[i] = static_cast<uint16_t>(i % 256); // 256 unique types
+            setBlockByIndex(section, i, static_cast<uint16_t>(i % 256));
         }
 
         CompressedSection compressed = PaletteCompression::compress(section);
@@ -136,7 +141,7 @@ TEST_CASE("PaletteCompression: tier selection", "[world][palette]")
         ChunkSection section;
         for (int i = 0; i < ChunkSection::VOLUME; ++i)
         {
-            section.blocks[i] = static_cast<uint16_t>(i % 300); // 300 unique types
+            setBlockByIndex(section, i, static_cast<uint16_t>(i % 300));
         }
 
         CompressedSection compressed = PaletteCompression::compress(section);
@@ -170,7 +175,7 @@ TEST_CASE("PaletteCompression: memoryUsage matches expected values", "[world][pa
         ChunkSection section;
         for (int i = 0; i < ChunkSection::VOLUME; ++i)
         {
-            section.blocks[i] = static_cast<uint16_t>(i % 2);
+            setBlockByIndex(section, i, static_cast<uint16_t>(i % 2));
         }
 
         CompressedSection compressed = PaletteCompression::compress(section);
@@ -184,7 +189,7 @@ TEST_CASE("PaletteCompression: memoryUsage matches expected values", "[world][pa
         ChunkSection section;
         for (int i = 0; i < ChunkSection::VOLUME; ++i)
         {
-            section.blocks[i] = static_cast<uint16_t>(i % 4);
+            setBlockByIndex(section, i, static_cast<uint16_t>(i % 4));
         }
 
         CompressedSection compressed = PaletteCompression::compress(section);
@@ -198,7 +203,7 @@ TEST_CASE("PaletteCompression: memoryUsage matches expected values", "[world][pa
         ChunkSection section;
         for (int i = 0; i < ChunkSection::VOLUME; ++i)
         {
-            section.blocks[i] = static_cast<uint16_t>(i % 16);
+            setBlockByIndex(section, i, static_cast<uint16_t>(i % 16));
         }
 
         CompressedSection compressed = PaletteCompression::compress(section);
@@ -212,7 +217,7 @@ TEST_CASE("PaletteCompression: memoryUsage matches expected values", "[world][pa
         ChunkSection section;
         for (int i = 0; i < ChunkSection::VOLUME; ++i)
         {
-            section.blocks[i] = static_cast<uint16_t>(i % 256);
+            setBlockByIndex(section, i, static_cast<uint16_t>(i % 256));
         }
 
         CompressedSection compressed = PaletteCompression::compress(section);
@@ -226,7 +231,7 @@ TEST_CASE("PaletteCompression: memoryUsage matches expected values", "[world][pa
         ChunkSection section;
         for (int i = 0; i < ChunkSection::VOLUME; ++i)
         {
-            section.blocks[i] = static_cast<uint16_t>(i); // 4096 unique IDs
+            setBlockByIndex(section, i, static_cast<uint16_t>(i));
         }
 
         CompressedSection compressed = PaletteCompression::compress(section);
@@ -260,7 +265,7 @@ TEST_CASE("PaletteCompression: edge cases", "[world][palette]")
         ChunkSection section;
         for (int i = 0; i < ChunkSection::VOLUME; ++i)
         {
-            section.blocks[i] = static_cast<uint16_t>(i);
+            setBlockByIndex(section, i, static_cast<uint16_t>(i));
         }
 
         CompressedSection compressed = PaletteCompression::compress(section);
@@ -277,7 +282,7 @@ TEST_CASE("PaletteCompression: edge cases", "[world][palette]")
         ChunkSection section;
         for (int i = 0; i < ChunkSection::VOLUME; ++i)
         {
-            section.blocks[i] = static_cast<uint16_t>(i % 3);
+            setBlockByIndex(section, i, static_cast<uint16_t>(i % 3));
         }
 
         CompressedSection compressed = PaletteCompression::compress(section);
@@ -294,7 +299,7 @@ TEST_CASE("PaletteCompression: edge cases", "[world][palette]")
         ChunkSection section;
         for (int i = 0; i < ChunkSection::VOLUME; ++i)
         {
-            section.blocks[i] = static_cast<uint16_t>(i % 5);
+            setBlockByIndex(section, i, static_cast<uint16_t>(i % 5));
         }
 
         CompressedSection compressed = PaletteCompression::compress(section);
@@ -311,7 +316,7 @@ TEST_CASE("PaletteCompression: edge cases", "[world][palette]")
         ChunkSection section;
         for (int i = 0; i < ChunkSection::VOLUME; ++i)
         {
-            section.blocks[i] = static_cast<uint16_t>(i % 17);
+            setBlockByIndex(section, i, static_cast<uint16_t>(i % 17));
         }
 
         CompressedSection compressed = PaletteCompression::compress(section);
@@ -328,7 +333,7 @@ TEST_CASE("PaletteCompression: edge cases", "[world][palette]")
         ChunkSection section;
         for (int i = 0; i < ChunkSection::VOLUME; ++i)
         {
-            section.blocks[i] = static_cast<uint16_t>(i % 257);
+            setBlockByIndex(section, i, static_cast<uint16_t>(i % 257));
         }
 
         CompressedSection compressed = PaletteCompression::compress(section);
@@ -346,7 +351,7 @@ TEST_CASE("PaletteCompression: edge cases", "[world][palette]")
         uint16_t largeIds[] = {0, 1, 32768, 65534, 65535};
         for (int i = 0; i < ChunkSection::VOLUME; ++i)
         {
-            section.blocks[i] = largeIds[i % 5];
+            setBlockByIndex(section, i, largeIds[i % 5]);
         }
 
         CompressedSection compressed = PaletteCompression::compress(section);

@@ -19,6 +19,14 @@ size_t CompressedSection::memoryUsage() const
 namespace
 {
 
+/// Inverse of ChunkSection::toIndex — decomposes linear index to block coordinates.
+constexpr void indexToCoord(int i, int& x, int& y, int& z)
+{
+    x = i % ChunkSection::SIZE;
+    z = (i / ChunkSection::SIZE) % ChunkSection::SIZE;
+    y = i / (ChunkSection::SIZE * ChunkSection::SIZE);
+}
+
 uint8_t selectBitsPerEntry(uint32_t uniqueCount)
 {
     if (uniqueCount <= 1)
@@ -141,7 +149,9 @@ ChunkSection PaletteCompression::decompress(const CompressedSection& compressed)
             int wordIndex = i / entriesPerWord;
             int bitOffset = (i % entriesPerWord) * 16;
             uint16_t blockId = static_cast<uint16_t>((compressed.data[wordIndex] >> bitOffset) & mask);
-            section.setBlock(i % ChunkSection::SIZE, (i / 256), (i / 16) % 16, blockId);
+            int x, y, z;
+            indexToCoord(i, x, y, z);
+            section.setBlock(x, y, z, blockId);
         }
         return section;
     }
@@ -163,11 +173,8 @@ ChunkSection PaletteCompression::decompress(const CompressedSection& compressed)
         uint16_t paletteIndex = static_cast<uint16_t>((compressed.data[wordIndex] >> bitOffset) & mask);
 
         VX_ASSERT(paletteIndex < compressed.palette.size(), "Palette index out of bounds");
-        // Write directly to blocks array using the same indexing as ChunkSection::toIndex
-        // blocks layout: y * 256 + z * 16 + x
-        int x = i % ChunkSection::SIZE;
-        int z = (i / ChunkSection::SIZE) % ChunkSection::SIZE;
-        int y = i / (ChunkSection::SIZE * ChunkSection::SIZE);
+        int x, y, z;
+        indexToCoord(i, x, y, z);
         section.setBlock(x, y, z, compressed.palette[paletteIndex]);
     }
 
