@@ -1,6 +1,6 @@
 # Story 3.3b: Expand BlockDefinition to Full Property Set
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -19,47 +19,47 @@ so that no structural changes to Block.h are needed when Epics 5–10 arrive.
 
 ## Tasks / Subtasks
 
-- [ ] Task A: Expand Block.h with enums and fields (AC: 1, 2, 6)
-  - [ ] A.1 Add `RenderType` enum class: `Opaque, Cutout, Translucent`
-  - [ ] A.2 Add `ModelType` enum class: `FullCube, Slab, Stair, Cross, Torch, Connected, JsonModel, MeshModel, Custom`
-  - [ ] A.3 Add `LiquidType` enum class: `None, Source, Flowing`
-  - [ ] A.4 Add `PushReaction` enum class: `Normal, Destroy, Block`
-  - [ ] A.5 Add rendering fields: `renderType`, `modelType`, `tintIndex`, `waving`
-  - [ ] A.6 Add physics fields: `isClimbable`, `moveResistance`, `damagePerSecond`, `drowning`, `isBuildableTo`, `isFloodable`, `isReplaceable`
-  - [ ] A.7 Add groups: `std::unordered_map<std::string, int> groups`
-  - [ ] A.8 Add sound stubs: `soundFootstep`, `soundDig`, `soundPlace`
-  - [ ] A.9 Add liquid stubs: `liquidType`, `liquidViscosity`, `liquidRange`, `liquidRenewable`, `liquidAlternativeFlowing`, `liquidAlternativeSource`
-  - [ ] A.10 Add visual: `postEffectColor`
-  - [ ] A.11 Add mechanical: `pushReaction`, `isFallingBlock`
-  - [ ] A.12 Add signal stubs: `powerOutput`, `isPowerSource`, `isPowerConductor`
-  - [ ] A.13 Change `lightFilter` default from 15 to 0
-  - [ ] A.14 Verify: all existing code that constructs BlockDefinition still compiles (defaults cover all new fields)
-- [ ] Task B: Update JSON parser in BlockRegistry.cpp (AC: 4)
-  - [ ] B.1 Add enum string→value helpers: `parseRenderType(string)`, `parseModelType(string)`, `parseLiquidType(string)`, `parsePushReaction(string)`
-  - [ ] B.2 Parse all new fields from JSON with fallback to defaults for omitted fields
-  - [ ] B.3 Parse `groups` as JSON object `{"cracky": 3, "stone": 1}` → `std::unordered_map`
-  - [ ] B.4 Parse `sounds` as JSON object `{"footstep": "...", "dig": "...", "place": "..."}`
-  - [ ] B.5 Parse `liquid` as JSON object with all 6 sub-fields
-  - [ ] B.6 Verify: existing blocks.json still loads correctly with no changes (backward compatible)
-- [ ] Task C: Update blocks.json with new properties (AC: 3)
-  - [ ] C.1 Water: add `renderType: "translucent"`, `isReplaceable: true`, `liquidType: "source"`, `liquidViscosity: 1`, `drowning: 1`, `postEffectColor: "0x80000044"`, `moveResistance: 3`
-  - [ ] C.2 Glass: add `renderType: "cutout"`
-  - [ ] C.3 Oak leaves: add `renderType: "cutout"`, `waving: 1`, `isFloodable: true`, `groups: {"choppy": 3, "leafdecay": 3}`
-  - [ ] C.4 Torch: add `isFloodable: true`, `isBuildableTo: false`, `modelType: "torch"`, `groups: {"dig_immediate": 3}`
-  - [ ] C.5 Sand: add `isFallingBlock: true`, `groups: {"crumbly": 3, "falling_node": 1}`
-  - [ ] C.6 Stone: add `groups: {"cracky": 3, "stone": 1}`, `lightFilter: 15`
-  - [ ] C.7 Dirt: add `groups: {"crumbly": 3}`, `lightFilter: 15`
-  - [ ] C.8 Grass block: add `groups: {"crumbly": 3}`, `lightFilter: 15`
-  - [ ] C.9 Oak log: add `groups: {"choppy": 2, "wood": 1}`, `lightFilter: 15`
-  - [ ] C.10 Glowstone: add `groups: {"cracky": 3}`, `lightFilter: 15`
-- [ ] Task D: Add tests (AC: 5)
-  - [ ] D.1 Test: default-constructed BlockDefinition has `renderType == Opaque`, `modelType == FullCube`, `liquidType == None`, `pushReaction == Normal`
-  - [ ] D.2 Test: `lightFilter` default is 0 (not 15)
-  - [ ] D.3 Test: loadFromJson parses `renderType: "cutout"` → `RenderType::Cutout`
-  - [ ] D.4 Test: loadFromJson parses `groups: {"cracky": 3}` → map contains key "cracky" with value 3
-  - [ ] D.5 Test: loadFromJson with omitted fields uses defaults (backward compatibility)
-  - [ ] D.6 Test: water block from JSON has `liquidType == Source`, `drowning == 1`, `moveResistance == 3`
-  - [ ] D.7 Test: existing TestBlockRegistry tests still pass unchanged
+- [x] Task A: Expand Block.h with enums and fields (AC: 1, 2, 6)
+  - [x] A.1 Add `RenderType` enum class: `Opaque, Cutout, Translucent`
+  - [x] A.2 Add `ModelType` enum class: `FullCube, Slab, Stair, Cross, Torch, Connected, JsonModel, MeshModel, Custom`
+  - [x] A.3 Add `LiquidType` enum class: `None, Source, Flowing`
+  - [x] A.4 Add `PushReaction` enum class: `Normal, Destroy, Block`
+  - [x] A.5 Add rendering fields: `renderType`, `modelType`, `tintIndex`, `waving`
+  - [x] A.6 Add physics fields: `isClimbable`, `moveResistance`, `damagePerSecond`, `drowning`, `isBuildableTo`, `isFloodable`, `isReplaceable`
+  - [x] A.7 Add groups: `std::unordered_map<std::string, int> groups`
+  - [x] A.8 Add sound stubs: `soundFootstep`, `soundDig`, `soundPlace`
+  - [x] A.9 Add liquid stubs: `liquidType`, `liquidViscosity`, `liquidRange`, `liquidRenewable`, `liquidAlternativeFlowing`, `liquidAlternativeSource`
+  - [x] A.10 Add visual: `postEffectColor`
+  - [x] A.11 Add mechanical: `pushReaction`, `isFallingBlock`
+  - [x] A.12 Add signal stubs: `powerOutput`, `isPowerSource`, `isPowerConductor`
+  - [x] A.13 Change `lightFilter` default from 15 to 0
+  - [x] A.14 Verify: all existing code that constructs BlockDefinition still compiles (defaults cover all new fields)
+- [x] Task B: Update JSON parser in BlockRegistry.cpp (AC: 4)
+  - [x] B.1 Add enum string→value helpers: `parseRenderType(string)`, `parseModelType(string)`, `parseLiquidType(string)`, `parsePushReaction(string)`
+  - [x] B.2 Parse all new fields from JSON with fallback to defaults for omitted fields
+  - [x] B.3 Parse `groups` as JSON object `{"cracky": 3, "stone": 1}` → `std::unordered_map`
+  - [x] B.4 Parse `sounds` as JSON object `{"footstep": "...", "dig": "...", "place": "..."}`
+  - [x] B.5 Parse `liquid` as JSON object with all 6 sub-fields
+  - [x] B.6 Verify: existing blocks.json still loads correctly with no changes (backward compatible)
+- [x] Task C: Update blocks.json with new properties (AC: 3)
+  - [x] C.1 Water: add `renderType: "translucent"`, `isReplaceable: true`, `liquidType: "source"`, `liquidViscosity: 1`, `drowning: 1`, `postEffectColor: "0x80000044"`, `moveResistance: 3`
+  - [x] C.2 Glass: add `renderType: "cutout"`
+  - [x] C.3 Oak leaves: add `renderType: "cutout"`, `waving: 1`, `isFloodable: true`, `groups: {"choppy": 3, "leafdecay": 3}`
+  - [x] C.4 Torch: add `isFloodable: true`, `isBuildableTo: false`, `modelType: "torch"`, `groups: {"dig_immediate": 3}`
+  - [x] C.5 Sand: add `isFallingBlock: true`, `groups: {"crumbly": 3, "falling_node": 1}`
+  - [x] C.6 Stone: add `groups: {"cracky": 3, "stone": 1}`, `lightFilter: 15`
+  - [x] C.7 Dirt: add `groups: {"crumbly": 3}`, `lightFilter: 15`
+  - [x] C.8 Grass block: add `groups: {"crumbly": 3}`, `lightFilter: 15`
+  - [x] C.9 Oak log: add `groups: {"choppy": 2, "wood": 1}`, `lightFilter: 15`
+  - [x] C.10 Glowstone: add `groups: {"cracky": 3}`, `lightFilter: 15`
+- [x] Task D: Add tests (AC: 5)
+  - [x] D.1 Test: default-constructed BlockDefinition has `renderType == Opaque`, `modelType == FullCube`, `liquidType == None`, `pushReaction == Normal`
+  - [x] D.2 Test: `lightFilter` default is 0 (not 15)
+  - [x] D.3 Test: loadFromJson parses `renderType: "cutout"` → `RenderType::Cutout`
+  - [x] D.4 Test: loadFromJson parses `groups: {"cracky": 3}` → map contains key "cracky" with value 3
+  - [x] D.5 Test: loadFromJson with omitted fields uses defaults (backward compatibility)
+  - [x] D.6 Test: water block from JSON has `liquidType == Source`, `drowning == 1`, `moveResistance == 3`
+  - [x] D.7 Test: existing TestBlockRegistry tests still pass unchanged
 
 ## Dev Notes
 
@@ -339,10 +339,31 @@ tests/world/TestBlockRegistry.cpp           (add tests for new fields)
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 4.6
 
 ### Debug Log References
 
+None — clean implementation, no errors encountered.
+
 ### Completion Notes List
 
+- Expanded BlockDefinition from 10 to 35+ fields with 4 new enum classes (RenderType, ModelType, LiquidType, PushReaction)
+- All new fields have sensible defaults — zero breaking changes to existing code
+- Changed lightFilter default from 15 to 0 (transparent by default); solid blocks now specify lightFilter: 15 in JSON
+- Added 4 static enum parse helpers in BlockRegistry.cpp (parseRenderType, parseModelType, parseLiquidType, parsePushReaction)
+- JSON parser extended to handle: enum fields, groups map, sounds object, liquid object, postEffectColor (hex string or uint), and all scalar new fields
+- Updated all 10 blocks in blocks.json with relevant new properties (groups, renderType, liquid, waving, isFallingBlock, etc.)
+- Added 11 new test sections covering: default values, enum parsing, groups parsing, backward compatibility, water/leaves/torch/sand/stone field verification
+- All existing test sections preserved unchanged
+
+### Change Log
+
+- 2026-03-26: Story 3.3b implementation complete — expanded BlockDefinition to 35+ fields with full JSON parsing and test coverage
+- 2026-03-26: Code review fix — replaced `std::stoul` with `std::from_chars` in postEffectColor hex parsing (crash risk in no-exceptions build)
+
 ### File List
+
+- engine/include/voxel/world/Block.h (modified — expanded struct, added 4 enums, added #include <unordered_map>)
+- engine/src/world/BlockRegistry.cpp (modified — added 4 enum parse helpers, expanded JSON parser for all new fields, changed lightFilter default from 15 to 0)
+- assets/scripts/base/blocks.json (modified — added new fields to all 10 blocks)
+- tests/world/TestBlockRegistry.cpp (modified — added 11 new test sections)

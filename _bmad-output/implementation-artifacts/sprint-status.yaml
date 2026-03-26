@@ -5,7 +5,7 @@
 project: VoxelForge
 methodology: BMAD v6 + Game Dev Studio
 created: 2026-03-24
-last_updated: 2026-03-26  # Story 3.3b in-progress
+last_updated: 2026-03-26  # Story 3.3b code review complete, all issues fixed
 
 # Status values: backlog | ready | in-progress | review | done | blocked
 
@@ -109,7 +109,7 @@ epics:
         assigned_to: dev-agent
       - id: "3.3b"
         title: "Expand BlockDefinition to Full Property Set"
-        status: in-progress
+        status: done
         assigned_to: dev-agent
         notes: "Expands Block.h from 10 to 35+ fields. Zero API changes to BlockRegistry. All new fields have defaults — backward compatible."
       - id: "3.4"
@@ -372,8 +372,8 @@ summary:
   by_status:
     backlog: 49
     ready-for-dev: 0
-    in_progress: 1
+    in_progress: 0
     review: 1
-    done: 16
+    done: 17
     blocked: 0
   implementation_order: "3.3b (ready) → 3.4 → 3.6 → 3.7 → Epic 4..."
