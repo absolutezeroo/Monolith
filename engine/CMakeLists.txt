@@ -23,6 +23,7 @@ add_library(VoxelEngine STATIC
         src/world/PaletteCompression.cpp
         src/world/RegionFile.cpp
         src/world/ChunkSerializer.cpp
+        src/world/SplineCurve.cpp
         src/world/WorldGenerator.cpp
         src/input/InputManager.cpp
 )

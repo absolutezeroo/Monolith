@@ -1,6 +1,6 @@
 # Story 4.2: Spline Remapping + Elevation Distribution
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -21,25 +21,25 @@ so that I get distinct plains, hills, and mountains instead of uniform noise.
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: Create SplineCurve class** (AC: 1, 2)
-  - [ ] Create `engine/include/voxel/world/SplineCurve.h`
-  - [ ] Create `engine/src/world/SplineCurve.cpp`
-  - [ ] Define `ControlPoint` struct: `{ float noise; float height; float tangent; }`
-  - [ ] Constructor: `explicit SplineCurve(std::vector<ControlPoint> points)` — sorted by noise ascending
-  - [ ] `float evaluate(float noiseValue) const` — cubic Hermite interpolation between adjacent control points
-  - [ ] Clamp behavior: values below first point return first height, above last return last height
-  - [ ] Static factory: `SplineCurve createDefault()` — returns the standard terrain profile
-  - [ ] Validate: assert >= 2 control points, sorted order
+- [x] **Task 1: Create SplineCurve class** (AC: 1, 2)
+  - [x] Create `engine/include/voxel/world/SplineCurve.h`
+  - [x] Create `engine/src/world/SplineCurve.cpp`
+  - [x] Define `ControlPoint` struct: `{ float noise; float height; float tangent; }`
+  - [x] Constructor: `explicit SplineCurve(std::vector<ControlPoint> points)` — sorted by noise ascending
+  - [x] `float evaluate(float noiseValue) const` — cubic Hermite interpolation between adjacent control points
+  - [x] Clamp behavior: values below first point return first height, above last return last height
+  - [x] Static factory: `SplineCurve createDefault()` — returns the standard terrain profile
+  - [x] Validate: assert >= 2 control points, sorted order
 
-- [ ] **Task 2: Implement cubic Hermite interpolation** (AC: 1, 2)
-  - [ ] Find surrounding control points for input value (binary search or linear scan — few points)
-  - [ ] Compute `t` = local parameter in `[0, 1]` between adjacent points
-  - [ ] Apply Hermite basis: `h00(t)*p0 + h10(t)*m0*dx + h01(t)*p1 + h11(t)*m1*dx`
-  - [ ] Where `h00 = 2t³-3t²+1`, `h10 = t³-2t²+t`, `h01 = -2t³+3t²`, `h11 = t³-t²`
-  - [ ] `dx` = distance between control point noise values (interval scaling for tangents)
+- [x] **Task 2: Implement cubic Hermite interpolation** (AC: 1, 2)
+  - [x] Find surrounding control points for input value (binary search or linear scan — few points)
+  - [x] Compute `t` = local parameter in `[0, 1]` between adjacent points
+  - [x] Apply Hermite basis: `h00(t)*p0 + h10(t)*m0*dx + h01(t)*p1 + h11(t)*m1*dx`
+  - [x] Where `h00 = 2t³-3t²+1`, `h10 = t³-2t²+t`, `h01 = -2t³+3t²`, `h11 = t³-t²`
+  - [x] `dx` = distance between control point noise values (interval scaling for tangents)
 
-- [ ] **Task 3: Define default terrain spline** (AC: 3)
-  - [ ] Control points (approximate — tune visually):
+- [x] **Task 3: Define default terrain spline** (AC: 3)
+  - [x] Control points (approximate — tune visually):
     - `{-1.0, 62.0, 0.0}` — deep ocean floor / lowest plains
     - `{-0.4, 64.0, 5.0}` — sea level plains (flat region)
     - `{0.0, 68.0, 15.0}` — gentle rise starts (plains → hills transition)
@@ -47,14 +47,14 @@ so that I get distinct plains, hills, and mountains instead of uniform noise.
     - `{0.6, 120.0, 60.0}` — steep mountain rise
     - `{0.8, 140.0, 20.0}` — mountain peaks
     - `{1.0, 150.0, 0.0}` — plateau at extreme (flat mountaintops)
-  - [ ] These values are starting points — visual tuning expected
+  - [x] These values are starting points — visual tuning expected
 
-- [ ] **Task 4: Modify WorldGenerator noise pipeline** (AC: 4, 5, 7)
-  - [ ] Add second `FastNoiseLite` instance for detail noise (or reconfigure single instance)
-  - [ ] Continent noise config: `NoiseType_OpenSimplex2`, `FractalType_FBm`, freq 0.001, octaves 4
-  - [ ] Detail noise config: `NoiseType_OpenSimplex2`, `FractalType_FBm`, freq 0.02, octaves 4
-  - [ ] Seed detail noise differently: use `seed + 1` or `seed ^ 0x12345` (deterministic offset)
-  - [ ] New height calculation per (x, z):
+- [x] **Task 4: Modify WorldGenerator noise pipeline** (AC: 4, 5, 7)
+  - [x] Add second `FastNoiseLite` instance for detail noise (or reconfigure single instance)
+  - [x] Continent noise config: `NoiseType_OpenSimplex2`, `FractalType_FBm`, freq 0.001, octaves 4
+  - [x] Detail noise config: `NoiseType_OpenSimplex2`, `FractalType_FBm`, freq 0.02, octaves 4
+  - [x] Seed detail noise differently: use `seed + 1` or `seed ^ 0x12345` (deterministic offset)
+  - [x] New height calculation per (x, z):
     ```
     continentNoise = m_continentNoise.GetNoise(worldX, worldZ);  // [-1, 1]
     baseHeight = m_spline.evaluate(continentNoise);               // [62, 150]
@@ -62,31 +62,31 @@ so that I get distinct plains, hills, and mountains instead of uniform noise.
     finalHeight = baseHeight + detailNoise * DETAIL_AMPLITUDE;    // ±5–10 blocks
     finalHeight = std::clamp(finalHeight, 1.0f, 254.0f);         // stay in column bounds
     ```
-  - [ ] Replace the existing linear height mapping from Story 4.1
-  - [ ] Keep surface composition logic unchanged (grass/dirt/stone/bedrock layering)
+  - [x] Replace the existing linear height mapping from Story 4.1
+  - [x] Keep surface composition logic unchanged (grass/dirt/stone/bedrock layering)
 
-- [ ] **Task 5: Add SplineCurve member to WorldGenerator** (AC: 4)
-  - [ ] Add `SplineCurve m_spline` member, initialized with `SplineCurve::createDefault()`
-  - [ ] Add `FastNoiseLite m_continentNoise` and `FastNoiseLite m_detailNoise` members
-  - [ ] Rename or repurpose the existing single `FastNoiseLite` from Story 4.1
-  - [ ] Store `DETAIL_AMPLITUDE` as `static constexpr float` (start with 7.0f)
+- [x] **Task 5: Add SplineCurve member to WorldGenerator** (AC: 4)
+  - [x] Add `SplineCurve m_spline` member, initialized with `SplineCurve::createDefault()`
+  - [x] Add `FastNoiseLite m_continentNoise` and `FastNoiseLite m_detailNoise` members
+  - [x] Rename or repurpose the existing single `FastNoiseLite` from Story 4.1
+  - [x] Store `DETAIL_AMPLITUDE` as `static constexpr float` (start with 7.0f)
 
-- [ ] **Task 6: Unit tests** (AC: 8)
-  - [ ] Create `tests/world/TestSplineCurve.cpp`
-  - [ ] Test: evaluate at exact control point returns that point's height
-  - [ ] Test: evaluate between two linear points interpolates smoothly
-  - [ ] Test: evaluate below min clamps to first height
-  - [ ] Test: evaluate above max clamps to last height
-  - [ ] Test: monotonically increasing control points produce monotonically increasing output (sample many points)
-  - [ ] Test: default spline maps -1.0 → ~62, 0.0 → ~68, 1.0 → ~150
-  - [ ] Add to `tests/world/TestWorldGenerator.cpp`:
+- [x] **Task 6: Unit tests** (AC: 8)
+  - [x] Create `tests/world/TestSplineCurve.cpp`
+  - [x] Test: evaluate at exact control point returns that point's height
+  - [x] Test: evaluate between two linear points interpolates smoothly
+  - [x] Test: evaluate below min clamps to first height
+  - [x] Test: evaluate above max clamps to last height
+  - [x] Test: monotonically increasing control points produce monotonically increasing output (sample many points)
+  - [x] Test: default spline maps -1.0 → ~62, 0.0 → ~68, 1.0 → ~150
+  - [x] Add to `tests/world/TestWorldGenerator.cpp`:
     - Test: determinism still holds with new pipeline
     - Test: height distribution — generate 1000 columns, verify some are in [60–70] (plains), some in [80–100] (hills), some in [120+] (mountains)
     - Test: heights stay within [1, 254] bounds
 
-- [ ] **Task 7: CMake wiring** (AC: 1)
-  - [ ] Add `src/world/SplineCurve.cpp` to `engine/CMakeLists.txt` source list
-  - [ ] Add `tests/world/TestSplineCurve.cpp` to `tests/CMakeLists.txt`
+- [x] **Task 7: CMake wiring** (AC: 1)
+  - [x] Add `src/world/SplineCurve.cpp` to `engine/CMakeLists.txt` source list
+  - [x] Add `tests/world/TestSplineCurve.cpp` to `tests/CMakeLists.txt`
 
 ## Dev Notes
 
@@ -196,10 +196,38 @@ Story 4.1 (not yet implemented) will create:
 
 ### Agent Model Used
 
-(to be filled by dev agent)
+Claude Opus 4.6
 
 ### Debug Log References
 
+- No debug issues encountered. Build and all tests passed on first attempt.
+
 ### Completion Notes List
 
+- Created `SplineCurve` class with cubic Hermite interpolation, `ControlPoint` struct, `evaluate()` with clamping, `createDefault()` factory, and `VX_ASSERT` validation.
+- Implemented full Hermite basis: h00/h10/h01/h11 with interval-scaled tangents (dx).
+- Default terrain profile: 7 control points mapping noise [-1,1] to heights [62,150] — plains/hills/mountains/plateau.
+- Replaced WorldGenerator's single `FastNoiseLite m_noise` with `m_continentNoise` (freq 0.001, 4 octaves) and `m_detailNoise` (freq 0.02, 4 octaves, seed ^ 0x12345).
+- Added `SplineCurve m_spline` member initialized from `createDefault()`.
+- New `computeHeight()`: spline.evaluate(continentNoise) + detailNoise * 7.0f, clamped to [1, 254].
+- Surface composition (bedrock/stone/dirt/grass layering) unchanged.
+- Spawn point logic unchanged — still works with new height range.
+- Created 10 SplineCurve tests: evaluation at control points, smooth interpolation, clamping, monotonicity, default profile values, edge cases, two-point spline.
+- Updated WorldGenerator tests: height bounds [1, 254], spawn bounds [3, 256], added terrain distribution test (plains/hills/mountains verification across 9x9 chunk grid).
+- Determinism and surface composition tests preserved and passing.
+- All tests pass, no regressions.
+
 ### File List
+
+- `engine/include/voxel/world/SplineCurve.h` (new)
+- `engine/src/world/SplineCurve.cpp` (new)
+- `engine/include/voxel/world/WorldGenerator.h` (modified)
+- `engine/src/world/WorldGenerator.cpp` (modified)
+- `engine/CMakeLists.txt` (modified)
+- `tests/world/TestSplineCurve.cpp` (new)
+- `tests/world/TestWorldGenerator.cpp` (modified)
+- `tests/CMakeLists.txt` (modified)
+
+### Change Log
+
+- 2026-03-26: Implemented Story 4.2 — SplineCurve class + dual-noise terrain pipeline with spline remapping

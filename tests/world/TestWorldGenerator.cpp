@@ -68,7 +68,7 @@ TEST_CASE("WorldGenerator: determinism — same seed and coord produce identical
 
 // ── Height bounds ─────────────────────────────────────────────────────────────
 
-TEST_CASE("WorldGenerator: surface blocks are within [40, 120]", "[world][worldgenerator]")
+TEST_CASE("WorldGenerator: surface blocks are within [1, 254]", "[world][worldgenerator]")
 {
     BlockRegistry registry = makeTerrainRegistry();
     WorldGenerator gen(12345, registry);
@@ -92,8 +92,8 @@ TEST_CASE("WorldGenerator: surface blocks are within [40, 120]", "[world][worldg
                 {
                     if (col.getBlock(x, y, z) == grassId)
                     {
-                        REQUIRE(y >= 40);
-                        REQUIRE(y <= 120);
+                        REQUIRE(y >= 1);
+                        REQUIRE(y <= 254);
                         break;
                     }
                 }
@@ -180,9 +180,9 @@ TEST_CASE("WorldGenerator: spawn point is above ground", "[world][worldgenerator
 
     glm::dvec3 spawn = gen.findSpawnPoint();
 
-    // Spawn Y should be at least 42 (min height 40 + 2)
-    REQUIRE(spawn.y >= 42.0);
-    REQUIRE(spawn.y <= 122.0); // max height 120 + 2
+    // Spawn Y should be height + 2; with spline range [1, 254], spawn in [3, 256]
+    REQUIRE(spawn.y >= 3.0);
+    REQUIRE(spawn.y <= 256.0);
 
     // Spawn should be at block center (x.5, z.5)
     double fracX = spawn.x - std::floor(spawn.x);
@@ -219,4 +219,67 @@ TEST_CASE("WorldGenerator: different seeds produce different terrain", "[world][
     }
 
     REQUIRE(differences > 0);
+}
+
+// ── Height distribution ──────────────────────────────────────────────────────
+
+TEST_CASE("WorldGenerator: terrain has plains, hills, and mountains", "[world][worldgenerator]")
+{
+    BlockRegistry registry = makeTerrainRegistry();
+    WorldGenerator gen(54321, registry);
+
+    uint16_t grassId = registry.getIdByName("base:grass_block");
+    REQUIRE(grassId != BLOCK_AIR);
+
+    int plainsCount = 0;   // heights in [55, 70]
+    int hillsCount = 0;    // heights in [80, 100]
+    int mountainCount = 0; // heights in [120, 254]
+    int totalColumns = 0;
+
+    // Generate many chunks across a wide area to sample the full noise range
+    for (int cx = -20; cx <= 20; cx += 5)
+    {
+        for (int cz = -20; cz <= 20; cz += 5)
+        {
+            ChunkColumn col = gen.generateChunkColumn({cx, cz});
+
+            for (int x = 0; x < ChunkSection::SIZE; x += 4)
+            {
+                for (int z = 0; z < ChunkSection::SIZE; z += 4)
+                {
+                    // Find grass block (surface)
+                    for (int y = ChunkColumn::COLUMN_HEIGHT - 1; y >= 0; --y)
+                    {
+                        if (col.getBlock(x, y, z) == grassId)
+                        {
+                            ++totalColumns;
+                            if (y >= 55 && y <= 70)
+                            {
+                                ++plainsCount;
+                            }
+                            if (y >= 80 && y <= 100)
+                            {
+                                ++hillsCount;
+                            }
+                            if (y >= 120)
+                            {
+                                ++mountainCount;
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Verify we sampled enough columns
+    REQUIRE(totalColumns > 100);
+
+    // Verify terrain diversity: each category should have at least some representation
+    INFO("plains=" << plainsCount << " hills=" << hillsCount << " mountains=" << mountainCount
+                   << " total=" << totalColumns);
+    REQUIRE(plainsCount > 0);
+    REQUIRE(hillsCount > 0);
+    REQUIRE(mountainCount > 0);
 }

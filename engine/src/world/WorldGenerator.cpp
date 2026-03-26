@@ -4,7 +4,6 @@
 #include "voxel/world/Block.h"
 
 #include <algorithm>
-#include <cmath>
 
 namespace voxel::world
 {
