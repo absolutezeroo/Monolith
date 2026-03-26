@@ -96,14 +96,15 @@ core::Result<uint16_t> BlockRegistry::registerBlock(BlockDefinition def)
     auto typeIndex = static_cast<uint16_t>(m_blocks.size());
     def.numericId = typeIndex;
 
-    // Compute stateCount from properties
-    uint16_t stateCount = 1;
+    // Compute stateCount from properties (use uint32_t to detect overflow)
+    uint32_t stateCount = 1;
     for (const auto& prop : def.properties)
     {
         VX_ASSERT(!prop.values.empty(), "BlockStateProperty must have at least one value");
-        stateCount *= static_cast<uint16_t>(prop.values.size());
+        stateCount *= static_cast<uint32_t>(prop.values.size());
     }
-    def.stateCount = stateCount;
+    VX_ASSERT(stateCount <= UINT16_MAX, "Block stateCount exceeds uint16_t capacity");
+    def.stateCount = static_cast<uint16_t>(stateCount);
     def.baseStateId = m_nextStateId;
 
     VX_ASSERT(
@@ -111,11 +112,11 @@ core::Result<uint16_t> BlockRegistry::registerBlock(BlockDefinition def)
         "Block state ID space exhausted");
 
     // Map all state IDs to this type
-    for (uint16_t s = 0; s < stateCount; ++s)
+    for (uint16_t s = 0; s < def.stateCount; ++s)
     {
         m_stateToBlockIndex.push_back(typeIndex);
     }
-    m_nextStateId += stateCount;
+    m_nextStateId += def.stateCount;
 
     uint16_t baseStateId = def.baseStateId;
     m_nameToId[def.stringId] = typeIndex;

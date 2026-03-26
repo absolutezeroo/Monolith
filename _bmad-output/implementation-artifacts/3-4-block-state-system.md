@@ -1,6 +1,6 @@
 # Story 3.4: Block State System
 
-Status: review
+Status: done
 
 ## Story
 
@@ -273,6 +273,7 @@ Claude Opus 4.6
 ### Change Log
 
 - 2026-03-26: Implemented Block State System (Story 3.4) — flattened state ID allocation, state decomposition/composition APIs, JSON property parsing, comprehensive unit tests.
+- 2026-03-26: Code review — fixed `uint16_t` overflow in stateCount multiplication (used `uint32_t` accumulator with bounds check). All 13 ACs verified, all 20 tasks validated. Clean review.
 
 ### File List
 
