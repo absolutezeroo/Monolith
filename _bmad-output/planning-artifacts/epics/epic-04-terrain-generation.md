@@ -21,6 +21,28 @@
 - Deterministic: same seed + same coord = same output, always
 - Unit test: determinism (generate twice, compare block-by-block)
 
+**Seed management:**
+- Seed source priority: command line arg (`--seed 12345`) > `config.json` `"seed"` field > random (generated from system clock + PID)
+- On first run: generate random seed, save to `config.json` AND `worlds/MyWorld/world.json`
+- On subsequent runs: load seed from `world.json` (world-specific, not global config)
+- Seed displayed in F3 debug overlay
+
+**Spawn point calculation:**
+- Initial spawn: find terrain height at world position (0, 0) using the heightmap
+- Walk outward in spiral if (0,0) is underwater, in a cave, or otherwise unsuitable
+- Spawn Y = highest solid block at (spawnX, spawnZ) + 2 (feet above ground)
+- Player spawns in fly mode initially (before Story 7.3 adds gravity) — just set Camera position to spawn
+- Save spawn position in `world.json` for respawn (future: beds change spawn)
+- `WorldGenerator::findSpawnPoint(seed) → glm::dvec3` — called once at world creation
+
+**Wiring into ChunkManager (resolves gap between Epic 3 and Epic 4):**
+Story 3.5 created `ChunkManager::loadChunk()` which creates empty ChunkColumns. This story replaces that:
+- `ChunkManager` receives a `WorldGenerator&` at construction (injected dependency, not owned)
+- `ChunkManager::loadChunk(glm::ivec2 coord)` now calls `m_worldGen.generateChunkColumn(coord)` instead of creating empty columns
+- GameApp owns the `WorldGenerator` instance and passes it to ChunkManager
+- For now generation is synchronous on the main thread — Story 5.6 will make it async via enkiTS later
+- If a saved chunk exists on disk (Story 3.7): load from disk instead of generating. Disk has priority over generation.
+
 ---
 
 ## Story 4.2: Spline Remapping + Elevation Distribution

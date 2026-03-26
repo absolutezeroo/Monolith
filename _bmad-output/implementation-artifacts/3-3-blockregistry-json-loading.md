@@ -1,6 +1,6 @@
 # Story 3.3: BlockRegistry + JSON Loading
 
-Status: done
+Status: ready-for-dev
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -22,50 +22,50 @@ so that the engine knows what each block type is.
 
 ## Tasks / Subtasks
 
-- [x] Task 1: Add `nlohmann-json` to vcpkg.json and CMake (AC: 4, 5)
-  - [x] Add `"nlohmann-json"` to `vcpkg.json` dependencies array
-  - [x] Add `find_package(nlohmann_json CONFIG REQUIRED)` to `engine/CMakeLists.txt`
-  - [x] Add `PRIVATE nlohmann_json::nlohmann_json` to `target_link_libraries`
-- [x] Task 2: Create `Block.h` header with `BlockDefinition` struct (AC: 1)
-  - [x] Create `engine/include/voxel/world/Block.h`
-  - [x] Define `BlockDefinition` struct with all fields per architecture
-  - [x] Define `BLOCK_AIR` constant as `uint16_t{0}` (move from `ChunkSection.h` or re-export)
-- [x] Task 3: Create `BlockRegistry.h` header (AC: 2, 3, 6)
-  - [x] Create `engine/include/voxel/world/BlockRegistry.h`
-  - [x] Declare `BlockRegistry` class with public API
-  - [x] Constructor auto-registers air block (ID 0)
-- [x] Task 4: Implement `BlockRegistry.cpp` (AC: 2, 3, 6)
-  - [x] Create `engine/src/world/BlockRegistry.cpp`
-  - [x] `registerBlock()` — assigns next ID, validates namespace format, rejects duplicates
-  - [x] `getBlock(uint16_t)` — bounds-checked access to `m_blocks` vector
-  - [x] `getIdByName(string_view)` — lookup in `m_nameToId` map
-  - [x] `blockCount()` — returns `m_blocks.size()`
-- [x] Task 5: Implement `loadFromJson()` (AC: 4, 5, 6)
-  - [x] Create `engine/src/world/BlockRegistry.cpp` method `loadFromJson(const std::filesystem::path&) → Result<uint16_t>`
-  - [x] Parse JSON array, construct `BlockDefinition` per entry, call `registerBlock`
-  - [x] Return count of loaded blocks on success, `EngineError::FileNotFound` or `EngineError::InvalidFormat` on failure
-- [x] Task 6: Create sample `blocks.json` (AC: 4, 5)
-  - [x] Create directory `assets/scripts/base/`
-  - [x] Create `assets/scripts/base/blocks.json` with base block definitions (stone, dirt, grass, sand, water, wood, leaves + glass, glowstone, torch)
-- [x] Task 7: Register sources in CMake (AC: all)
-  - [x] Add `src/world/BlockRegistry.cpp` to `engine/CMakeLists.txt`
-  - [x] Add `world/TestBlockRegistry.cpp` to `tests/CMakeLists.txt`
-- [x] Task 8: Write unit tests (AC: 7)
-  - [x] Create `tests/world/TestBlockRegistry.cpp`
-  - [x] Test: constructor auto-registers air at ID 0
-  - [x] Test: registerBlock assigns sequential IDs
-  - [x] Test: getBlock returns correct definition by ID
-  - [x] Test: getIdByName returns correct ID by string name
-  - [x] Test: getIdByName returns sentinel/error for unknown name
-  - [x] Test: duplicate name registration is rejected
-  - [x] Test: invalid namespace format rejected (no colon, empty parts, multiple colons)
-  - [x] Test: loadFromJson parses sample blocks.json correctly
-  - [x] Test: loadFromJson returns FileNotFound for missing file
-  - [x] Test: loadFromJson returns InvalidFormat for malformed JSON
-- [x] Task 9: Handle BLOCK_AIR migration from ChunkSection.h
-  - [x] Move `BLOCK_AIR` to `Block.h` (canonical location)
-  - [x] Update `ChunkSection.h` to `#include "voxel/world/Block.h"` and remove local `BLOCK_AIR`
-  - [x] Verify all existing tests still compile and pass
+- [ ] Task 1: Add `nlohmann-json` to vcpkg.json and CMake (AC: 4, 5)
+  - [ ] Add `"nlohmann-json"` to `vcpkg.json` dependencies array
+  - [ ] Add `find_package(nlohmann_json CONFIG REQUIRED)` to `engine/CMakeLists.txt`
+  - [ ] Add `PRIVATE nlohmann_json::nlohmann_json` to `target_link_libraries`
+- [ ] Task 2: Create `Block.h` header with `BlockDefinition` struct (AC: 1)
+  - [ ] Create `engine/include/voxel/world/Block.h`
+  - [ ] Define `BlockDefinition` struct with all fields per architecture
+  - [ ] Define `BLOCK_AIR` constant as `uint16_t{0}` (move from `ChunkSection.h` or re-export)
+- [ ] Task 3: Create `BlockRegistry.h` header (AC: 2, 3, 6)
+  - [ ] Create `engine/include/voxel/world/BlockRegistry.h`
+  - [ ] Declare `BlockRegistry` class with public API
+  - [ ] Constructor auto-registers air block (ID 0)
+- [ ] Task 4: Implement `BlockRegistry.cpp` (AC: 2, 3, 6)
+  - [ ] Create `engine/src/world/BlockRegistry.cpp`
+  - [ ] `registerBlock()` — assigns next ID, validates namespace format, rejects duplicates
+  - [ ] `getBlock(uint16_t)` — bounds-checked access to `m_blocks` vector
+  - [ ] `getIdByName(string_view)` — lookup in `m_nameToId` map
+  - [ ] `blockCount()` — returns `m_blocks.size()`
+- [ ] Task 5: Implement `loadFromJson()` (AC: 4, 5, 6)
+  - [ ] Create `engine/src/world/BlockRegistry.cpp` method `loadFromJson(const std::filesystem::path&) → Result<uint16_t>`
+  - [ ] Parse JSON array, construct `BlockDefinition` per entry, call `registerBlock`
+  - [ ] Return count of loaded blocks on success, `EngineError::FileNotFound` or `EngineError::InvalidFormat` on failure
+- [ ] Task 6: Create sample `blocks.json` (AC: 4, 5)
+  - [ ] Create directory `assets/scripts/base/`
+  - [ ] Create `assets/scripts/base/blocks.json` with base block definitions (stone, dirt, grass, sand, water, wood, leaves)
+- [ ] Task 7: Register sources in CMake (AC: all)
+  - [ ] Add `src/world/BlockRegistry.cpp` to `engine/CMakeLists.txt`
+  - [ ] Add `world/TestBlockRegistry.cpp` to `tests/CMakeLists.txt`
+- [ ] Task 8: Write unit tests (AC: 7)
+  - [ ] Create `tests/world/TestBlockRegistry.cpp`
+  - [ ] Test: constructor auto-registers air at ID 0
+  - [ ] Test: registerBlock assigns sequential IDs
+  - [ ] Test: getBlock returns correct definition by ID
+  - [ ] Test: getIdByName returns correct ID by string name
+  - [ ] Test: getIdByName returns sentinel/error for unknown name
+  - [ ] Test: duplicate name registration is rejected
+  - [ ] Test: invalid namespace format rejected (no colon, empty parts)
+  - [ ] Test: loadFromJson parses sample blocks.json correctly
+  - [ ] Test: loadFromJson returns FileNotFound for missing file
+  - [ ] Test: loadFromJson returns InvalidFormat for malformed JSON
+- [ ] Task 9: Handle BLOCK_AIR migration from ChunkSection.h
+  - [ ] Move `BLOCK_AIR` to `Block.h` (canonical location)
+  - [ ] Update `ChunkSection.h` to `#include "voxel/world/Block.h"` and remove local `BLOCK_AIR`
+  - [ ] Verify all existing tests still compile and pass
 
 ## Dev Notes
 
@@ -615,33 +615,9 @@ Recent commits show established patterns:
 ## Dev Agent Record
 
 ### Agent Model Used
-Claude Opus 4.6
 
 ### Debug Log References
-- Fixed [[nodiscard]] warnings in test file (lines 120, 125, 203) — MSVC /WX treats as error
-- Fixed use-after-move bug in loadFromJson warning log (captured stringId before std::move)
 
 ### Completion Notes List
-- BlockDefinition struct matches architecture.md System 4 exactly (all 10 fields)
-- BlockRegistry auto-registers "base:air" at ID 0 with correct properties (non-solid, transparent, no collision)
-- Namespace validation enforces "namespace:name" format with single colon, non-empty parts
-- JSON loading uses nlohmann-json no-throw mode (JSON_NOEXCEPTION + parse with nullptr,false)
-- 10 base blocks defined in blocks.json (stone, dirt, grass_block, sand, water, oak_log, oak_leaves, glass, glowstone, torch)
-- BLOCK_AIR migrated from ChunkSection.h to Block.h — all existing tests unaffected
-- VOXELFORGE_ASSETS_DIR compile definition added to tests for portable JSON file path resolution
-- 14 test sections covering all ACs: registration, lookup, namespace validation, JSON loading, error cases
-
-### Change Log
-- 2026-03-25: Initial implementation of BlockRegistry + JSON Loading (all 9 tasks completed)
-- 2026-03-25: Code review — fixed textureIndices type guard (M1) and registerBlock overflow guard (L1). Status → done.
 
 ### File List
-- `engine/include/voxel/world/Block.h` (new)
-- `engine/include/voxel/world/BlockRegistry.h` (new)
-- `engine/src/world/BlockRegistry.cpp` (new)
-- `assets/scripts/base/blocks.json` (new)
-- `tests/world/TestBlockRegistry.cpp` (new)
-- `vcpkg.json` (modified — added nlohmann-json)
-- `engine/CMakeLists.txt` (modified — nlohmann_json find/link/define, BlockRegistry.cpp source)
-- `tests/CMakeLists.txt` (modified — TestBlockRegistry.cpp source, VOXELFORGE_ASSETS_DIR define)
-- `engine/include/voxel/world/ChunkSection.h` (modified — BLOCK_AIR migrated to Block.h)

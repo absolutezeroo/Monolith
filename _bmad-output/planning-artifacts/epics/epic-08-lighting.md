@@ -6,6 +6,40 @@
 
 ---
 
+## Story 8.0: Wire Light Data into Meshing Pipeline
+
+**As a** developer,
+**I want** the mesher to read light values and bake them into vertex data,
+**so that** Stories 8.1–8.4 can propagate light and see results rendered.
+
+**Acceptance Criteria:**
+
+**The actual problem:**
+The mesher (Epic 5) was built to read only block IDs from ChunkSection. The quad format has 15 reserved bits (bits 49–63) that can hold light data. But the mesher's function signature, the snapshot struct, and the vertex shader all need modification before any lighting story can produce visible results.
+
+**Mesher signature change:**
+- `MeshBuilder::buildGreedy()` signature changes from:
+  `(const ChunkSection&, neighbors[6]) → ChunkMesh`
+  to:
+  `(const ChunkSection&, neighbors[6], const LightMap*, neighborLightMaps[6]) → ChunkMesh`
+- `LightMap*` is nullable — when null (before Epic 8 is implemented), mesher writes 0 into light bits (equivalent to full brightness, no lighting applied)
+- When non-null, mesher averages the 4 adjacent light values per vertex and packs them into bits 49–56 of the quad: `[skyLight:4 | blockLight:4]`
+
+**Snapshot change:**
+- `MeshChunkTask` snapshot (Story 5.4) extended to include `LightMap` data per section + 6 neighbors
+- Before Epic 8: snapshot copies null pointers for light maps (no overhead)
+- After Epic 8: snapshot copies light data alongside block data
+
+**Shader change:**
+- `chunk.vert` (Story 6.2) unpacks bits 49–56 as two `float` outputs: `fragSkyLight`, `fragBlockLight` (each 0.0–1.0, mapped from 0–15)
+- `chunk.frag` multiplies albedo by `max(skyLight * dayFactor, blockLight)` — but until Story 8.4 implements the lighting pass, this just outputs 1.0 (no change to visuals)
+
+**Key property:** This story changes interfaces but produces ZERO visual change. Existing rendering looks identical. The light pipeline is just plumbed through and ready for Stories 8.1–8.4 to fill with real data.
+
+- Unit tests: mesher with null LightMap produces identical output to before. Mesher with a test LightMap produces quads with non-zero light bits.
+
+---
+
 ## Story 8.1: Light Data Storage + BFS Block Light
 
 **As a** developer,

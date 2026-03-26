@@ -5,7 +5,7 @@
 project: VoxelForge
 methodology: BMAD v6 + Game Dev Studio
 created: 2026-03-24
-last_updated: 2026-03-25  # Story 3.3 code review passed
+last_updated: 2026-03-25  # Story 3.3 ready-for-dev
 
 # Status values: backlog | ready | in-progress | review | done | blocked
 
@@ -91,21 +91,35 @@ epics:
         assigned_to: dev-agent
       - id: "3.2"
         title: "ChunkColumn (Vertical Stack of Sections)"
-        status: done
-        assigned_to: dev-agent
-      - id: "3.3"
-        title: "BlockRegistry + JSON Loading"
-        status: done
-        assigned_to: dev-agent
-      - id: "3.4"
-        title: "ChunkManager + Spatial HashMap"
         status: review
         assigned_to: dev-agent
-      - id: "3.5"
-        title: "Palette Compression Codec"
+      - id: "3.0a"
+        title: "Structural Refactoring (Code Organization)"
         status: ready-for-dev
         assigned_to: null
+        notes: "6 parts: InputManager, Pipeline dedup, Overlay split, Config files, EngineError, ChunkSection O(1). No GPU changes."
+      - id: "3.0b"
+        title: "Renderer Fixes + Missing Features"
+        status: backlog
+        assigned_to: null
+        notes: "4 parts: Wire Gigabuffer, Swapchain fix, Depth buffer, HUD/Config/Screenshot. Depends on 3.0a."
+      - id: "3.3"
+        title: "BlockRegistry + JSON Loading"
+        status: backlog
+        assigned_to: null
+      - id: "3.4"
+        title: "Block State System"
+        status: backlog
+        assigned_to: null
+      - id: "3.5"
+        title: "ChunkManager + Spatial HashMap"
+        status: backlog
+        assigned_to: null
       - id: "3.6"
+        title: "Palette Compression Codec"
+        status: backlog
+        assigned_to: null
+      - id: "3.7"
         title: "Chunk Serialization (Disk I/O)"
         status: backlog
         assigned_to: null
@@ -156,10 +170,18 @@ epics:
         status: backlog
         assigned_to: null
       - id: "5.4"
-        title: "Async Mesh Jobs via enkiTS"
+        title: "Non-Cubic Block Model Meshing"
         status: backlog
         assigned_to: null
       - id: "5.5"
+        title: "Block Tinting + Waving Animation in Vertex Format"
+        status: backlog
+        assigned_to: null
+      - id: "5.6"
+        title: "Async Mesh Jobs via enkiTS"
+        status: backlog
+        assigned_to: null
+      - id: "5.7"
         title: "Mesh Upload to Gigabuffer"
         status: backlog
         assigned_to: null
@@ -170,6 +192,10 @@ epics:
     status: backlog
     dependencies: [2, 5]
     stories:
+      - id: "6.0"
+        title: "Vulkan Descriptor Infrastructure"
+        status: backlog
+        assigned_to: null
       - id: "6.1"
         title: "Shared Quad Index Buffer"
         status: backlog
@@ -192,6 +218,14 @@ epics:
         assigned_to: null
       - id: "6.6"
         title: "Deferred Rendering G-Buffer Setup"
+        status: backlog
+        assigned_to: null
+      - id: "6.7"
+        title: "Transparent & Translucent Rendering Pass"
+        status: backlog
+        assigned_to: null
+      - id: "6.8"
+        title: "Block Tinting Shader Support"
         status: backlog
         assigned_to: null
 
@@ -228,6 +262,10 @@ epics:
     status: backlog
     dependencies: [3, 6]
     stories:
+      - id: "8.0"
+        title: "Wire Light Data into Meshing Pipeline"
+        status: backlog
+        assigned_to: null
       - id: "8.1"
         title: "Light Data Storage + BFS Block Light"
         status: backlog
@@ -246,7 +284,7 @@ epics:
         assigned_to: null
 
   - id: 9
-    name: "Lua Scripting"
+    name: "Lua Scripting (Complete Block Callback System)"
     priority: P1
     status: backlog
     dependencies: [3, 7]
@@ -256,18 +294,42 @@ epics:
         status: backlog
         assigned_to: null
       - id: "9.2"
-        title: "Block & Item Registration API"
+        title: "Block Registration + Placement & Destruction Callbacks"
         status: backlog
         assigned_to: null
       - id: "9.3"
-        title: "Event Hook System"
+        title: "Block Interaction Callbacks (Rightclick, Punch, Multi-phase)"
         status: backlog
         assigned_to: null
       - id: "9.4"
-        title: "World Query & Modification API"
+        title: "Block Tick & Update System (Timers, ABM, LBM)"
         status: backlog
         assigned_to: null
       - id: "9.5"
+        title: "Neighbor Change + Physics Shape Callbacks"
+        status: backlog
+        assigned_to: null
+      - id: "9.6"
+        title: "Entity-Block Interaction Callbacks"
+        status: backlog
+        assigned_to: null
+      - id: "9.7"
+        title: "Metadata & Inventory Callbacks"
+        status: backlog
+        assigned_to: null
+      - id: "9.8"
+        title: "World Query & Modification API"
+        status: backlog
+        assigned_to: null
+      - id: "9.9"
+        title: "Visual & Client Callbacks"
+        status: backlog
+        assigned_to: null
+      - id: "9.10"
+        title: "Global Event Hooks"
+        status: backlog
+        assigned_to: null
+      - id: "9.11"
         title: "Mod Loading + Hot-Reload"
         status: backlog
         assigned_to: null
@@ -297,15 +359,16 @@ epics:
 
 summary:
   total_epics: 10
-  total_stories: 52
+  total_stories: 67
   by_priority:
-    P0: 34
-    P1: 14
+    P0: 42
+    P1: 21
     P2: 4
   by_status:
-    backlog: 35
-    ready-for-dev: 3
+    backlog: 46
+    ready-for-dev: 2
     in_progress: 0
-    review: 0
-    done: 14
+    review: 1
+    done: 13
     blocked: 0
+  implementation_order: "3.2 (review) → 3.0a → 3.0b → 3.3 → 3.4 → 3.5 → ..."

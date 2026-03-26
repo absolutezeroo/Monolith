@@ -1,6 +1,6 @@
 # Story 3.2: ChunkColumn (Vertical Stack of Sections)
 
-Status: done
+Status: review
 
 ## Story
 
@@ -249,6 +249,4 @@ No issues encountered. Build and all tests pass on first attempt.
 - `tests/world/TestChunkColumn.cpp` (new)
 - `engine/CMakeLists.txt` (modified — added ChunkColumn.cpp)
 - `tests/CMakeLists.txt` (modified — added TestChunkColumn.cpp)
-- `engine/include/voxel/world/ChunkSection.h` (modified — removed unused `#include <algorithm>`)
-- `tests/world/TestChunkSection.cpp` (modified — added comment re: VX_ASSERT death-test limitation)
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` (modified — 3.2 status update)

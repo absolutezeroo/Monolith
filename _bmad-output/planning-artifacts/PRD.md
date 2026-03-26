@@ -251,13 +251,13 @@ Renderer
 |---|------|---------|----------|-------------|-------------|
 | 1 | Foundation | 6 | P0 | None | Core layer, CMake, vcpkg, logging, math types, Catch2 tests, CI |
 | 2 | Vulkan Bootstrap | 6 | P0 | Epic 1 | GLFW window, Vulkan init (volk+vk-bootstrap+VMA), triangle, gigabuffer, staging, camera |
-| 3 | Voxel World Core | 6 | P0 | Epic 1 | ChunkSection, ChunkColumn, ChunkManager, BlockRegistry, palette compression, coordinate system |
+| 3 | Voxel World Core | 9 | P0 | Epic 1 | Structural refactoring (3.0a+3.0b), ChunkSection, ChunkColumn, BlockRegistry, Block State System, ChunkManager, palette compression, serialization |
 | 4 | Terrain Generation | 5 | P0 | Epic 3 | FastNoiseLite, heightmap terrain, spline remapping, biomes, caves, tree placement |
-| 5 | Meshing Pipeline | 5 | P0 | Epic 3 | Binary greedy meshing, 8-byte quad format, face culling, AO calculation, mesh upload to gigabuffer |
-| 6 | GPU-Driven Rendering | 6 | P0 | Epic 2, 5 | Indirect draw pipeline, compute culling shader, vertex pulling shader, texture arrays, deferred G-Buffer |
+| 5 | Meshing Pipeline | 7 | P0 | Epic 3 | Binary greedy meshing, non-cubic block models, block tinting vertex format, 8-byte quad format, face culling, AO calculation, mesh upload to gigabuffer |
+| 6 | GPU-Driven Rendering | 9 | P0 | Epic 2, 5 | Descriptor infrastructure, indirect draw pipeline, compute culling, vertex pulling, texture arrays, deferred G-Buffer, transparent/translucent pass, block tinting shader |
 | 7 | Player Interaction | 5 | P0 | Epic 3, 6 | FPS controls, AABB collision, DDA raycasting, block place/break, hotbar, gravity |
-| 8 | Lighting | 4 | P1 | Epic 3, 6 | Block light BFS, sky light, dynamic updates, day/night cycle, deferred lighting pass |
-| 9 | Lua Scripting | 5 | P1 | Epic 3, 7 | sol2 integration, block/item registration API, event hooks, world API, sandboxing, hot-reload |
+| 8 | Lighting | 5 | P1 | Epic 3, 6 | Mesher light integration, block light BFS, sky light, dynamic updates, day/night cycle, deferred lighting pass |
+| 9 | Lua Scripting | 11 | P1 | Epic 3, 7 | sol2 integration, block registration with 85 callbacks/APIs (placement, destruction, interaction, tick/ABM/LBM, neighbor, entity, inventory, visual, 34 global events), world API, mod loading, hot-reload |
 | 10 | Polish & LOD | 4 | P2 | Epic 6, 8 | Tommo's cave culling, LOD (POP buffers or clipmaps), HZB occlusion culling, SSAO |
 
 ### Epic Dependency Graph
