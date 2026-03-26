@@ -5,7 +5,7 @@
 project: VoxelForge
 methodology: BMAD v6 + Game Dev Studio
 created: 2026-03-24
-last_updated: 2026-03-26  # Story 3.6 (Palette Compression) code review passed — done
+last_updated: 2026-03-26  # Story 3.4 (Block State System) contexted — ready-for-dev
 
 # Status values: backlog | ready | in-progress | review | done | blocked
 
@@ -114,7 +114,7 @@ epics:
         notes: "Expands Block.h from 10 to 35+ fields. Zero API changes to BlockRegistry. All new fields have defaults — backward compatible."
       - id: "3.4"
         title: "Block State System"
-        status: backlog
+        status: ready-for-dev
         assigned_to: null
       - id: "3.5"
         title: "ChunkManager + Spatial HashMap"
@@ -370,10 +370,10 @@ summary:
     P1: 21
     P2: 4
   by_status:
-    backlog: 47
-    ready-for-dev: 1
+    backlog: 46
+    ready-for-dev: 2
     in_progress: 0
     review: 0
     done: 20
     blocked: 0
-  implementation_order: "3.7 (ready) → 3.4 → Epic 4..."
+  implementation_order: "3.4 (ready) → 3.7 (ready) → Epic 4..."
