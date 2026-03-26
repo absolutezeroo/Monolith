@@ -16,3 +16,7 @@ cmake_install.cmake
 compile_commands.json
 *.vcxproj*
 vcpkg_installed/
+
+# User-specific / runtime
+config.json
+screenshots/

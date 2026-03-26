@@ -141,14 +141,14 @@ TEST_CASE("ChunkSection", "[world]")
     {
         // Set block at (x=3, y=5, z=7) -> index = 5*256 + 7*16 + 3 = 1395
         section.setBlock(3, 5, 7, 99);
-        REQUIRE(section.blocks[1395] == 99);
+        REQUIRE(section.data()[1395] == 99);
 
         // Set block at (x=0, y=0, z=0) -> index = 0
         section.setBlock(0, 0, 0, 50);
-        REQUIRE(section.blocks[0] == 50);
+        REQUIRE(section.data()[0] == 50);
 
         // Set block at (x=15, y=15, z=15) -> index = 15*256 + 15*16 + 15 = 4095
         section.setBlock(15, 15, 15, 77);
-        REQUIRE(section.blocks[4095] == 77);
+        REQUIRE(section.data()[4095] == 77);
     }
 }

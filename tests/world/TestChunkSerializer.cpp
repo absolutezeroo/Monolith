@@ -4,6 +4,7 @@
 #include "voxel/world/BlockRegistry.h"
 #include "voxel/world/ChunkColumn.h"
 #include "voxel/world/PaletteCompression.h"
+#include "voxel/world/RegionFile.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -330,6 +331,43 @@ TEST_CASE("ChunkSerializer ID remapping", "[world][serialization]")
         // Unknown "base:obsidian" should become air
         CHECK(loadResult.value().getBlock(0, 0, 0) == BLOCK_AIR);
     }
+}
+
+TEST_CASE("RegionFile compact eliminates dead space", "[world][serialization]")
+{
+    TempDir tempDir;
+    BlockRegistry registry = makeTestRegistry();
+    uint16_t stoneId = registry.getIdByName("base:stone");
+    uint16_t dirtId = registry.getIdByName("base:dirt");
+
+    // Save a chunk, then overwrite it (creates dead data from the first write)
+    ChunkColumn column({0, 0});
+    column.setBlock(0, 0, 0, stoneId);
+    REQUIRE(ChunkSerializer::save(column, registry, tempDir.path).has_value());
+
+    auto regionPath = tempDir.path / "r.0.0.vxr";
+    auto sizeBeforeOverwrite = std::filesystem::file_size(regionPath);
+
+    // Overwrite same chunk with different data
+    column.setBlock(1, 0, 0, dirtId);
+    REQUIRE(ChunkSerializer::save(column, registry, tempDir.path).has_value());
+
+    auto sizeAfterOverwrite = std::filesystem::file_size(regionPath);
+    // File grew because old data is still there (append-only)
+    REQUIRE(sizeAfterOverwrite > sizeBeforeOverwrite);
+
+    // Compact should shrink the file
+    auto compactResult = RegionFile::compact(regionPath);
+    REQUIRE(compactResult.has_value());
+
+    auto sizeAfterCompact = std::filesystem::file_size(regionPath);
+    CHECK(sizeAfterCompact < sizeAfterOverwrite);
+
+    // Data should still load correctly
+    auto loadResult = ChunkSerializer::load({0, 0}, registry, tempDir.path);
+    REQUIRE(loadResult.has_value());
+    CHECK(loadResult.value().getBlock(0, 0, 0) == stoneId);
+    CHECK(loadResult.value().getBlock(1, 0, 0) == dirtId);
 }
 
 TEST_CASE("ChunkSerializer serializeColumn/deserializeColumn direct", "[world][serialization]")

@@ -151,4 +151,115 @@ core::Result<std::vector<uint8_t>> RegionFile::readChunk(
     return data;
 }
 
+core::Result<void> RegionFile::compact(const std::filesystem::path& regionPath)
+{
+    if (!std::filesystem::exists(regionPath))
+    {
+        return std::unexpected(core::EngineError::file(regionPath.string()));
+    }
+
+    // Read the entire header from the original file
+    std::fstream src(regionPath, std::ios::in | std::ios::binary);
+    if (!src.is_open())
+    {
+        return std::unexpected(core::EngineError{
+            core::ErrorCode::InvalidFormat, "Failed to open region file for compaction: " + regionPath.string()});
+    }
+
+    // Read all header entries
+    HeaderEntry entries[HEADER_ENTRIES];
+    for (int i = 0; i < HEADER_ENTRIES; ++i)
+    {
+        entries[i] = readHeaderEntry(src, i);
+    }
+
+    // Write a new temp file: fresh header + live chunks packed sequentially
+    auto tempPath = regionPath;
+    tempPath += ".compact_tmp";
+
+    {
+        std::ofstream dst(tempPath, std::ios::binary);
+        if (!dst.is_open())
+        {
+            return std::unexpected(core::EngineError{
+                core::ErrorCode::InvalidFormat, "Failed to create temp file for compaction"});
+        }
+
+        // Write empty header placeholder
+        std::vector<uint8_t> emptyHeader(HEADER_BYTES, 0);
+        dst.write(reinterpret_cast<const char*>(emptyHeader.data()), HEADER_BYTES);
+
+        // Copy live chunks and track new offsets
+        uint32_t writePos = HEADER_BYTES;
+        HeaderEntry newEntries[HEADER_ENTRIES] = {};
+
+        for (int i = 0; i < HEADER_ENTRIES; ++i)
+        {
+            if (entries[i].offset == 0 && entries[i].size == 0)
+            {
+                continue; // no chunk here
+            }
+
+            // Read chunk data from source
+            std::vector<uint8_t> chunkData(entries[i].size);
+            src.seekg(static_cast<std::streamoff>(entries[i].offset));
+            src.read(reinterpret_cast<char*>(chunkData.data()), static_cast<std::streamsize>(entries[i].size));
+            if (!src.good())
+            {
+                return std::unexpected(core::EngineError{
+                    core::ErrorCode::InvalidFormat, "Failed to read chunk during compaction"});
+            }
+
+            // Write chunk data to dest
+            dst.write(reinterpret_cast<const char*>(chunkData.data()), static_cast<std::streamsize>(chunkData.size()));
+            if (!dst.good())
+            {
+                return std::unexpected(core::EngineError{
+                    core::ErrorCode::InvalidFormat, "Failed to write chunk during compaction"});
+            }
+
+            newEntries[i].offset = writePos;
+            newEntries[i].size = entries[i].size;
+            writePos += entries[i].size;
+        }
+
+        // Go back and write the real header with updated offsets
+        dst.seekp(0);
+        for (int i = 0; i < HEADER_ENTRIES; ++i)
+        {
+            uint8_t buf[4];
+            auto writeLE = [&](uint32_t v) {
+                buf[0] = static_cast<uint8_t>(v & 0xFF);
+                buf[1] = static_cast<uint8_t>((v >> 8) & 0xFF);
+                buf[2] = static_cast<uint8_t>((v >> 16) & 0xFF);
+                buf[3] = static_cast<uint8_t>((v >> 24) & 0xFF);
+                dst.write(reinterpret_cast<const char*>(buf), 4);
+            };
+            writeLE(newEntries[i].offset);
+            writeLE(newEntries[i].size);
+        }
+
+        if (!dst.good())
+        {
+            return std::unexpected(core::EngineError{
+                core::ErrorCode::InvalidFormat, "Failed to finalize compacted region file"});
+        }
+    }
+
+    // Close the source before rename
+    src.close();
+
+    // Atomically replace original with compacted file
+    std::error_code ec;
+    std::filesystem::rename(tempPath, regionPath, ec);
+    if (ec)
+    {
+        std::filesystem::remove(tempPath, ec);
+        return std::unexpected(core::EngineError{
+            core::ErrorCode::InvalidFormat, "Failed to replace region file after compaction"});
+    }
+
+    return {};
+}
+
 } // namespace voxel::world

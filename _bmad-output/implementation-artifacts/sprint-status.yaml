@@ -5,7 +5,7 @@
 project: VoxelForge
 methodology: BMAD v6 + Game Dev Studio
 created: 2026-03-24
-last_updated: 2026-03-26  # Story 4.1 (FastNoiseLite + Heightmap) — ready-for-dev
+last_updated: 2026-03-26  # Story 4.3 (Biome System — Whittaker Diagram) — ready-for-dev
 
 # Status values: backlog | ready | in-progress | review | done | blocked
 
@@ -141,12 +141,12 @@ epics:
         assigned_to: dev-agent
       - id: "4.2"
         title: "Spline Remapping + Elevation Distribution"
-        status: backlog
-        assigned_to: null
+        status: ready-for-dev
+        assigned_to: dev-agent
       - id: "4.3"
         title: "Biome System (Whittaker Diagram)"
-        status: backlog
-        assigned_to: null
+        status: ready-for-dev
+        assigned_to: dev-agent
       - id: "4.4"
         title: "3D Caves and Overhangs"
         status: backlog
@@ -370,10 +370,10 @@ summary:
     P1: 21
     P2: 4
   by_status:
-    backlog: 45
-    ready-for-dev: 2
+    backlog: 43
+    ready-for-dev: 4
     in_progress: 0
     review: 0
     done: 21
     blocked: 0
-  implementation_order: "4.1 (ready) → 4.2 → 4.3 → 4.4 → 4.5 → Epic 5..."
+  implementation_order: "4.1 (ready) → 4.2 (ready) → 4.3 (ready) → 4.4 → 4.5 → Epic 5..."

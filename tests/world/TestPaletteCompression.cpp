@@ -20,7 +20,7 @@ static void requireBlocksEqual(const ChunkSection& a, const ChunkSection& b)
 {
     for (int i = 0; i < ChunkSection::VOLUME; ++i)
     {
-        REQUIRE(a.blocks[i] == b.blocks[i]);
+        REQUIRE(a.data()[i] == b.data()[i]);
     }
 }
 

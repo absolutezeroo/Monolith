@@ -7,7 +7,7 @@ namespace voxel::world
 
 ChunkSection::ChunkSection() : m_nonAirCount(0)
 {
-    std::fill(std::begin(blocks), std::end(blocks), BLOCK_AIR);
+    std::fill(std::begin(m_blocks), std::end(m_blocks), BLOCK_AIR);
 }
 
 uint16_t ChunkSection::getBlock(int x, int y, int z) const
@@ -15,7 +15,7 @@ uint16_t ChunkSection::getBlock(int x, int y, int z) const
     VX_ASSERT(x >= 0 && x < SIZE, "x out of bounds");
     VX_ASSERT(y >= 0 && y < SIZE, "y out of bounds");
     VX_ASSERT(z >= 0 && z < SIZE, "z out of bounds");
-    return blocks[toIndex(x, y, z)];
+    return m_blocks[toIndex(x, y, z)];
 }
 
 void ChunkSection::setBlock(int x, int y, int z, uint16_t id)
@@ -24,7 +24,7 @@ void ChunkSection::setBlock(int x, int y, int z, uint16_t id)
     VX_ASSERT(y >= 0 && y < SIZE, "y out of bounds");
     VX_ASSERT(z >= 0 && z < SIZE, "z out of bounds");
     int idx = toIndex(x, y, z);
-    uint16_t old = blocks[idx];
+    uint16_t old = m_blocks[idx];
     if (old == id)
     {
         return;
@@ -37,12 +37,12 @@ void ChunkSection::setBlock(int x, int y, int z, uint16_t id)
     {
         --m_nonAirCount;
     }
-    blocks[idx] = id;
+    m_blocks[idx] = id;
 }
 
 void ChunkSection::fill(uint16_t id)
 {
-    std::fill(std::begin(blocks), std::end(blocks), id);
+    std::fill(std::begin(m_blocks), std::end(m_blocks), id);
     m_nonAirCount = (id == BLOCK_AIR) ? 0 : VOLUME;
 }
 

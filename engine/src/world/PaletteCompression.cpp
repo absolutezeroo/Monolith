@@ -64,7 +64,7 @@ CompressedSection PaletteCompression::compress(const ChunkSection& section)
 
     for (int i = 0; i < ChunkSection::VOLUME; ++i)
     {
-        uint16_t blockId = section.blocks[i];
+        uint16_t blockId = section.data()[i];
         if (!blockToPaletteIndex.contains(blockId))
         {
             blockToPaletteIndex[blockId] = static_cast<uint16_t>(palette.size());
@@ -99,7 +99,7 @@ CompressedSection PaletteCompression::compress(const ChunkSection& section)
         {
             int wordIndex = i / entriesPerWord;
             int bitOffset = (i % entriesPerWord) * 16;
-            result.data[wordIndex] |= static_cast<uint64_t>(section.blocks[i]) << bitOffset;
+            result.data[wordIndex] |= static_cast<uint64_t>(section.data()[i]) << bitOffset;
         }
         return result;
     }
@@ -115,7 +115,7 @@ CompressedSection PaletteCompression::compress(const ChunkSection& section)
 
     for (int i = 0; i < ChunkSection::VOLUME; ++i)
     {
-        uint16_t paletteIndex = blockToPaletteIndex[section.blocks[i]];
+        uint16_t paletteIndex = blockToPaletteIndex[section.data()[i]];
         int wordIndex = i / entriesPerWord;
         int bitOffset = (i % entriesPerWord) * bitsPerEntry;
         result.data[wordIndex] |= (static_cast<uint64_t>(paletteIndex) & mask) << bitOffset;

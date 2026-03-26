@@ -38,6 +38,10 @@ public:
         const std::filesystem::path& regionPath,
         int localIndex
     );
+
+    /// Rewrite the region file with only live chunk data, eliminating dead space
+    /// from previous overwrites. Replaces the original file atomically via rename.
+    [[nodiscard]] static core::Result<void> compact(const std::filesystem::path& regionPath);
 };
 
 } // namespace voxel::world
