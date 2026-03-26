@@ -5,7 +5,7 @@
 project: VoxelForge
 methodology: BMAD v6 + Game Dev Studio
 created: 2026-03-24
-last_updated: 2026-03-26  # Story 4.3 (Biome System — Whittaker Diagram) — done
+last_updated: 2026-03-26  # Story 4.4 (3D Caves and Overhangs) — review
 
 # Status values: backlog | ready | in-progress | review | done | blocked
 
@@ -149,7 +149,7 @@ epics:
         assigned_to: dev-agent
       - id: "4.4"
         title: "3D Caves and Overhangs"
-        status: ready-for-dev
+        status: review
         assigned_to: dev-agent
       - id: "4.5"
         title: "Tree and Decoration Placement"

@@ -18,6 +18,7 @@ add_executable(VoxelTests
     world/TestPaletteCompression.cpp
     world/TestChunkSerializer.cpp
     world/TestBiomeSystem.cpp
+    world/TestCaveCarver.cpp
     world/TestSplineCurve.cpp
     world/TestWorldGenerator.cpp
 )

@@ -3,6 +3,7 @@
 #include "voxel/world/BiomeSystem.h"
 #include "voxel/world/BiomeTypes.h"
 #include "voxel/world/BlockRegistry.h"
+#include "voxel/world/CaveCarver.h"
 #include "voxel/world/ChunkColumn.h"
 #include "voxel/world/SplineCurve.h"
 
@@ -58,6 +59,9 @@ class WorldGenerator
 
     // Biome system for climate-based biome selection and blending
     BiomeSystem m_biomeSystem;
+
+    // Cave carving post-pass
+    CaveCarver m_caveCarver;
 
     // Spline curve mapping continent noise to terrain height
     SplineCurve m_spline;

@@ -1,6 +1,6 @@
 # Story 4.4: 3D Caves and Overhangs
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -21,22 +21,22 @@ so that the underground is interesting to explore.
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: Create CaveCarver class** (AC: 1, 4)
-  - [ ] Create `engine/include/voxel/world/CaveCarver.h`
-  - [ ] Create `engine/src/world/CaveCarver.cpp`
-  - [ ] Constructor: `explicit CaveCarver(uint64_t seed)`
-  - [ ] Members:
+- [x] **Task 1: Create CaveCarver class** (AC: 1, 4)
+  - [x] Create `engine/include/voxel/world/CaveCarver.h`
+  - [x]Create `engine/src/world/CaveCarver.cpp`
+  - [x]Constructor: `explicit CaveCarver(uint64_t seed)`
+  - [x]Members:
     - `FastNoiseLite m_cheeseNoise` — primary large-cavity noise
     - `FastNoiseLite m_spaghettiNoise` — elongated tunnel noise
-  - [ ] Cheese noise config: `NoiseType_OpenSimplex2`, `FractalType_FBm`, freq 0.02, octaves 3, seed = `static_cast<int>(seed + 4)`
-  - [ ] Spaghetti noise config: `NoiseType_OpenSimplex2`, `FractalType_FBm`, freq 0.03, octaves 2, seed = `static_cast<int>(seed + 5)`
+  - [x]Cheese noise config: `NoiseType_OpenSimplex2`, `FractalType_FBm`, freq 0.02, octaves 3, seed = `static_cast<int>(seed + 4)`
+  - [x]Spaghetti noise config: `NoiseType_OpenSimplex2`, `FractalType_FBm`, freq 0.03, octaves 2, seed = `static_cast<int>(seed + 5)`
     - Spaghetti uses a coordinate-stretch trick, not a separate FastNoiseLite frequency per axis (FastNoiseLite only has a single frequency). Instead, scale input coords: `GetNoise(x * 1.0f, y * 0.33f, z * 1.0f)` — this stretches caves along the Y axis, creating horizontal tunnels
-  - [ ] Method: `void carveColumn(ChunkColumn& column, glm::ivec2 chunkCoord, int surfaceHeights[16][16]) const`
-  - [ ] Method: `bool shouldCarve(float worldX, float worldY, float worldZ, int surfaceHeight) const` — evaluates both noise layers + threshold
+  - [x]Method: `void carveColumn(ChunkColumn& column, glm::ivec2 chunkCoord, int surfaceHeights[16][16]) const`
+  - [x]Method: `bool shouldCarve(float worldX, float worldY, float worldZ, int surfaceHeight) const` — evaluates both noise layers + threshold
 
-- [ ] **Task 2: Implement depth-dependent threshold** (AC: 3)
-  - [ ] Method: `static float getThreshold(int y, int surfaceHeight)` — pure function
-  - [ ] Threshold curve design:
+- [x] **Task 2: Implement depth-dependent threshold** (AC: 3)
+  - [x]Method: `static float getThreshold(int y, int surfaceHeight)` — pure function
+  - [x]Threshold curve design:
     ```
     y in [0, 5]:           threshold = 1.0 (never carve — bedrock protection zone)
     y in [5, 20]:          threshold lerps from 0.9 to 0.55 (few caves near bedrock)
@@ -46,12 +46,12 @@ so that the underground is interesting to explore.
     y in [surface-10, surface+5]: threshold lerps from 0.55 to 0.75 (reduced near surface but openings allowed)
     y > surface+5:         skip (already air, above terrain)
     ```
-  - [ ] Use `std::lerp` (C++20) for interpolation between zones
-  - [ ] Surface height passed per-column to adapt threshold near the actual surface, not a fixed Y
-  - [ ] The values above are starting points — tune for visual quality
+  - [x]Use `std::lerp` (C++20) for interpolation between zones
+  - [x]Surface height passed per-column to adapt threshold near the actual surface, not a fixed Y
+  - [x]The values above are starting points — tune for visual quality
 
-- [ ] **Task 3: Implement cave carving logic** (AC: 2, 5, 6)
-  - [ ] `shouldCarve()` algorithm:
+- [x] **Task 3: Implement cave carving logic** (AC: 2, 5, 6)
+  - [x]`shouldCarve()` algorithm:
     1. Sample cheese noise: `float cheese = m_cheeseNoise.GetNoise(worldX, worldY, worldZ)`
     2. Remap cheese from [-1,1] to [0,1]: `cheese = (cheese + 1.0f) * 0.5f`
     3. Sample spaghetti noise with Y-stretch: `float spaghetti = m_spaghettiNoise.GetNoise(worldX, worldY * 0.33f, worldZ)`
@@ -60,7 +60,7 @@ so that the underground is interesting to explore.
     6. Clamp `spaghettiCarve` to [0,1]
     7. Combined density: `float density = std::max(cheese, spaghettiCarve)`
     8. Compare: `return density > getThreshold(y, surfaceHeight)`
-  - [ ] `carveColumn()` algorithm:
+  - [x]`carveColumn()` algorithm:
     1. For each (x, z) in [0,15]:
        - Compute `worldX = chunkCoord.x * 16 + x`, `worldZ = chunkCoord.y * 16 + z`
        - `surfaceH = surfaceHeights[x][z]`
@@ -68,33 +68,33 @@ so that the underground is interesting to explore.
          - `worldY = static_cast<float>(y)`
          - If block at (x, y, z) is not `BLOCK_AIR` and `shouldCarve(worldX, worldY, worldZ, surfaceH)`:
            - `column.setBlock(x, y, z, BLOCK_AIR)`
-  - [ ] Bedrock at y=0 is always skipped (loop starts at y=1, and threshold=1.0 in [0,5] range provides additional safety)
-  - [ ] Overhangs are an emergent property: where 3D noise near y=surfaceH creates air pockets, surface blocks are carved, revealing stone/dirt underneath as overhang ceilings
+  - [x]Bedrock at y=0 is always skipped (loop starts at y=1, and threshold=1.0 in [0,5] range provides additional safety)
+  - [x]Overhangs are an emergent property: where 3D noise near y=surfaceH creates air pockets, surface blocks are carved, revealing stone/dirt underneath as overhang ceilings
 
-- [ ] **Task 4: Integrate CaveCarver into WorldGenerator** (AC: 2, 7)
-  - [ ] Add `CaveCarver m_caveCarver` member to `WorldGenerator`, initialized with same seed
-  - [ ] In `generateChunkColumn()`, after terrain fill + biome surface application:
+- [x] **Task 4: Integrate CaveCarver into WorldGenerator** (AC: 2, 7)
+  - [x]Add `CaveCarver m_caveCarver` member to `WorldGenerator`, initialized with same seed
+  - [x]In `generateChunkColumn()`, after terrain fill + biome surface application:
     1. Collect surface heights: `int surfaceHeights[16][16]` — the Y of the topmost solid block per (x, z), already computed during the fill loop
     2. Call `m_caveCarver.carveColumn(column, chunkCoord, surfaceHeights)`
-  - [ ] The carving pass is the LAST step in generation (after bedrock, stone, biome surface). This means caves carve through biome surface blocks too (intentional — caves can breach any terrain).
-  - [ ] Surface height tracking: during the existing fill loop, record the height `h` computed for each (x, z) column into the `surfaceHeights` array. Pass this to `carveColumn()`. No extra noise evaluation needed for surface heights.
+  - [x]The carving pass is the LAST step in generation (after bedrock, stone, biome surface). This means caves carve through biome surface blocks too (intentional — caves can breach any terrain).
+  - [x]Surface height tracking: during the existing fill loop, record the height `h` computed for each (x, z) column into the `surfaceHeights` array. Pass this to `carveColumn()`. No extra noise evaluation needed for surface heights.
 
-- [ ] **Task 5: Unit tests** (AC: 8)
-  - [ ] Create `tests/world/TestCaveCarver.cpp`
-  - [ ] Test: **Determinism** — carve same column twice with same seed → identical output
-  - [ ] Test: **Bedrock protection** — after carving, y=0 is never air (scan full column)
-  - [ ] Test: **Caves exist** — generate a chunk column, count air blocks in y range [30, 80]. Expect at least some carved blocks (> 0 air that wasn't originally air). Use a known seed that produces caves.
-  - [ ] Test: **Depth distribution** — count carved blocks per Y-band ([5-20], [40-80], [surface-10, surface]). Mid-depth band should have more carved blocks than near-bedrock or near-surface bands.
-  - [ ] Test: **Threshold curve** — `getThreshold()` returns expected values at key Y positions: 1.0 at y=0, ~0.45 at y=60, higher near surface.
-  - [ ] Test: **shouldCarve determinism** — same (x,y,z) + same seed = same result
-  - [ ] Add to `tests/world/TestWorldGenerator.cpp`:
+- [x] **Task 5: Unit tests** (AC: 8)
+  - [x]Create `tests/world/TestCaveCarver.cpp`
+  - [x]Test: **Determinism** — carve same column twice with same seed → identical output
+  - [x]Test: **Bedrock protection** — after carving, y=0 is never air (scan full column)
+  - [x]Test: **Caves exist** — generate a chunk column, count air blocks in y range [30, 80]. Expect at least some carved blocks (> 0 air that wasn't originally air). Use a known seed that produces caves.
+  - [x]Test: **Depth distribution** — count carved blocks per Y-band ([5-20], [40-80], [surface-10, surface]). Mid-depth band should have more carved blocks than near-bedrock or near-surface bands.
+  - [x]Test: **Threshold curve** — `getThreshold()` returns expected values at key Y positions: 1.0 at y=0, ~0.45 at y=60, higher near surface.
+  - [x]Test: **shouldCarve determinism** — same (x,y,z) + same seed = same result
+  - [x]Add to `tests/world/TestWorldGenerator.cpp`:
     - Test: terrain determinism preserved with cave carver enabled
     - Test: generated chunk has both solid and air blocks at mid-depth (caves exist in full pipeline)
-  - [ ] Tag all cave tests with `[world][cave]`
+  - [x]Tag all cave tests with `[world][cave]`
 
-- [ ] **Task 6: CMake wiring** (AC: all)
-  - [ ] Add `src/world/CaveCarver.cpp` to `engine/CMakeLists.txt` source list
-  - [ ] Add `tests/world/TestCaveCarver.cpp` to `tests/CMakeLists.txt`
+- [x] **Task 6: CMake wiring** (AC: all)
+  - [x]Add `src/world/CaveCarver.cpp` to `engine/CMakeLists.txt` source list
+  - [x]Add `tests/world/TestCaveCarver.cpp` to `tests/CMakeLists.txt`
 
 ## Dev Notes
 
@@ -258,10 +258,42 @@ No new directories needed. All files fit the existing `voxel::world` module stru
 
 ### Agent Model Used
 
-(to be filled by dev agent)
+Claude Opus 4.6
 
 ### Debug Log References
 
+- Threshold tuning: story-specified values (peak 0.45) caused ~60% carving rate, far too aggressive. Tuned to peak 0.78 with dual-component threshold (depth-based + surface-relative protection) for ~3-5% carving.
+- Existing WorldGenerator tests needed cave-awareness updates: surface composition tests now use match-rate thresholds instead of strict 100% checks; height jump test relaxed from 15 to 45 blocks to accommodate cave openings.
+
 ### Completion Notes List
 
+- CaveCarver class created with cheese (large chambers) and spaghetti (narrow tunnels) noise layers
+- Depth-dependent threshold uses dual-component approach: absolute-Y depth curve + surface-relative protection within 15 blocks of surface
+- Threshold values tuned from story starting points for realistic cave density (~3-5% at peak zone)
+- Spaghetti noise uses Y-axis coordinate stretching (0.33x) for horizontal tunnel bias
+- Spaghetti carving uses isosurface intersection technique (narrow band around noise=0.5)
+- Combined density via max(cheese, spaghettiCarve) produces both large caverns and connecting tunnels
+- Bedrock at y=0 always protected (loop starts at y=1, threshold=1.0 for y<=5)
+- Cave carver integrated as post-pass in WorldGenerator after terrain fill + biome surface
+- 6 dedicated CaveCarver test cases + 2 WorldGenerator integration tests added
+- 3 existing WorldGenerator tests updated for cave-awareness
+- All 105 tests pass (0 regressions)
+
 ### File List
+
+New files:
+- engine/include/voxel/world/CaveCarver.h
+- engine/src/world/CaveCarver.cpp
+- tests/world/TestCaveCarver.cpp
+
+Modified files:
+- engine/include/voxel/world/WorldGenerator.h
+- engine/src/world/WorldGenerator.cpp
+- engine/CMakeLists.txt
+- tests/CMakeLists.txt
+- tests/world/TestWorldGenerator.cpp
+- _bmad-output/implementation-artifacts/sprint-status.yaml
+
+## Change Log
+
+- 2026-03-26: Implemented Story 4.4 — 3D Caves and Overhangs. Created CaveCarver with cheese + spaghetti noise layers, depth-dependent threshold with surface protection, integrated into WorldGenerator as a post-pass. Added 8 new tests, updated 3 existing tests for cave-awareness. All 105 tests pass.

@@ -1,0 +1,294 @@
+#include "voxel/world/Block.h"
+#include "voxel/world/BlockRegistry.h"
+#include "voxel/world/CaveCarver.h"
+#include "voxel/world/ChunkColumn.h"
+#include "voxel/world/ChunkSection.h"
+
+#include <catch2/catch_test_macros.hpp>
+
+#include <cmath>
+#include <cstdint>
+
+using namespace voxel::world;
+
+namespace
+{
+
+/// Fill a column with stone (ID 1) from y=0 to surfaceHeight, air above.
+/// Returns the stone block ID used.
+void fillTestColumn(ChunkColumn& column, int uniformSurfaceHeight, uint16_t stoneId, uint16_t bedrockId)
+{
+    for (int lx = 0; lx < ChunkSection::SIZE; ++lx)
+    {
+        for (int lz = 0; lz < ChunkSection::SIZE; ++lz)
+        {
+            column.setBlock(lx, 0, lz, bedrockId);
+            for (int y = 1; y <= uniformSurfaceHeight; ++y)
+            {
+                column.setBlock(lx, y, lz, stoneId);
+            }
+        }
+    }
+}
+
+/// Build surface heights array with a uniform value.
+void fillSurfaceHeights(int surfaceHeights[16][16], int height)
+{
+    for (int x = 0; x < 16; ++x)
+    {
+        for (int z = 0; z < 16; ++z)
+        {
+            surfaceHeights[x][z] = height;
+        }
+    }
+}
+
+/// Count air blocks in a Y range within a column (that were originally solid).
+int countAirInRange(const ChunkColumn& col, int yMin, int yMax)
+{
+    int airCount = 0;
+    for (int y = yMin; y <= yMax; ++y)
+    {
+        for (int x = 0; x < ChunkSection::SIZE; ++x)
+        {
+            for (int z = 0; z < ChunkSection::SIZE; ++z)
+            {
+                if (col.getBlock(x, y, z) == BLOCK_AIR)
+                {
+                    ++airCount;
+                }
+            }
+        }
+    }
+    return airCount;
+}
+
+BlockRegistry makeTestRegistry()
+{
+    BlockRegistry registry;
+
+    BlockDefinition stone;
+    stone.stringId = "base:stone";
+    (void)registry.registerBlock(std::move(stone));
+
+    BlockDefinition bedrock;
+    bedrock.stringId = "base:bedrock";
+    (void)registry.registerBlock(std::move(bedrock));
+
+    return registry;
+}
+
+} // namespace
+
+// ── Determinism ──────────────────────────────────────────────────────────────
+
+TEST_CASE("CaveCarver: determinism — same seed produces identical results", "[world][cave]")
+{
+    constexpr uint64_t SEED = 42;
+    constexpr int SURFACE_H = 120;
+    glm::ivec2 coord{3, -7};
+
+    BlockRegistry registry = makeTestRegistry();
+    uint16_t stoneId = registry.getIdByName("base:stone");
+    uint16_t bedrockId = registry.getIdByName("base:bedrock");
+
+    CaveCarver carver1(SEED);
+    CaveCarver carver2(SEED);
+
+    ChunkColumn col1(coord);
+    ChunkColumn col2(coord);
+    int surfaceHeights[16][16];
+    fillSurfaceHeights(surfaceHeights, SURFACE_H);
+    fillTestColumn(col1, SURFACE_H, stoneId, bedrockId);
+    fillTestColumn(col2, SURFACE_H, stoneId, bedrockId);
+
+    carver1.carveColumn(col1, coord, surfaceHeights);
+    carver2.carveColumn(col2, coord, surfaceHeights);
+
+    for (int y = 0; y < ChunkColumn::COLUMN_HEIGHT; ++y)
+    {
+        for (int x = 0; x < ChunkSection::SIZE; ++x)
+        {
+            for (int z = 0; z < ChunkSection::SIZE; ++z)
+            {
+                REQUIRE(col1.getBlock(x, y, z) == col2.getBlock(x, y, z));
+            }
+        }
+    }
+}
+
+// ── Bedrock protection ───────────────────────────────────────────────────────
+
+TEST_CASE("CaveCarver: bedrock at y=0 is never carved", "[world][cave]")
+{
+    constexpr uint64_t SEED = 12345;
+    constexpr int SURFACE_H = 100;
+
+    BlockRegistry registry = makeTestRegistry();
+    uint16_t stoneId = registry.getIdByName("base:stone");
+    uint16_t bedrockId = registry.getIdByName("base:bedrock");
+
+    CaveCarver carver(SEED);
+
+    // Test multiple chunk coordinates to be thorough
+    glm::ivec2 coords[] = {{0, 0}, {5, -3}, {-10, 10}, {100, 100}};
+
+    for (auto coord : coords)
+    {
+        ChunkColumn col(coord);
+        int surfaceHeights[16][16];
+        fillSurfaceHeights(surfaceHeights, SURFACE_H);
+        fillTestColumn(col, SURFACE_H, stoneId, bedrockId);
+
+        carver.carveColumn(col, coord, surfaceHeights);
+
+        for (int x = 0; x < ChunkSection::SIZE; ++x)
+        {
+            for (int z = 0; z < ChunkSection::SIZE; ++z)
+            {
+                REQUIRE(col.getBlock(x, 0, z) != BLOCK_AIR);
+            }
+        }
+    }
+}
+
+// ── Caves exist at mid-depth ─────────────────────────────────────────────────
+
+TEST_CASE("CaveCarver: caves exist at mid-depth", "[world][cave]")
+{
+    constexpr uint64_t SEED = 77777;
+    constexpr int SURFACE_H = 130;
+
+    BlockRegistry registry = makeTestRegistry();
+    uint16_t stoneId = registry.getIdByName("base:stone");
+    uint16_t bedrockId = registry.getIdByName("base:bedrock");
+
+    CaveCarver carver(SEED);
+
+    // Check many chunks to ensure at least some have caves
+    int totalMidAir = 0;
+
+    for (int cx = -5; cx <= 5; ++cx)
+    {
+        for (int cz = -5; cz <= 5; ++cz)
+        {
+            glm::ivec2 coord{cx, cz};
+            ChunkColumn col(coord);
+            int surfaceHeights[16][16];
+            fillSurfaceHeights(surfaceHeights, SURFACE_H);
+            fillTestColumn(col, SURFACE_H, stoneId, bedrockId);
+
+            carver.carveColumn(col, coord, surfaceHeights);
+
+            totalMidAir += countAirInRange(col, 30, 80);
+        }
+    }
+
+    INFO("Total air blocks in y=[30,80] across 121 chunks: " << totalMidAir);
+    REQUIRE(totalMidAir > 0);
+}
+
+// ── Depth distribution ───────────────────────────────────────────────────────
+
+TEST_CASE("CaveCarver: depth distribution — more caves at mid-depth than near bedrock", "[world][cave]")
+{
+    constexpr uint64_t SEED = 54321;
+    constexpr int SURFACE_H = 150;
+
+    BlockRegistry registry = makeTestRegistry();
+    uint16_t stoneId = registry.getIdByName("base:stone");
+    uint16_t bedrockId = registry.getIdByName("base:bedrock");
+
+    CaveCarver carver(SEED);
+
+    int nearBedrockAir = 0;  // y in [5, 20]
+    int midDepthAir = 0;     // y in [40, 80]
+
+    for (int cx = -5; cx <= 5; ++cx)
+    {
+        for (int cz = -5; cz <= 5; ++cz)
+        {
+            glm::ivec2 coord{cx, cz};
+            ChunkColumn col(coord);
+            int surfaceHeights[16][16];
+            fillSurfaceHeights(surfaceHeights, SURFACE_H);
+            fillTestColumn(col, SURFACE_H, stoneId, bedrockId);
+
+            carver.carveColumn(col, coord, surfaceHeights);
+
+            nearBedrockAir += countAirInRange(col, 5, 20);
+            midDepthAir += countAirInRange(col, 40, 80);
+        }
+    }
+
+    INFO("Near-bedrock air [5-20]: " << nearBedrockAir);
+    INFO("Mid-depth air [40-80]: " << midDepthAir);
+
+    // Mid-depth band is wider (41 layers vs 16), but even per-layer,
+    // mid-depth should have more caves due to lower threshold
+    REQUIRE(midDepthAir > nearBedrockAir);
+}
+
+// ── Threshold curve ──────────────────────────────────────────────────────────
+
+TEST_CASE("CaveCarver: threshold curve returns expected values", "[world][cave]")
+{
+    constexpr int SURFACE_H = 120;
+
+    SECTION("Bedrock zone (y <= 5) returns 1.0")
+    {
+        REQUIRE(CaveCarver::getThreshold(0, SURFACE_H) == 1.0f);
+        REQUIRE(CaveCarver::getThreshold(3, SURFACE_H) == 1.0f);
+        REQUIRE(CaveCarver::getThreshold(5, SURFACE_H) == 1.0f);
+    }
+
+    SECTION("Peak cave zone (y=60) has threshold ~0.78")
+    {
+        float threshold = CaveCarver::getThreshold(60, SURFACE_H);
+        REQUIRE(threshold >= 0.73f);
+        REQUIRE(threshold <= 0.83f);
+    }
+
+    SECTION("Near bedrock (y=10) has high threshold")
+    {
+        float threshold = CaveCarver::getThreshold(10, SURFACE_H);
+        REQUIRE(threshold > 0.82f);
+    }
+
+    SECTION("Near surface has higher threshold than mid-depth")
+    {
+        float midThreshold = CaveCarver::getThreshold(60, SURFACE_H);
+        float nearSurfaceThreshold = CaveCarver::getThreshold(SURFACE_H - 2, SURFACE_H);
+        REQUIRE(nearSurfaceThreshold > midThreshold);
+    }
+
+    SECTION("Threshold is monotonically decreasing from bedrock to peak zone")
+    {
+        float prev = CaveCarver::getThreshold(6, SURFACE_H);
+        for (int y = 7; y <= 50; ++y)
+        {
+            float curr = CaveCarver::getThreshold(y, SURFACE_H);
+            REQUIRE(curr <= prev + 0.001f); // allow tiny float tolerance
+            prev = curr;
+        }
+    }
+}
+
+// ── shouldCarve determinism ──────────────────────────────────────────────────
+
+TEST_CASE("CaveCarver: shouldCarve is deterministic", "[world][cave]")
+{
+    constexpr uint64_t SEED = 99;
+    CaveCarver carver1(SEED);
+    CaveCarver carver2(SEED);
+
+    // Test several positions
+    float positions[][3] = {{100.0f, 50.0f, 200.0f}, {-50.0f, 30.0f, 75.0f}, {0.0f, 60.0f, 0.0f}};
+
+    for (auto& pos : positions)
+    {
+        bool result1 = carver1.shouldCarve(pos[0], pos[1], pos[2], 120);
+        bool result2 = carver2.shouldCarve(pos[0], pos[1], pos[2], 120);
+        REQUIRE(result1 == result2);
+    }
+}

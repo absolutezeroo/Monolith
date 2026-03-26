@@ -24,6 +24,7 @@ add_library(VoxelEngine STATIC
         src/world/RegionFile.cpp
         src/world/ChunkSerializer.cpp
         src/world/BiomeSystem.cpp
+        src/world/CaveCarver.cpp
         src/world/SplineCurve.cpp
         src/world/WorldGenerator.cpp
         src/input/InputManager.cpp

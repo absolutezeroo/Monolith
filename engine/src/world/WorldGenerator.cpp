@@ -33,6 +33,7 @@ WorldGenerator::WorldGenerator(uint64_t seed, const BlockRegistry& registry)
     , m_bedrockId(resolveBlockId(registry, "base:bedrock", 1))
     , m_stoneId(resolveBlockId(registry, "base:stone", 1))
     , m_biomeSystem(seed)
+    , m_caveCarver(seed)
     , m_spline(SplineCurve::createDefault())
 {
     // FNL accepts int (32-bit) seeds; mask to 31 bits for positive range.
@@ -87,6 +88,9 @@ ChunkColumn WorldGenerator::generateChunkColumn(glm::ivec2 chunkCoord) const
 {
     ChunkColumn column(chunkCoord);
 
+    // Track surface heights per (x, z) for the cave carving post-pass
+    int surfaceHeights[ChunkSection::SIZE][ChunkSection::SIZE] = {};
+
     for (int lx = 0; lx < ChunkSection::SIZE; ++lx)
     {
         for (int lz = 0; lz < ChunkSection::SIZE; ++lz)
@@ -106,6 +110,9 @@ ChunkColumn WorldGenerator::generateChunkColumn(glm::ivec2 chunkCoord) const
 
             finalHeight = std::clamp(finalHeight, MIN_TERRAIN_HEIGHT, MAX_TERRAIN_HEIGHT);
             int height = static_cast<int>(finalHeight);
+
+            // Record surface height for cave carver
+            surfaceHeights[lx][lz] = height;
 
             // Surface depth from blended biome, clamped to valid range
             int surfaceDepth = static_cast<int>(std::round(blended.blendedSurfaceDepth));
@@ -142,6 +149,9 @@ ChunkColumn WorldGenerator::generateChunkColumn(glm::ivec2 chunkCoord) const
             column.setBlock(lx, height, lz, surfaceId);
         }
     }
+
+    // Cave carving post-pass: carve caves through the filled terrain
+    m_caveCarver.carveColumn(column, chunkCoord, surfaceHeights);
 
     return column;
 }
