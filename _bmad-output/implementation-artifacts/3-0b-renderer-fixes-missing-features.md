@@ -1,6 +1,6 @@
 # Story 3.0b: Renderer Fixes + Missing Features
 
-Status: review
+Status: done
 
 ## Story
 

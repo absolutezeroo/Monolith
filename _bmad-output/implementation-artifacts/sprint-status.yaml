@@ -100,9 +100,9 @@ epics:
         notes: "6 parts: InputManager, Pipeline dedup, Overlay split, Config files, EngineError, ChunkSection O(1). No GPU changes."
       - id: "3.0b"
         title: "Renderer Fixes + Missing Features"
-        status: review
+        status: done
         assigned_to: dev-agent
-        notes: "4 parts: Wire Gigabuffer, Swapchain fix, Depth buffer, HUD/Config/Screenshot. Depends on 3.0a. Review fixes applied (10 findings, all resolved). Pending build verification."
+        notes: "4 parts: Wire Gigabuffer, Swapchain fix, Depth buffer, HUD/Config/Screenshot. Depends on 3.0a. Code review: 10 findings, all resolved."
       - id: "3.3"
         title: "BlockRegistry + JSON Loading"
         status: done
