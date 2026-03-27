@@ -20,6 +20,7 @@ add_executable(VoxelTests
     world/TestBiomeSystem.cpp
     world/TestCaveCarver.cpp
     world/TestSplineCurve.cpp
+    world/TestStructureGenerator.cpp
     world/TestWorldGenerator.cpp
 )
 

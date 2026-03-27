@@ -6,6 +6,7 @@
 #include "voxel/world/CaveCarver.h"
 #include "voxel/world/ChunkColumn.h"
 #include "voxel/world/SplineCurve.h"
+#include "voxel/world/StructureGenerator.h"
 
 #pragma warning(push, 0)
 #include "voxel/world/FastNoiseLite.h"
@@ -40,6 +41,13 @@ class WorldGenerator
     /// Get detail noise value at a world (x, z) position.
     [[nodiscard]] float getDetailNoise(int worldX, int worldZ) const;
 
+    /// Compute the surface height at an arbitrary world (x, z) position.
+    /// Used by StructureGenerator for cross-chunk tree surface lookups.
+    [[nodiscard]] int computeSurfaceHeight(float worldX, float worldZ) const;
+
+    /// Static callback adapter for StructureGenerator's function pointer.
+    static int surfaceHeightCallback(float worldX, float worldZ, const void* userData);
+
     static constexpr float DETAIL_AMPLITUDE = 7.0f;
 
     uint64_t m_seed;
@@ -62,6 +70,9 @@ class WorldGenerator
 
     // Cave carving post-pass
     CaveCarver m_caveCarver;
+
+    // Structure generation post-pass (trees, decorations, ores)
+    StructureGenerator m_structureGen;
 
     // Spline curve mapping continent noise to terrain height
     SplineCurve m_spline;

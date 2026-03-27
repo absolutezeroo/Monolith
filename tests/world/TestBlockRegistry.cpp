@@ -138,7 +138,7 @@ TEST_CASE("BlockRegistry JSON loading", "[world]")
         auto blocksPath = assetsDir / "scripts" / "base" / "blocks.json";
         auto result = registry.loadFromJson(blocksPath);
         REQUIRE(result.has_value());
-        REQUIRE(result.value() == 13);
+        REQUIRE(result.value() == 29);
 
         // Verify specific blocks loaded correctly
         REQUIRE(registry.getIdByName("base:stone") != BLOCK_AIR);
@@ -153,8 +153,8 @@ TEST_CASE("BlockRegistry JSON loading", "[world]")
         REQUIRE(registry.getIdByName("base:glowstone") != BLOCK_AIR);
         REQUIRE(registry.getBlock(registry.getIdByName("base:glowstone")).lightEmission == 15);
 
-        // Total: 1 air + 10 from JSON
-        REQUIRE(registry.blockCount() == 14);
+        // Total: 1 air + 29 from JSON
+        REQUIRE(registry.blockCount() == 30);
     }
 
     SECTION("loadFromJson returns FileNotFound for missing file")
@@ -349,14 +349,14 @@ TEST_CASE("BlockRegistry JSON new fields", "[world]")
         REQUIRE(water.postEffectColor == 0x80000044);
     }
 
-    SECTION("existing blocks.json still loads all 13 blocks correctly")
+    SECTION("existing blocks.json still loads all 29 blocks correctly")
     {
         std::filesystem::path assetsDir(VOXELFORGE_ASSETS_DIR);
         auto blocksPath = assetsDir / "scripts" / "base" / "blocks.json";
         auto result = registry.loadFromJson(blocksPath);
         REQUIRE(result.has_value());
-        REQUIRE(result.value() == 13);
-        REQUIRE(registry.blockCount() == 14);
+        REQUIRE(result.value() == 29);
+        REQUIRE(registry.blockCount() == 30);
     }
 
     SECTION("oak_leaves has cutout renderType and waving")
@@ -700,13 +700,13 @@ TEST_CASE("BlockState - JSON property parsing", "[world][state]")
         std::filesystem::remove(testPath);
     }
 
-    SECTION("existing blocks.json still loads all 13 blocks with stateCount=1")
+    SECTION("existing blocks.json still loads all 29 blocks with stateCount=1")
     {
         std::filesystem::path assetsDir(VOXELFORGE_ASSETS_DIR);
         auto blocksPath = assetsDir / "scripts" / "base" / "blocks.json";
         auto result = registry.loadFromJson(blocksPath);
         REQUIRE(result.has_value());
-        REQUIRE(result.value() == 13);
+        REQUIRE(result.value() == 29);
 
         // All existing blocks should have stateCount=1
         for (uint16_t i = 0; i < registry.blockCount(); ++i)

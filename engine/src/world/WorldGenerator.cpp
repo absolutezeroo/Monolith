@@ -34,6 +34,7 @@ WorldGenerator::WorldGenerator(uint64_t seed, const BlockRegistry& registry)
     , m_stoneId(resolveBlockId(registry, "base:stone", 1))
     , m_biomeSystem(seed)
     , m_caveCarver(seed)
+    , m_structureGen(seed, registry)
     , m_spline(SplineCurve::createDefault())
 {
     // FNL accepts int (32-bit) seeds; mask to 31 bits for positive range.
@@ -150,10 +151,34 @@ ChunkColumn WorldGenerator::generateChunkColumn(glm::ivec2 chunkCoord) const
         }
     }
 
-    // Cave carving post-pass: carve caves through the filled terrain
+    // Ore veins placed before cave carving (so caves can cut through ores naturally)
+    m_structureGen.populateOres(column, chunkCoord);
+
+    // Cave carving post-pass
     m_caveCarver.carveColumn(column, chunkCoord, surfaceHeights);
 
+    // Trees and decorations placed after cave carving
+    m_structureGen.populateStructures(
+        column, chunkCoord, m_biomeSystem, surfaceHeights, &surfaceHeightCallback, this);
+
     return column;
+}
+
+int WorldGenerator::computeSurfaceHeight(float worldX, float worldZ) const
+{
+    float continentNoise = m_continentNoise.GetNoise(worldX, worldZ);
+    float baseHeight = m_spline.evaluate(continentNoise);
+    BlendedBiome blended = m_biomeSystem.getBlendedBiomeAt(worldX, worldZ);
+    float detailNoise = m_detailNoise.GetNoise(worldX, worldZ);
+    float finalHeight = baseHeight + blended.blendedHeightModifier +
+                        detailNoise * DETAIL_AMPLITUDE * blended.blendedHeightScale;
+    return static_cast<int>(std::clamp(finalHeight, MIN_TERRAIN_HEIGHT, MAX_TERRAIN_HEIGHT));
+}
+
+int WorldGenerator::surfaceHeightCallback(float worldX, float worldZ, const void* userData)
+{
+    const auto* self = static_cast<const WorldGenerator*>(userData);
+    return self->computeSurfaceHeight(worldX, worldZ);
 }
 
 glm::dvec3 WorldGenerator::findSpawnPoint() const

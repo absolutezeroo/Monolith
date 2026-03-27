@@ -18,38 +18,51 @@ using namespace voxel::world;
 namespace
 {
 
-/// Helper: register all terrain blocks needed by WorldGenerator (including biome blocks) and return the registry.
+/// Helper: register all terrain blocks needed by WorldGenerator (including biome + structure blocks) and return the
+/// registry.
 BlockRegistry makeTerrainRegistry()
 {
     BlockRegistry registry;
 
-    BlockDefinition stone;
-    stone.stringId = "base:stone";
-    (void)registry.registerBlock(std::move(stone));
+    auto reg = [&](std::string_view name)
+    {
+        BlockDefinition def;
+        def.stringId = std::string(name);
+        (void)registry.registerBlock(std::move(def));
+    };
 
-    BlockDefinition dirt;
-    dirt.stringId = "base:dirt";
-    (void)registry.registerBlock(std::move(dirt));
+    // Terrain blocks
+    reg("base:stone");
+    reg("base:dirt");
+    reg("base:grass_block");
+    reg("base:bedrock");
+    reg("base:sand");
+    reg("base:sandstone");
+    reg("base:snow_block");
 
-    BlockDefinition grass;
-    grass.stringId = "base:grass_block";
-    (void)registry.registerBlock(std::move(grass));
+    // Tree blocks (needed by StructureGenerator)
+    reg("base:oak_log");
+    reg("base:oak_leaves");
+    reg("base:birch_log");
+    reg("base:birch_leaves");
+    reg("base:spruce_log");
+    reg("base:spruce_leaves");
+    reg("base:jungle_log");
+    reg("base:jungle_leaves");
+    reg("base:cactus");
 
-    BlockDefinition bedrock;
-    bedrock.stringId = "base:bedrock";
-    (void)registry.registerBlock(std::move(bedrock));
+    // Decoration blocks
+    reg("base:tall_grass");
+    reg("base:flower_red");
+    reg("base:flower_yellow");
+    reg("base:dead_bush");
+    reg("base:snow_layer");
 
-    BlockDefinition sand;
-    sand.stringId = "base:sand";
-    (void)registry.registerBlock(std::move(sand));
-
-    BlockDefinition sandstone;
-    sandstone.stringId = "base:sandstone";
-    (void)registry.registerBlock(std::move(sandstone));
-
-    BlockDefinition snow;
-    snow.stringId = "base:snow_block";
-    (void)registry.registerBlock(std::move(snow));
+    // Ore blocks
+    reg("base:coal_ore");
+    reg("base:iron_ore");
+    reg("base:gold_ore");
+    reg("base:diamond_ore");
 
     return registry;
 }
@@ -143,6 +156,15 @@ TEST_CASE("WorldGenerator: surface composition follows biome definitions", "[wor
 
     uint16_t bedrockId = registry.getIdByName("base:bedrock");
     std::set<uint16_t> validSurface = getAllSurfaceBlockIds(registry);
+
+    // StructureGenerator places decorations and tree blocks above the terrain surface —
+    // these are valid "surface" blocks for this test's purposes.
+    for (auto name : {"base:oak_log", "base:oak_leaves", "base:birch_log", "base:birch_leaves", "base:spruce_log",
+                      "base:spruce_leaves", "base:jungle_log", "base:jungle_leaves", "base:cactus", "base:tall_grass",
+                      "base:flower_red", "base:flower_yellow", "base:dead_bush", "base:snow_layer"})
+    {
+        validSurface.insert(registry.getIdByName(name));
+    }
 
     ChunkColumn col = gen.generateChunkColumn({0, 0});
 
@@ -250,6 +272,24 @@ TEST_CASE("WorldGenerator: surface blocks match biome definitions", "[world][wor
     WorldGenerator gen(SEED, registry);
     BiomeSystem biomes(SEED);
 
+    // Blocks placed ABOVE the terrain surface by StructureGenerator — skip when finding terrain surface
+    std::set<uint16_t> nonTerrainBlocks = {
+        registry.getIdByName("base:oak_log"),
+        registry.getIdByName("base:oak_leaves"),
+        registry.getIdByName("base:birch_log"),
+        registry.getIdByName("base:birch_leaves"),
+        registry.getIdByName("base:spruce_log"),
+        registry.getIdByName("base:spruce_leaves"),
+        registry.getIdByName("base:jungle_log"),
+        registry.getIdByName("base:jungle_leaves"),
+        registry.getIdByName("base:cactus"),
+        registry.getIdByName("base:tall_grass"),
+        registry.getIdByName("base:flower_red"),
+        registry.getIdByName("base:flower_yellow"),
+        registry.getIdByName("base:dead_bush"),
+        registry.getIdByName("base:snow_layer"),
+    };
+
     // Generate several chunks and verify surface block matches expected biome
     glm::ivec2 coords[] = {{0, 0}, {10, 10}, {-15, 5}, {20, -20}};
 
@@ -267,11 +307,12 @@ TEST_CASE("WorldGenerator: surface blocks match biome definitions", "[world][wor
                 int worldX = coord.x * ChunkSection::SIZE + lx;
                 int worldZ = coord.y * ChunkSection::SIZE + lz;
 
-                // Find surface
+                // Find terrain surface (skip decorations and tree blocks placed above by StructureGenerator)
                 int surfaceY = -1;
                 for (int y = ChunkColumn::COLUMN_HEIGHT - 1; y >= 0; --y)
                 {
-                    if (col.getBlock(lx, y, lz) != BLOCK_AIR)
+                    uint16_t block = col.getBlock(lx, y, lz);
+                    if (block != BLOCK_AIR && nonTerrainBlocks.count(block) == 0)
                     {
                         surfaceY = y;
                         break;
