@@ -262,6 +262,96 @@ TEST_CASE("Block at section boundary with null neighbor treats boundary as air f
     REQUIRE(found);
 }
 
+TEST_CASE("AO cross-boundary: PosX neighbor with opaque block above face", "[renderer][ao][cross-boundary]")
+{
+    // Block at (15, 0, 0) with PosX neighbor containing opaque block at (0, 1, 0).
+    // The +X face of (15,0,0) should see the neighbor block (0,1,0) occluding from above.
+    BlockRegistry registry;
+    uint16_t stoneId = registerStone(registry);
+    MeshBuilder builder(registry);
+
+    ChunkSection section;
+    section.setBlock(15, 0, 0, stoneId);
+
+    // PosX neighbor: place an opaque block at (0, 1, 0) — directly above the +X face.
+    ChunkSection neighborPosX;
+    neighborPosX.setBlock(0, 1, 0, stoneId);
+
+    std::array<const ChunkSection*, 6> neighbors = {&neighborPosX, nullptr, nullptr, nullptr, nullptr, nullptr};
+
+    ChunkMesh mesh = builder.buildNaive(section, neighbors);
+
+    // Find the +X (PosX) face of block at (15, 0, 0).
+    bool found = false;
+    for (const uint64_t quad : mesh.quads)
+    {
+        if (unpackX(quad) == 15 && unpackY(quad) == 0 && unpackZ(quad) == 0 &&
+            unpackFace(quad) == BlockFace::PosX)
+        {
+            found = true;
+            auto ao = unpackAO(quad);
+
+            // PosX face AO_OFFSETS: corner 0 = (-Y,-Z), corner 1 = (+Y,-Z), corner 2 = (+Y,+Z), corner 3 = (-Y,+Z)
+            // The neighbor block at (0,1,0) in the +X section maps to padded (17, 2, 1).
+            // For block (15,0,0), padded coords are (16, 1, 1).
+            // PosX corner 1 samples: side1=(+1,+1,0)→(17,2,1)=opaque, side2=(+1,0,-1)→(17,1,0)=air,
+            //   corner=(+1,+1,-1)→(17,2,0)=air → AO = 3 - 1 - 0 - 0 = 2
+            // PosX corner 2 samples: side1=(+1,+1,0)→(17,2,1)=opaque, side2=(+1,0,+1)→(17,1,2)=air,
+            //   corner=(+1,+1,+1)→(17,2,2)=air → AO = 3 - 1 - 0 - 0 = 2
+            // Corners 1 and 2 (the +Y side) should have AO < 3 due to the neighbor above.
+            REQUIRE(ao[1] < 3);
+            REQUIRE(ao[2] < 3);
+            break;
+        }
+    }
+    REQUIRE(found);
+}
+
+TEST_CASE("AO cross-boundary: PosY neighbor with opaque block beside face", "[renderer][ao][cross-boundary]")
+{
+    // Block at (0, 15, 0) with PosY neighbor containing opaque block at (1, 0, 0).
+    // The +Y face of (0,15,0) should see some occlusion from the adjacent block above.
+    BlockRegistry registry;
+    uint16_t stoneId = registerStone(registry);
+    MeshBuilder builder(registry);
+
+    ChunkSection section;
+    section.setBlock(0, 15, 0, stoneId);
+
+    // PosY neighbor: place an opaque block at (1, 0, 0) — beside the +Y face.
+    ChunkSection neighborPosY;
+    neighborPosY.setBlock(1, 0, 0, stoneId);
+
+    std::array<const ChunkSection*, 6> neighbors = {nullptr, nullptr, &neighborPosY, nullptr, nullptr, nullptr};
+
+    ChunkMesh mesh = builder.buildNaive(section, neighbors);
+
+    // Find the +Y (PosY) face of block at (0, 15, 0).
+    bool found = false;
+    for (const uint64_t quad : mesh.quads)
+    {
+        if (unpackX(quad) == 0 && unpackY(quad) == 15 && unpackZ(quad) == 0 &&
+            unpackFace(quad) == BlockFace::PosY)
+        {
+            found = true;
+            auto ao = unpackAO(quad);
+
+            // PosY face AO_OFFSETS: corner 0 = (-X,-Z), corner 1 = (+X,-Z), corner 2 = (+X,+Z), corner 3 = (-X,+Z)
+            // The neighbor block at (1,0,0) in the +Y section maps to padded (2, 17, 1).
+            // For block (0,15,0), padded coords are (1, 16, 1).
+            // PosY corner 1 samples: side1=(+1,+1,0)→(2,17,1)=opaque, side2=(0,+1,-1)→(1,17,0)=air,
+            //   corner=(+1,+1,-1)→(2,17,0)=air → AO = 3 - 1 - 0 - 0 = 2
+            // PosY corner 2 samples: side1=(+1,+1,0)→(2,17,1)=opaque, side2=(0,+1,+1)→(1,17,2)=air,
+            //   corner=(+1,+1,+1)→(2,17,2)=air → AO = 3 - 1 - 0 - 0 = 2
+            // Corners 1 and 2 (the +X side) should have AO < 3 due to the neighbor beside.
+            REQUIRE(ao[1] < 3);
+            REQUIRE(ao[2] < 3);
+            break;
+        }
+    }
+    REQUIRE(found);
+}
+
 TEST_CASE("AO performance benchmark with dense terrain", "[renderer][ao][!benchmark]")
 {
     BlockRegistry registry;

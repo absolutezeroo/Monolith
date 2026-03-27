@@ -125,10 +125,10 @@ core::Result<uint16_t> BlockRegistry::registerBlock(BlockDefinition def)
     return baseStateId;
 }
 
-const BlockDefinition& BlockRegistry::getBlock(uint16_t id) const
+const BlockDefinition& BlockRegistry::getBlockByTypeIndex(uint16_t typeIndex) const
 {
-    VX_ASSERT(id < m_blocks.size(), "Block ID out of range");
-    return m_blocks[id];
+    VX_ASSERT(typeIndex < m_blocks.size(), "Block type index out of range");
+    return m_blocks[typeIndex];
 }
 
 uint16_t BlockRegistry::getIdByName(std::string_view name) const
@@ -149,6 +149,11 @@ uint16_t BlockRegistry::blockCount() const
 const BlockDefinition& BlockRegistry::getBlockType(uint16_t stateId) const
 {
     VX_ASSERT(stateId < m_stateToBlockIndex.size(), "State ID out of range");
+    if (stateId >= m_stateToBlockIndex.size())
+    {
+        VX_LOG_WARN("getBlockType: invalid state ID {} (max {}), returning air", stateId, m_stateToBlockIndex.size());
+        return m_blocks[0]; // air is always index 0
+    }
     uint16_t typeIndex = m_stateToBlockIndex[stateId];
     return m_blocks[typeIndex];
 }

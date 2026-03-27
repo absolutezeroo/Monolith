@@ -1,6 +1,6 @@
 # Story 5.3b: Quad Format Fix + Registry Safety Hardening
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -17,78 +17,36 @@ so that the meshing pipeline doesn't break when multi-state blocks are introduce
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: Expand quad format to 16-bit state ID** (AC: 1)
-  - [ ] Update bit layout comment in `ChunkMesh.h` to new layout:
-    ```
-    [0:5]   X position (6 bits)
-    [6:11]  Y position (6 bits)
-    [12:17] Z position (6 bits)
-    [18:23] Width-1 (6 bits)
-    [24:29] Height-1 (6 bits)
-    [30:45] Block state ID (16 bits)   ← was 10
-    [46:48] Face direction (3 bits)    ← shifted from 40
-    [49:50] AO corner 0 (2 bits)       ← shifted from 43
-    [51:52] AO corner 1 (2 bits)       ← shifted from 45
-    [53:54] AO corner 2 (2 bits)       ← shifted from 47
-    [55:56] AO corner 3 (2 bits)       ← shifted from 49
-    [57]    Quad diagonal flip (1 bit) ← shifted from 51
-    [58]    Is non-cubic model (1 bit) ← Story 5.4
-    [59:60] Tint index (2 bits)        ← Story 5.5
-    [61]    Waving flag (1 bit)        ← Story 5.5
-    [62:63] Reserved (2 bits)
-    ```
-  - [ ] Update `packQuad()`:
-    - Change `blockStateId & 0x3FF` to `blockStateId & 0xFFFF`
-    - Change `<< 30` stays the same (start bit unchanged)
-    - Change face shift from `<< 40` to `<< 46`
-    - Change ao0 shift from `<< 43` to `<< 49`
-    - Change ao1 shift from `<< 45` to `<< 51`
-    - Change ao2 shift from `<< 47` to `<< 53`
-    - Change ao3 shift from `<< 49` to `<< 55`
-    - Change flip shift from `<< 51` to `<< 57`
-  - [ ] Update `unpackBlockStateId()`: mask `0xFFFF` instead of `0x3FF`
-  - [ ] Update `unpackFace()`: shift `>> 46` instead of `>> 40`, mask `0x7`
-  - [ ] Update `unpackAO()`: shifts to 49, 51, 53, 55
-  - [ ] Update `unpackFlip()`: shift `>> 57`
-  - [ ] Run all existing roundtrip tests — they must pass
+- [x] **Task 1: Expand quad format to 16-bit state ID** (AC: 1)
+  - [x] Update bit layout comment in `ChunkMesh.h` to new layout
+  - [x] Update `packQuad()`: mask 0xFFFF, shifts 46/49/51/53/55/57
+  - [x] Update `unpackBlockStateId()`: mask `0xFFFF` instead of `0x3FF`
+  - [x] Update `unpackFace()`: shift `>> 46` instead of `>> 40`, mask `0x7`
+  - [x] Update `unpackAO()`: shifts to 49, 51, 53, 55
+  - [x] Update `unpackFlip()`: shift `>> 57`
+  - [x] Run all existing roundtrip tests — they must pass (238 assertions, 11 cases)
 
-- [ ] **Task 2: Rename `getBlock()` and migrate to `getBlockType()`** (AC: 2)
-  - [ ] In `BlockRegistry.h`: rename `getBlock(uint16_t id)` to `getBlockByTypeIndex(uint16_t typeIndex)` — keep it public for now (tests use it with type indices from `getIdByName()`)
-  - [ ] In `BlockRegistry.cpp`: rename the implementation accordingly
-  - [ ] In `MeshBuilder.cpp` line 348: change `m_registry.getBlock(neighborId)` to `m_registry.getBlockType(neighborId)`
-  - [ ] In `AmbientOcclusion.h` (7 sites, lines 111/128/145/162/179/196/213): change `registry.getBlock(blockId)` to `registry.getBlockType(blockId)` in `buildOpacityPad()`
-  - [ ] In `tests/world/TestBlockRegistry.cpp` (10 sites): change `registry.getBlock(...)` to `registry.getBlockByTypeIndex(...)` — these tests use type indices from `getIdByName()` so the rename is correct
-  - [ ] Verify: no remaining `registry.getBlock(` or `m_registry.getBlock(` calls in engine code (grep to confirm)
+- [x] **Task 2: Rename `getBlock()` and migrate to `getBlockType()`** (AC: 2)
+  - [x] In `BlockRegistry.h`: rename `getBlock(uint16_t id)` to `getBlockByTypeIndex(uint16_t typeIndex)`
+  - [x] In `BlockRegistry.cpp`: rename the implementation accordingly
+  - [x] In `MeshBuilder.cpp`: change `m_registry.getBlock(neighborId)` to `m_registry.getBlockType(neighborId)`
+  - [x] In `AmbientOcclusion.h` (7 sites): change `registry.getBlock(blockId)` to `registry.getBlockType(blockId)` in `buildOpacityPad()`
+  - [x] In `tests/world/TestBlockRegistry.cpp` (~30 sites): change `registry.getBlock(...)` to `registry.getBlockByTypeIndex(...)`
+  - [x] Verify: no remaining `registry.getBlock(` calls in engine code (grep confirmed)
 
-- [ ] **Task 3: Safe fallback in `getBlockType()`** (AC: 3)
-  - [ ] In `BlockRegistry.cpp`, update `getBlockType()`:
-    ```cpp
-    const BlockDefinition& BlockRegistry::getBlockType(uint16_t stateId) const
-    {
-        VX_ASSERT(stateId < m_stateToBlockIndex.size(), "State ID out of range");
-        if (stateId >= m_stateToBlockIndex.size())
-        {
-            VX_LOG_WARN("getBlockType: invalid state ID {} (max {}), returning air",
-                        stateId, m_stateToBlockIndex.size());
-            return m_blocks[0]; // air is always index 0
-        }
-        uint16_t typeIndex = m_stateToBlockIndex[stateId];
-        return m_blocks[typeIndex];
-    }
-    ```
-  - [ ] `VX_ASSERT` fires in debug → catches bugs during development
-  - [ ] Bounds check in release → returns air instead of crashing on corrupt data
-  - [ ] Add test: `getBlockType(9999)` on a registry with < 100 state IDs → returns air, no crash
+- [x] **Task 3: Safe fallback in `getBlockType()`** (AC: 3)
+  - [x] In `BlockRegistry.cpp`, added bounds check with `VX_LOG_WARN` and air fallback
+  - [x] `VX_ASSERT` fires in debug → catches bugs during development
+  - [x] Bounds check in release → returns air instead of crashing on corrupt data
+  - [x] Add test: `getBlockType(9999)` → returns air (guarded with `#ifdef NDEBUG`, debug asserts correctly)
 
-- [ ] **Task 4: AO cross-boundary tests** (AC: 4)
-  - [ ] In `tests/renderer/TestAmbientOcclusion.cpp`, add:
-    - Test: block at (15, 0, 0) with PosX neighbor having opaque block at (0, 1, 0) → +X face top corners have AO < 3 (the neighbor occludes from above the face)
-    - Test: block at (0, 15, 0) with PosY neighbor having opaque block at (1, 0, 0) → +Y face should show some occlusion from the adjacent block above
-    - These tests document current behavior (edge/corner positions in the opacity pad default to air)
-    - Add `[cross-boundary]` tag for easy filtering
+- [x] **Task 4: AO cross-boundary tests** (AC: 4)
+  - [x] Test: block at (15, 0, 0) with PosX neighbor opaque at (0, 1, 0) → +X face corners 1,2 have AO < 3
+  - [x] Test: block at (0, 15, 0) with PosY neighbor opaque at (1, 0, 0) → +Y face corners 1,2 have AO < 3
+  - [x] Both tests tagged `[cross-boundary]` for easy filtering
 
-- [ ] **Task 5: Update epic quad format reference table** (AC: 1)
-  - [ ] In `_bmad-output/planning-artifacts/epics/epic-05-meshing-pipeline.md`, update the quad format reference table at the top to match the new bit layout (already done in the epic file — verify it matches the code)
+- [x] **Task 5: Update epic quad format reference table** (AC: 1)
+  - [x] Updated `epic-05-meshing-pipeline.md` table to 16-bit state ID layout with note about Epic 8 impact
 
 ## Dev Notes
 
@@ -135,10 +93,33 @@ The old quad format had bits 53–60 reserved for sky light (4 bits) and block l
 
 ### Agent Model Used
 
-(to be filled by dev agent)
+Claude Opus 4.6
 
 ### Debug Log References
 
+- All 125 test cases pass (474,232 assertions) — zero regressions
+- Cross-boundary AO tests: 2 new test cases, 8 assertions, all pass
+- Roundtrip tests: 238 assertions across 11 meshing/AO test cases, all pass
+
 ### Completion Notes List
 
+- Expanded block state ID from 10→16 bits in packed quad format, shifting face/AO/flip fields by 6 positions
+- Renamed `getBlock()` → `getBlockByTypeIndex()` to clarify type-index-only usage; migrated all engine code to `getBlockType()` for state ID lookups
+- Added release-safe bounds check in `getBlockType()` — returns air with `VX_LOG_WARN` for out-of-range state IDs; `VX_ASSERT` still fires in debug
+- Added 2 cross-boundary AO tests verifying opacity pad correctly reads neighbor sections at section edges
+- Updated epic-05 quad format reference table; added note about Epic 8 needing secondary data channel for lighting
+
+### Change Log
+
+- 2026-03-27: Implemented Story 5.3b — Quad format expanded to 16-bit state ID, registry access corrected, safe fallback added, cross-boundary AO tests added
+
 ### File List
+
+- engine/include/voxel/renderer/ChunkMesh.h (modified — quad format pack/unpack/comment)
+- engine/include/voxel/renderer/AmbientOcclusion.h (modified — getBlock → getBlockType, 7 sites)
+- engine/include/voxel/world/BlockRegistry.h (modified — rename getBlock → getBlockByTypeIndex)
+- engine/src/world/BlockRegistry.cpp (modified — rename + safe fallback in getBlockType)
+- engine/src/renderer/MeshBuilder.cpp (modified — getBlock → getBlockType, 1 site)
+- tests/world/TestBlockRegistry.cpp (modified — getBlock → getBlockByTypeIndex, ~30 sites + new out-of-range test)
+- tests/renderer/TestAmbientOcclusion.cpp (modified — 2 new cross-boundary tests)
+- _bmad-output/planning-artifacts/epics/epic-05-meshing-pipeline.md (modified — quad format table updated)

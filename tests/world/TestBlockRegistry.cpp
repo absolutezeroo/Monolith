@@ -15,10 +15,10 @@ TEST_CASE("BlockRegistry", "[world]")
     SECTION("constructor registers air at ID 0")
     {
         REQUIRE(registry.blockCount() == 1);
-        REQUIRE(registry.getBlock(0).stringId == "base:air");
-        REQUIRE(registry.getBlock(0).isSolid == false);
-        REQUIRE(registry.getBlock(0).isTransparent == true);
-        REQUIRE(registry.getBlock(0).hasCollision == false);
+        REQUIRE(registry.getBlockByTypeIndex(0).stringId == "base:air");
+        REQUIRE(registry.getBlockByTypeIndex(0).isSolid == false);
+        REQUIRE(registry.getBlockByTypeIndex(0).isTransparent == true);
+        REQUIRE(registry.getBlockByTypeIndex(0).hasCollision == false);
         REQUIRE(registry.getIdByName("base:air") == BLOCK_AIR);
     }
 
@@ -46,7 +46,7 @@ TEST_CASE("BlockRegistry", "[world]")
         auto id = registry.registerBlock(stone);
         REQUIRE(id.has_value());
 
-        const auto& block = registry.getBlock(id.value());
+        const auto& block = registry.getBlockByTypeIndex(id.value());
         REQUIRE(block.stringId == "base:stone");
         REQUIRE(block.hardness == 1.5f);
         REQUIRE(block.isSolid == true);
@@ -142,16 +142,16 @@ TEST_CASE("BlockRegistry JSON loading", "[world]")
 
         // Verify specific blocks loaded correctly
         REQUIRE(registry.getIdByName("base:stone") != BLOCK_AIR);
-        REQUIRE(registry.getBlock(registry.getIdByName("base:stone")).isSolid == true);
-        REQUIRE(registry.getBlock(registry.getIdByName("base:stone")).hardness == 1.5f);
+        REQUIRE(registry.getBlockByTypeIndex(registry.getIdByName("base:stone")).isSolid == true);
+        REQUIRE(registry.getBlockByTypeIndex(registry.getIdByName("base:stone")).hardness == 1.5f);
 
         REQUIRE(registry.getIdByName("base:water") != BLOCK_AIR);
-        REQUIRE(registry.getBlock(registry.getIdByName("base:water")).isSolid == false);
-        REQUIRE(registry.getBlock(registry.getIdByName("base:water")).isTransparent == true);
-        REQUIRE(registry.getBlock(registry.getIdByName("base:water")).hasCollision == false);
+        REQUIRE(registry.getBlockByTypeIndex(registry.getIdByName("base:water")).isSolid == false);
+        REQUIRE(registry.getBlockByTypeIndex(registry.getIdByName("base:water")).isTransparent == true);
+        REQUIRE(registry.getBlockByTypeIndex(registry.getIdByName("base:water")).hasCollision == false);
 
         REQUIRE(registry.getIdByName("base:glowstone") != BLOCK_AIR);
-        REQUIRE(registry.getBlock(registry.getIdByName("base:glowstone")).lightEmission == 15);
+        REQUIRE(registry.getBlockByTypeIndex(registry.getIdByName("base:glowstone")).lightEmission == 15);
 
         // Total: 1 air + 29 from JSON
         REQUIRE(registry.blockCount() == 30);
@@ -206,7 +206,7 @@ TEST_CASE("BlockRegistry JSON loading", "[world]")
         // grass_block has asymmetric textures [4, 4, 3, 2, 4, 4]
         auto grassId = registry.getIdByName("base:grass_block");
         REQUIRE(grassId != BLOCK_AIR);
-        const auto& grass = registry.getBlock(grassId);
+        const auto& grass = registry.getBlockByTypeIndex(grassId);
         REQUIRE(grass.textureIndices[0] == 4);
         REQUIRE(grass.textureIndices[2] == 3);
         REQUIRE(grass.textureIndices[3] == 2);
@@ -276,7 +276,7 @@ TEST_CASE("BlockRegistry JSON new fields", "[world]")
         REQUIRE(result.has_value());
         auto id = registry.getIdByName("test:glass");
         REQUIRE(id != BLOCK_AIR);
-        REQUIRE(registry.getBlock(id).renderType == RenderType::Cutout);
+        REQUIRE(registry.getBlockByTypeIndex(id).renderType == RenderType::Cutout);
 
         std::filesystem::remove(testPath);
     }
@@ -294,7 +294,7 @@ TEST_CASE("BlockRegistry JSON new fields", "[world]")
         REQUIRE(result.has_value());
         auto id = registry.getIdByName("test:stone");
         REQUIRE(id != BLOCK_AIR);
-        const auto& block = registry.getBlock(id);
+        const auto& block = registry.getBlockByTypeIndex(id);
         REQUIRE(block.groups.size() == 2);
         REQUIRE(block.groups.at("cracky") == 3);
         REQUIRE(block.groups.at("stone") == 1);
@@ -315,7 +315,7 @@ TEST_CASE("BlockRegistry JSON new fields", "[world]")
         REQUIRE(result.has_value());
         auto id = registry.getIdByName("test:minimal");
         REQUIRE(id != BLOCK_AIR);
-        const auto& block = registry.getBlock(id);
+        const auto& block = registry.getBlockByTypeIndex(id);
         REQUIRE(block.renderType == RenderType::Opaque);
         REQUIRE(block.modelType == ModelType::FullCube);
         REQUIRE(block.liquidType == LiquidType::None);
@@ -337,7 +337,7 @@ TEST_CASE("BlockRegistry JSON new fields", "[world]")
 
         auto waterId = registry.getIdByName("base:water");
         REQUIRE(waterId != BLOCK_AIR);
-        const auto& water = registry.getBlock(waterId);
+        const auto& water = registry.getBlockByTypeIndex(waterId);
         REQUIRE(water.liquidType == LiquidType::Source);
         REQUIRE(water.drowning == 1);
         REQUIRE(water.moveResistance == 3);
@@ -367,7 +367,7 @@ TEST_CASE("BlockRegistry JSON new fields", "[world]")
 
         auto leavesId = registry.getIdByName("base:oak_leaves");
         REQUIRE(leavesId != BLOCK_AIR);
-        const auto& leaves = registry.getBlock(leavesId);
+        const auto& leaves = registry.getBlockByTypeIndex(leavesId);
         REQUIRE(leaves.renderType == RenderType::Cutout);
         REQUIRE(leaves.waving == 1);
         REQUIRE(leaves.isFloodable == true);
@@ -383,7 +383,7 @@ TEST_CASE("BlockRegistry JSON new fields", "[world]")
 
         auto torchId = registry.getIdByName("base:torch");
         REQUIRE(torchId != BLOCK_AIR);
-        const auto& torch = registry.getBlock(torchId);
+        const auto& torch = registry.getBlockByTypeIndex(torchId);
         REQUIRE(torch.modelType == ModelType::Torch);
         REQUIRE(torch.isFloodable == true);
         REQUIRE(torch.isBuildableTo == false);
@@ -398,7 +398,7 @@ TEST_CASE("BlockRegistry JSON new fields", "[world]")
 
         auto sandId = registry.getIdByName("base:sand");
         REQUIRE(sandId != BLOCK_AIR);
-        const auto& sand = registry.getBlock(sandId);
+        const auto& sand = registry.getBlockByTypeIndex(sandId);
         REQUIRE(sand.isFallingBlock == true);
         REQUIRE(sand.groups.at("crumbly") == 3);
         REQUIRE(sand.groups.at("falling_node") == 1);
@@ -412,7 +412,7 @@ TEST_CASE("BlockRegistry JSON new fields", "[world]")
 
         auto stoneId = registry.getIdByName("base:stone");
         REQUIRE(stoneId != BLOCK_AIR);
-        const auto& stone = registry.getBlock(stoneId);
+        const auto& stone = registry.getBlockByTypeIndex(stoneId);
         REQUIRE(stone.groups.at("cracky") == 3);
         REQUIRE(stone.groups.at("stone") == 1);
         REQUIRE(stone.lightFilter == 15);
@@ -433,7 +433,7 @@ TEST_CASE("BlockState - simple blocks", "[world][state]")
         REQUIRE(result.has_value());
         REQUIRE(result.value() == 1); // baseStateId = 1 (after air=0)
 
-        const auto& def = registry.getBlock(registry.getIdByName("base:stone"));
+        const auto& def = registry.getBlockByTypeIndex(registry.getIdByName("base:stone"));
         REQUIRE(def.stateCount == 1);
         REQUIRE(def.baseStateId == 1);
     }
@@ -464,6 +464,19 @@ TEST_CASE("BlockState - simple blocks", "[world][state]")
 
         StateMap values = registry.getStateValues(stoneStateId);
         REQUIRE(values.empty());
+    }
+
+    SECTION("getBlockType returns air for out-of-range state ID (release safety)")
+    {
+        // In debug builds, VX_ASSERT fires and aborts — that's the intended behavior.
+        // This test validates the release-mode fallback (returns air for corrupt data).
+#ifdef NDEBUG
+        const auto& def = registry.getBlockType(9999);
+        REQUIRE(def.stringId == "base:air");
+        REQUIRE(def.numericId == 0);
+#else
+        SUCCEED("Skipped in debug — VX_ASSERT correctly aborts on out-of-range state IDs");
+#endif
     }
 }
 
@@ -498,7 +511,7 @@ TEST_CASE("BlockState - multi-state blocks", "[world][state]")
         // air=0, stone=1, dirt=2, door starts at 3
         REQUIRE(doorBaseState == 3);
 
-        const auto& doorDef = registry.getBlock(registry.getIdByName("base:oak_door"));
+        const auto& doorDef = registry.getBlockByTypeIndex(registry.getIdByName("base:oak_door"));
         REQUIRE(doorDef.stateCount == 32);
         REQUIRE(doorDef.baseStateId == 3);
     }
@@ -671,7 +684,7 @@ TEST_CASE("BlockState - JSON property parsing", "[world][state]")
 
         auto typeIdx = registry.getIdByName("test:door");
         REQUIRE(typeIdx != BLOCK_AIR);
-        const auto& def = registry.getBlock(typeIdx);
+        const auto& def = registry.getBlockByTypeIndex(typeIdx);
         REQUIRE(def.stateCount == 8); // 4 * 2
         REQUIRE(def.properties.size() == 2);
         REQUIRE(def.properties[0].name == "facing");
@@ -693,7 +706,7 @@ TEST_CASE("BlockState - JSON property parsing", "[world][state]")
         REQUIRE(result.has_value());
 
         auto typeIdx = registry.getIdByName("test:stone");
-        const auto& def = registry.getBlock(typeIdx);
+        const auto& def = registry.getBlockByTypeIndex(typeIdx);
         REQUIRE(def.stateCount == 1);
         REQUIRE(def.properties.empty());
 
@@ -711,7 +724,7 @@ TEST_CASE("BlockState - JSON property parsing", "[world][state]")
         // All existing blocks should have stateCount=1
         for (uint16_t i = 0; i < registry.blockCount(); ++i)
         {
-            REQUIRE(registry.getBlock(i).stateCount == 1);
+            REQUIRE(registry.getBlockByTypeIndex(i).stateCount == 1);
         }
         // totalStateCount should equal blockCount since all are simple
         REQUIRE(registry.totalStateCount() == registry.blockCount());

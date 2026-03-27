@@ -108,7 +108,7 @@ inline void buildOpacityPad(
                 uint16_t blockId = section.getBlock(x, y, z);
                 if (blockId != world::BLOCK_AIR)
                 {
-                    const world::BlockDefinition& def = registry.getBlock(blockId);
+                    const world::BlockDefinition& def = registry.getBlockType(blockId);
                     opacity[padIndex(x + 1, y + 1, z + 1)] = !def.isTransparent;
                 }
             }
@@ -125,7 +125,7 @@ inline void buildOpacityPad(
                 uint16_t blockId = neighbors[0]->getBlock(0, y, z);
                 if (blockId != world::BLOCK_AIR)
                 {
-                    const world::BlockDefinition& def = registry.getBlock(blockId);
+                    const world::BlockDefinition& def = registry.getBlockType(blockId);
                     opacity[padIndex(17, y + 1, z + 1)] = !def.isTransparent;
                 }
             }
@@ -142,7 +142,7 @@ inline void buildOpacityPad(
                 uint16_t blockId = neighbors[1]->getBlock(S - 1, y, z);
                 if (blockId != world::BLOCK_AIR)
                 {
-                    const world::BlockDefinition& def = registry.getBlock(blockId);
+                    const world::BlockDefinition& def = registry.getBlockType(blockId);
                     opacity[padIndex(0, y + 1, z + 1)] = !def.isTransparent;
                 }
             }
@@ -159,7 +159,7 @@ inline void buildOpacityPad(
                 uint16_t blockId = neighbors[2]->getBlock(x, 0, z);
                 if (blockId != world::BLOCK_AIR)
                 {
-                    const world::BlockDefinition& def = registry.getBlock(blockId);
+                    const world::BlockDefinition& def = registry.getBlockType(blockId);
                     opacity[padIndex(x + 1, 17, z + 1)] = !def.isTransparent;
                 }
             }
@@ -176,7 +176,7 @@ inline void buildOpacityPad(
                 uint16_t blockId = neighbors[3]->getBlock(x, S - 1, z);
                 if (blockId != world::BLOCK_AIR)
                 {
-                    const world::BlockDefinition& def = registry.getBlock(blockId);
+                    const world::BlockDefinition& def = registry.getBlockType(blockId);
                     opacity[padIndex(x + 1, 0, z + 1)] = !def.isTransparent;
                 }
             }
@@ -193,7 +193,7 @@ inline void buildOpacityPad(
                 uint16_t blockId = neighbors[4]->getBlock(x, y, 0);
                 if (blockId != world::BLOCK_AIR)
                 {
-                    const world::BlockDefinition& def = registry.getBlock(blockId);
+                    const world::BlockDefinition& def = registry.getBlockType(blockId);
                     opacity[padIndex(x + 1, y + 1, 17)] = !def.isTransparent;
                 }
             }
@@ -210,7 +210,7 @@ inline void buildOpacityPad(
                 uint16_t blockId = neighbors[5]->getBlock(x, y, S - 1);
                 if (blockId != world::BLOCK_AIR)
                 {
-                    const world::BlockDefinition& def = registry.getBlock(blockId);
+                    const world::BlockDefinition& def = registry.getBlockType(blockId);
                     opacity[padIndex(x + 1, y + 1, 0)] = !def.isTransparent;
                 }
             }

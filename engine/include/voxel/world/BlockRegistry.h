@@ -23,7 +23,7 @@ class BlockRegistry
     [[nodiscard]] core::Result<uint16_t> registerBlock(BlockDefinition def);
 
     /// Get block definition by type index (position in m_blocks).
-    [[nodiscard]] const BlockDefinition& getBlock(uint16_t id) const;
+    [[nodiscard]] const BlockDefinition& getBlockByTypeIndex(uint16_t typeIndex) const;
 
     /// Get block definition by state ID (resolves any state variant to its parent block).
     [[nodiscard]] const BlockDefinition& getBlockType(uint16_t stateId) const;

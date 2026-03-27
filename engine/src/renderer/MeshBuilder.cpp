@@ -27,10 +27,6 @@ struct MeshWorkspace
     std::array<uint16_t, 6 * S * S> faceMasks{};
 };
 
-inline int blockPadIndex(int px, int py, int pz)
-{
-    return (py * PAD + pz) * PAD + px;
-}
 
 /// Stride-based pad access for eliminating per-element switch in inner loops.
 /// For each face direction and a given slice value, provides base index + row/col strides
@@ -83,7 +79,7 @@ void buildBlockPad(
         {
             for (int x = 0; x < S; ++x)
             {
-                blockPad[blockPadIndex(x + 1, y + 1, z + 1)] = section.getBlock(x, y, z);
+                blockPad[padIndex(x + 1, y + 1, z + 1)] = section.getBlock(x, y, z);
             }
         }
     }
@@ -93,42 +89,42 @@ void buildBlockPad(
     {
         for (int y = 0; y < S; ++y)
             for (int z = 0; z < S; ++z)
-                blockPad[blockPadIndex(17, y + 1, z + 1)] = neighbors[0]->getBlock(0, y, z);
+                blockPad[padIndex(17, y + 1, z + 1)] = neighbors[0]->getBlock(0, y, z);
     }
     // NegX neighbor (face=1): x=15 slice from neighbor -> padded x=0
     if (neighbors[1] != nullptr)
     {
         for (int y = 0; y < S; ++y)
             for (int z = 0; z < S; ++z)
-                blockPad[blockPadIndex(0, y + 1, z + 1)] = neighbors[1]->getBlock(S - 1, y, z);
+                blockPad[padIndex(0, y + 1, z + 1)] = neighbors[1]->getBlock(S - 1, y, z);
     }
     // PosY neighbor (face=2): y=0 slice from neighbor -> padded y=17
     if (neighbors[2] != nullptr)
     {
         for (int z = 0; z < S; ++z)
             for (int x = 0; x < S; ++x)
-                blockPad[blockPadIndex(x + 1, 17, z + 1)] = neighbors[2]->getBlock(x, 0, z);
+                blockPad[padIndex(x + 1, 17, z + 1)] = neighbors[2]->getBlock(x, 0, z);
     }
     // NegY neighbor (face=3): y=15 slice from neighbor -> padded y=0
     if (neighbors[3] != nullptr)
     {
         for (int z = 0; z < S; ++z)
             for (int x = 0; x < S; ++x)
-                blockPad[blockPadIndex(x + 1, 0, z + 1)] = neighbors[3]->getBlock(x, S - 1, z);
+                blockPad[padIndex(x + 1, 0, z + 1)] = neighbors[3]->getBlock(x, S - 1, z);
     }
     // PosZ neighbor (face=4): z=0 slice from neighbor -> padded z=17
     if (neighbors[4] != nullptr)
     {
         for (int y = 0; y < S; ++y)
             for (int x = 0; x < S; ++x)
-                blockPad[blockPadIndex(x + 1, y + 1, 17)] = neighbors[4]->getBlock(x, y, 0);
+                blockPad[padIndex(x + 1, y + 1, 17)] = neighbors[4]->getBlock(x, y, 0);
     }
     // NegZ neighbor (face=5): z=15 slice from neighbor -> padded z=0
     if (neighbors[5] != nullptr)
     {
         for (int y = 0; y < S; ++y)
             for (int x = 0; x < S; ++x)
-                blockPad[blockPadIndex(x + 1, y + 1, 0)] = neighbors[5]->getBlock(x, y, S - 1);
+                blockPad[padIndex(x + 1, y + 1, 0)] = neighbors[5]->getBlock(x, y, S - 1);
     }
 }
 
@@ -199,6 +195,8 @@ void sliceToLocal(uint8_t faceIdx, int slice, int row, int col, int& x, int& y, 
         y = row;
         z = S - 1 - slice;
         break;
+    default: // Unreachable — all 6 faces covered.
+        break;
     }
 }
 
@@ -207,8 +205,7 @@ void sliceToLocal(uint8_t faceIdx, int slice, int row, int col, int& x, int& y, 
 /// Derived from analyzing AO_OFFSETS tangent axis signs per face/corner.
 // clang-format off
 constexpr int AO_CORNER_BLOCK[6][4][2] = {
-    // PosX(0): row=Y, col=Z — corners: (−Y,−Z) (−Y,+Z) (+Y,+Z) (+Y,−Z) ... wait
-    // PosX corners: c0(-Y,-Z), c1(+Y,-Z), c2(+Y,+Z), c3(-Y,+Z)
+    // PosX(0): row=Y, col=Z — c0(-Y,-Z), c1(+Y,-Z), c2(+Y,+Z), c3(-Y,+Z)
     {{0,0}, {1,0}, {1,1}, {0,1}},
     // NegX(1): row=Y, col=Z — c0(-Y,+Z), c1(+Y,+Z), c2(+Y,-Z), c3(-Y,-Z)
     {{0,1}, {1,1}, {1,0}, {0,0}},
@@ -282,7 +279,7 @@ ChunkMesh MeshBuilder::buildNaive(
                     }
                     else
                     {
-                        const world::BlockDefinition& neighborDef = m_registry.getBlock(neighborId);
+                        const world::BlockDefinition& neighborDef = m_registry.getBlockType(neighborId);
                         shouldEmit = neighborDef.isTransparent;
                     }
 

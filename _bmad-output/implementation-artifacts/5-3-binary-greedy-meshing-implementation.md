@@ -1,6 +1,6 @@
 # Story 5.3: Binary Greedy Meshing Implementation
 
-Status: review
+Status: done
 
 <!-- Dependencies: Story 5.1 (MeshBuilder + ChunkMesh) MUST be complete. Story 5.2 (AO) SHOULD be complete. -->
 
@@ -298,11 +298,12 @@ Bit range   Width   Field                  Set by 5.3?
 [24:29]     6       Height - 1 (0-63)      YES (merged height)
 [30:39]     10      Block state ID         YES
 [40:42]     3       Face direction (0-5)   YES
-[43:44]     2       AO corner 0+1          YES (if 5.2 done, else 3)
-[45:46]     2       AO corner 2+3          YES (if 5.2 done, else 3)
-[47]        1       Quad diagonal flip     YES (if 5.2 done, else 0)
-[48]        1       Is non-cubic model     YES (0 -- greedy only handles full cubes)
-[49:63]     15      Future fields          NO (stay 0)
+[43:44]     2       AO corner 0 (0-3)     YES (if 5.2 done, else 3)
+[45:46]     2       AO corner 1 (0-3)     YES (if 5.2 done, else 3)
+[47:48]     2       AO corner 2 (0-3)     YES (if 5.2 done, else 3)
+[49:50]     2       AO corner 3 (0-3)     YES (if 5.2 done, else 3)
+[51]        1       Quad diagonal flip     YES (if 5.2 done, else 0)
+[52:63]     12      Reserved               NO (stay 0)
 ```
 
 Use the existing `packQuad()` from `ChunkMesh.h`. It already accepts width, height, and AO parameters:

@@ -28,14 +28,17 @@ static constexpr uint8_t BLOCK_FACE_COUNT = 6;
 ///   [12:17] Z position (0-63)
 ///   [18:23] Width - 1  (0-63)
 ///   [24:29] Height - 1 (0-63)
-///   [30:39] Block state ID (0-1023)
-///   [40:42] Face direction (0-5)
-///   [43:44] AO corner 0 (0-3)
-///   [45:46] AO corner 1 (0-3)
-///   [47:48] AO corner 2 (0-3)
-///   [49:50] AO corner 3 (0-3)
-///   [51]    Quad diagonal flip
-///   [52:63] Reserved for future stories (non-cubic, sky/block light, tint, waving)
+///   [30:45] Block state ID (0-65535)
+///   [46:48] Face direction (0-5)
+///   [49:50] AO corner 0 (0-3)
+///   [51:52] AO corner 1 (0-3)
+///   [53:54] AO corner 2 (0-3)
+///   [55:56] AO corner 3 (0-3)
+///   [57]    Quad diagonal flip
+///   [58]    Is non-cubic model (Story 5.4)
+///   [59:60] Tint index (Story 5.5)
+///   [61]    Waving flag (Story 5.5)
+///   [62:63] Reserved
 
 /// Pack a quad into the 64-bit format. Width and height default to 1 (no merge).
 /// AO corners default to 3 (no occlusion). All other future fields default to 0.
@@ -59,13 +62,13 @@ inline constexpr uint64_t packQuad(
     q |= static_cast<uint64_t>(z & 0x3F) << 12;
     q |= static_cast<uint64_t>((width - 1) & 0x3F) << 18;
     q |= static_cast<uint64_t>((height - 1) & 0x3F) << 24;
-    q |= static_cast<uint64_t>(blockStateId & 0x3FF) << 30;
-    q |= static_cast<uint64_t>(static_cast<uint8_t>(face) & 0x7) << 40;
-    q |= static_cast<uint64_t>(ao0 & 0x3) << 43;
-    q |= static_cast<uint64_t>(ao1 & 0x3) << 45;
-    q |= static_cast<uint64_t>(ao2 & 0x3) << 47;
-    q |= static_cast<uint64_t>(ao3 & 0x3) << 49;
-    q |= static_cast<uint64_t>(flip ? 1 : 0) << 51;
+    q |= static_cast<uint64_t>(blockStateId & 0xFFFF) << 30;
+    q |= static_cast<uint64_t>(static_cast<uint8_t>(face) & 0x7) << 46;
+    q |= static_cast<uint64_t>(ao0 & 0x3) << 49;
+    q |= static_cast<uint64_t>(ao1 & 0x3) << 51;
+    q |= static_cast<uint64_t>(ao2 & 0x3) << 53;
+    q |= static_cast<uint64_t>(ao3 & 0x3) << 55;
+    q |= static_cast<uint64_t>(flip ? 1 : 0) << 57;
     return q;
 }
 
@@ -85,27 +88,27 @@ inline constexpr uint8_t unpackWidth(uint64_t quad) { return static_cast<uint8_t
 inline constexpr uint8_t unpackHeight(uint64_t quad) { return static_cast<uint8_t>(((quad >> 24) & 0x3F) + 1); }
 
 /// Unpack block state ID.
-inline constexpr uint16_t unpackBlockStateId(uint64_t quad) { return static_cast<uint16_t>((quad >> 30) & 0x3FF); }
+inline constexpr uint16_t unpackBlockStateId(uint64_t quad) { return static_cast<uint16_t>((quad >> 30) & 0xFFFF); }
 
 /// Unpack face direction.
 inline constexpr BlockFace unpackFace(uint64_t quad)
 {
-    return static_cast<BlockFace>((quad >> 40) & 0x7);
+    return static_cast<BlockFace>((quad >> 46) & 0x7);
 }
 
 /// Unpack all 4 AO corner values (0-3 each).
 inline constexpr std::array<uint8_t, 4> unpackAO(uint64_t quad)
 {
     return {
-        static_cast<uint8_t>((quad >> 43) & 0x3),
-        static_cast<uint8_t>((quad >> 45) & 0x3),
-        static_cast<uint8_t>((quad >> 47) & 0x3),
         static_cast<uint8_t>((quad >> 49) & 0x3),
+        static_cast<uint8_t>((quad >> 51) & 0x3),
+        static_cast<uint8_t>((quad >> 53) & 0x3),
+        static_cast<uint8_t>((quad >> 55) & 0x3),
     };
 }
 
 /// Unpack quad diagonal flip flag.
-inline constexpr bool unpackFlip(uint64_t quad) { return ((quad >> 51) & 0x1) != 0; }
+inline constexpr bool unpackFlip(uint64_t quad) { return ((quad >> 57) & 0x1) != 0; }
 
 /// Mesh data for a single chunk section.
 struct ChunkMesh

@@ -21,29 +21,30 @@
 
 **Quad format — complete 64-bit allocation (reference for ALL meshing/shader stories):**
 ```
-Bit range   Width   Field                  Set by      Used by
-─────────   ─────   ─────────────────────  ──────────  ──────────────
-[0:5]       6       X position (0–63)      Story 5.1   chunk.vert 6.2
-[6:11]      6       Y position (0–63)      Story 5.1   chunk.vert 6.2
-[12:17]     6       Z position (0–63)      Story 5.1   chunk.vert 6.2
-[18:23]     6       Width - 1 (0–63)       Story 5.3   chunk.vert 6.2
-[24:29]     6       Height - 1 (0–63)      Story 5.3   chunk.vert 6.2
-[30:39]     10      Block state ID         Story 5.1   chunk.frag 6.2 (texture lookup)
-[40:42]     3       Face direction (0–5)   Story 5.1   chunk.vert 6.2 (normal + corner reconstruction)
-[43:44]     2       AO corner 0 (0–3)     Story 5.2   chunk.frag 6.2
-[45:46]     2       AO corner 1 (0–3)     Story 5.2   chunk.frag 6.2
-[47:48]     2       AO corner 2 (0–3)     Story 5.2   chunk.frag 6.2
-[49:50]     2       AO corner 3 (0–3)     Story 5.2   chunk.frag 6.2
-[51]        1       Quad diagonal flip     Story 5.2   chunk.vert 6.2 (triangle winding)
-[52]        1       Is non-cubic model     Story 5.4   chunk.vert 6.2 (model vertex path)
-[53:56]     4       Sky light (0–15)       Story 8.0   chunk.frag 6.2 → lighting
-[57:60]     4       Block light (0–15)     Story 8.0   chunk.frag 6.2 → lighting
-[61:62]     2       Tint index (0–3)       Story 5.5   chunk.frag 6.8 (biome color)
-[63]        1       Waving flag (0–1)      Story 5.5   chunk.vert 6.2 (vertex animation)
+Bit range   Width   Field                  Set by       Used by
+─────────   ─────   ─────────────────────  ───────────  ──────────────
+[0:5]       6       X position (0–63)      Story 5.1    chunk.vert 6.2
+[6:11]      6       Y position (0–63)      Story 5.1    chunk.vert 6.2
+[12:17]     6       Z position (0–63)      Story 5.1    chunk.vert 6.2
+[18:23]     6       Width - 1 (0–63)       Story 5.3    chunk.vert 6.2
+[24:29]     6       Height - 1 (0–63)      Story 5.3    chunk.vert 6.2
+[30:45]     16      Block state ID (0–65535) Story 5.3b  chunk.frag 6.2 (texture lookup)
+[46:48]     3       Face direction (0–5)   Story 5.3b   chunk.vert 6.2 (normal + corner reconstruction)
+[49:50]     2       AO corner 0 (0–3)     Story 5.3b   chunk.frag 6.2
+[51:52]     2       AO corner 1 (0–3)     Story 5.3b   chunk.frag 6.2
+[53:54]     2       AO corner 2 (0–3)     Story 5.3b   chunk.frag 6.2
+[55:56]     2       AO corner 3 (0–3)     Story 5.3b   chunk.frag 6.2
+[57]        1       Quad diagonal flip     Story 5.3b   chunk.vert 6.2 (triangle winding)
+[58]        1       Is non-cubic model     Story 5.4    chunk.vert 6.2 (model vertex path)
+[59:60]     2       Tint index (0–3)       Story 5.5    chunk.frag 6.8 (biome color)
+[61]        1       Waving flag (0–1)      Story 5.5    chunk.vert 6.2 (vertex animation)
+[62:63]     2       Reserved
 ```
 All stories that touch the quad format MUST reference this table. Any bit allocation change must update this table first.
 
-> **Note (Story 5.2 review):** AO expanded from 4 bits (2 paired values) to 8 bits (4 individual 2-bit corners) to support the full 0–3 AO gradient per vertex. This shifted all fields after bit 42 by 4 positions. Tint reduced from 3→2 bits (4 tint indices) and waving reduced from 2→1 bit (flag only) to fit within 64 bits. The 2 reserved bits were absorbed. If more tint or waving precision is needed, Story 5.5 can adopt a secondary data channel.
+> **Note (Story 5.3b):** Block state ID expanded from 10→16 bits to match the full `uint16_t` state space of BlockRegistry. This shifted face/AO/flip fields by 6 positions. Sky light and block light fields removed from the quad — Epic 8 Story 8.0 must use a secondary data channel (e.g., a second `uint32_t` per quad or a light SSBO). Tint (2 bits) and waving (1 bit) remain.
+>
+> **Note (Story 5.2 review):** AO expanded from 4 bits (2 paired values) to 8 bits (4 individual 2-bit corners) to support the full 0–3 AO gradient per vertex. Tint reduced from 3→2 bits (4 tint indices) and waving reduced from 2→1 bit (flag only) to fit within 64 bits.
 - Unit test: single block in empty section → 6 faces; two adjacent blocks → 10 faces (shared face culled)
 - Performance baseline measured (expected ~500μs/chunk for dense terrain)
 
