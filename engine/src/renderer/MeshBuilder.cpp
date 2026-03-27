@@ -1,5 +1,6 @@
 #include "voxel/renderer/MeshBuilder.h"
 
+#include "voxel/renderer/AmbientOcclusion.h"
 #include "voxel/world/Block.h"
 #include "voxel/world/BlockRegistry.h"
 #include "voxel/world/ChunkSection.h"
@@ -30,6 +31,10 @@ ChunkMesh MeshBuilder::buildNaive(
     mesh.quads.reserve(ESTIMATED_QUADS);
 
     constexpr int SIZE = world::ChunkSection::SIZE;
+
+    // Build padded 18^3 opacity array for AO sampling across section boundaries.
+    std::array<bool, OPACITY_PAD_VOLUME> opacity{};
+    buildOpacityPad(opacity, section, neighbors, m_registry);
 
     // Iterate in Y-Z-X order for cache-friendly access (matches flat array layout y*256 + z*16 + x).
     for (int y = 0; y < SIZE; ++y)
@@ -66,12 +71,22 @@ ChunkMesh MeshBuilder::buildNaive(
 
                     if (shouldEmit)
                     {
+                        std::array<uint8_t, 4> ao = computeFaceAO(f, x, y, z, opacity);
+                        bool flip = shouldFlipQuad(ao);
+
                         uint64_t quad = packQuad(
                             static_cast<uint8_t>(x),
                             static_cast<uint8_t>(y),
                             static_cast<uint8_t>(z),
                             blockId,
-                            face);
+                            face,
+                            1,
+                            1,
+                            ao[0],
+                            ao[1],
+                            ao[2],
+                            ao[3],
+                            flip);
                         mesh.quads.push_back(quad);
                     }
                 }

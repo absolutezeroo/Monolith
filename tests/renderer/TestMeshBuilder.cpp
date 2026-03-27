@@ -97,8 +97,11 @@ TEST_CASE("MeshBuilder naive face culling", "[renderer][meshing]")
             REQUIRE(unpackBlockStateId(quad) == stoneId);
             REQUIRE(unpackWidth(quad) == 1);
             REQUIRE(unpackHeight(quad) == 1);
-            REQUIRE(unpackAO01(quad) == 3);
-            REQUIRE(unpackAO23(quad) == 3);
+            auto ao = unpackAO(quad);
+            REQUIRE(ao[0] == 3);
+            REQUIRE(ao[1] == 3);
+            REQUIRE(ao[2] == 3);
+            REQUIRE(ao[3] == 3);
         }
     }
 
@@ -189,10 +192,12 @@ TEST_CASE("MeshBuilder naive face culling", "[renderer][meshing]")
         BlockFace face = BlockFace::PosZ;
         uint8_t w = 10;
         uint8_t h = 20;
-        uint8_t ao01 = 2;
-        uint8_t ao23 = 1;
+        uint8_t ao0 = 3;
+        uint8_t ao1 = 2;
+        uint8_t ao2 = 1;
+        uint8_t ao3 = 0;
 
-        uint64_t quad = packQuad(x, y, z, blockStateId, face, w, h, ao01, ao23);
+        uint64_t quad = packQuad(x, y, z, blockStateId, face, w, h, ao0, ao1, ao2, ao3, true);
 
         REQUIRE(unpackX(quad) == x);
         REQUIRE(unpackY(quad) == y);
@@ -201,8 +206,12 @@ TEST_CASE("MeshBuilder naive face culling", "[renderer][meshing]")
         REQUIRE(unpackFace(quad) == face);
         REQUIRE(unpackWidth(quad) == w);
         REQUIRE(unpackHeight(quad) == h);
-        REQUIRE(unpackAO01(quad) == ao01);
-        REQUIRE(unpackAO23(quad) == ao23);
+        auto ao = unpackAO(quad);
+        REQUIRE(ao[0] == ao0);
+        REQUIRE(ao[1] == ao1);
+        REQUIRE(ao[2] == ao2);
+        REQUIRE(ao[3] == ao3);
+        REQUIRE(unpackFlip(quad) == true);
     }
 }
 

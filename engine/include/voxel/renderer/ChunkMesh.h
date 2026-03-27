@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <vector>
 
@@ -29,15 +30,12 @@ static constexpr uint8_t BLOCK_FACE_COUNT = 6;
 ///   [24:29] Height - 1 (0-63)
 ///   [30:39] Block state ID (0-1023)
 ///   [40:42] Face direction (0-5)
-///   [43:44] AO corner 0+1
-///   [45:46] AO corner 2+3
-///   [47]    Quad diagonal flip
-///   [48]    Is non-cubic model
-///   [49:52] Sky light (0-15)
-///   [53:56] Block light (0-15)
-///   [57:59] Tint index (0-7)
-///   [60:61] Waving type (0-3)
-///   [62:63] Reserved
+///   [43:44] AO corner 0 (0-3)
+///   [45:46] AO corner 1 (0-3)
+///   [47:48] AO corner 2 (0-3)
+///   [49:50] AO corner 3 (0-3)
+///   [51]    Quad diagonal flip
+///   [52:63] Reserved for future stories (non-cubic, sky/block light, tint, waving)
 
 /// Pack a quad into the 64-bit format. Width and height default to 1 (no merge).
 /// AO corners default to 3 (no occlusion). All other future fields default to 0.
@@ -49,8 +47,11 @@ inline constexpr uint64_t packQuad(
     BlockFace face,
     uint8_t width = 1,
     uint8_t height = 1,
-    uint8_t ao01 = 3,
-    uint8_t ao23 = 3)
+    uint8_t ao0 = 3,
+    uint8_t ao1 = 3,
+    uint8_t ao2 = 3,
+    uint8_t ao3 = 3,
+    bool flip = false)
 {
     uint64_t q = 0;
     q |= static_cast<uint64_t>(x & 0x3F);
@@ -60,9 +61,11 @@ inline constexpr uint64_t packQuad(
     q |= static_cast<uint64_t>((height - 1) & 0x3F) << 24;
     q |= static_cast<uint64_t>(blockStateId & 0x3FF) << 30;
     q |= static_cast<uint64_t>(static_cast<uint8_t>(face) & 0x7) << 40;
-    q |= static_cast<uint64_t>(ao01 & 0x3) << 43;
-    q |= static_cast<uint64_t>(ao23 & 0x3) << 45;
-    // bits 47-63 stay zero for Story 5.1
+    q |= static_cast<uint64_t>(ao0 & 0x3) << 43;
+    q |= static_cast<uint64_t>(ao1 & 0x3) << 45;
+    q |= static_cast<uint64_t>(ao2 & 0x3) << 47;
+    q |= static_cast<uint64_t>(ao3 & 0x3) << 49;
+    q |= static_cast<uint64_t>(flip ? 1 : 0) << 51;
     return q;
 }
 
@@ -90,9 +93,19 @@ inline constexpr BlockFace unpackFace(uint64_t quad)
     return static_cast<BlockFace>((quad >> 40) & 0x7);
 }
 
-/// Unpack AO corner pair values (0-3 each).
-inline constexpr uint8_t unpackAO01(uint64_t quad) { return static_cast<uint8_t>((quad >> 43) & 0x3); }
-inline constexpr uint8_t unpackAO23(uint64_t quad) { return static_cast<uint8_t>((quad >> 45) & 0x3); }
+/// Unpack all 4 AO corner values (0-3 each).
+inline constexpr std::array<uint8_t, 4> unpackAO(uint64_t quad)
+{
+    return {
+        static_cast<uint8_t>((quad >> 43) & 0x3),
+        static_cast<uint8_t>((quad >> 45) & 0x3),
+        static_cast<uint8_t>((quad >> 47) & 0x3),
+        static_cast<uint8_t>((quad >> 49) & 0x3),
+    };
+}
+
+/// Unpack quad diagonal flip flag.
+inline constexpr bool unpackFlip(uint64_t quad) { return ((quad >> 51) & 0x1) != 0; }
 
 /// Mesh data for a single chunk section.
 struct ChunkMesh

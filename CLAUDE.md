@@ -88,6 +88,17 @@ VoxelForge/
 └── tools/
 ```
 
+## Building from CLI
+
+```bash
+bash build.sh                     # Build everything (msvc-debug preset)
+bash build.sh VoxelTests          # Build tests only
+bash build.sh VoxelGame           # Build game only
+```
+
+`build.sh` sets up the MSVC x64 environment via `vcvarsall.bat` before calling CMake.
+The user also builds from **CLion** which handles the environment automatically.
+
 ## Quickstart
 
 ```bash
