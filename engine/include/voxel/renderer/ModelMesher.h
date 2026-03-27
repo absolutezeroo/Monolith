@@ -22,34 +22,44 @@ class ModelMesher
     /// @param z Block Z position within section (0-15).
     /// @param blockDef Block definition for texture/state info.
     /// @param state Current state values (needs "half" property).
+    /// @param stateId Actual block state ID (not base — may differ for state variants).
     /// @param ao Ambient occlusion value for all vertices (0-3).
+    /// @param faceMask Bitmask of visible faces (bit i = face i, matching BlockFace enum).
     static void generateSlab(
         int x,
         int y,
         int z,
         const world::BlockDefinition& blockDef,
         const world::StateMap& state,
+        uint16_t stateId,
         uint8_t ao,
+        uint8_t faceMask,
         std::vector<ModelVertex>& outVertices);
 
     /// Generate cross geometry — two diagonal quads through the block center.
     /// Used for flowers, tall grass, etc. Both quads are double-sided.
+    /// @param stateId Actual block state ID.
     static void generateCross(
         int x,
         int y,
         int z,
         const world::BlockDefinition& blockDef,
+        uint16_t stateId,
         std::vector<ModelVertex>& outVertices);
 
     /// Generate torch geometry — a thin vertical box.
     /// Standing torch: centered (7/16 to 9/16 XZ, 0 to 10/16 Y).
     /// Wall torch: angled toward attached wall face.
+    /// @param stateId Actual block state ID.
+    /// @param faceMask Bitmask of visible faces (bit i = face i, matching BlockFace enum).
     static void generateTorch(
         int x,
         int y,
         int z,
         const world::BlockDefinition& blockDef,
         const world::StateMap& state,
+        uint16_t stateId,
+        uint8_t faceMask,
         std::vector<ModelVertex>& outVertices);
 
   private:
@@ -65,7 +75,8 @@ class ModelMesher
         uint8_t flags,
         std::vector<ModelVertex>& outVertices);
 
-    /// Emit a box (6 faces × 6 vertices = 36 vertices) with given bounds.
+    /// Emit a box, emitting only faces whose bit is set in faceMask.
+    /// faceMask bit layout matches BlockFace enum: 0=PosX, 1=NegX, 2=PosY, 3=NegY, 4=PosZ, 5=NegZ.
     static void emitBox(
         const glm::vec3& offset,
         const glm::vec3& minCorner,
@@ -73,6 +84,7 @@ class ModelMesher
         uint16_t blockStateId,
         uint8_t ao,
         uint8_t flags,
+        uint8_t faceMask,
         std::vector<ModelVertex>& outVertices);
 };
 

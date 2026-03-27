@@ -39,6 +39,7 @@ void ModelMesher::emitBox(
     uint16_t blockStateId,
     uint8_t ao,
     uint8_t flags,
+    uint8_t faceMask,
     std::vector<ModelVertex>& outVertices)
 {
     float x0 = offset.x + minCorner.x;
@@ -48,35 +49,53 @@ void ModelMesher::emitBox(
     float y1 = offset.y + maxCorner.y;
     float z1 = offset.z + maxCorner.z;
 
-    // +X face
-    emitQuad(
-        {x1, y0, z0}, {x1, y0, z1}, {x1, y1, z1}, {x1, y1, z0},
-        {1.0f, 0.0f, 0.0f}, blockStateId, ao, flags, outVertices);
+    // +X face (bit 0)
+    if (faceMask & (1u << 0))
+    {
+        emitQuad(
+            {x1, y0, z0}, {x1, y0, z1}, {x1, y1, z1}, {x1, y1, z0},
+            {1.0f, 0.0f, 0.0f}, blockStateId, ao, flags, outVertices);
+    }
 
-    // -X face
-    emitQuad(
-        {x0, y0, z1}, {x0, y0, z0}, {x0, y1, z0}, {x0, y1, z1},
-        {-1.0f, 0.0f, 0.0f}, blockStateId, ao, flags, outVertices);
+    // -X face (bit 1)
+    if (faceMask & (1u << 1))
+    {
+        emitQuad(
+            {x0, y0, z1}, {x0, y0, z0}, {x0, y1, z0}, {x0, y1, z1},
+            {-1.0f, 0.0f, 0.0f}, blockStateId, ao, flags, outVertices);
+    }
 
-    // +Y face
-    emitQuad(
-        {x0, y1, z0}, {x1, y1, z0}, {x1, y1, z1}, {x0, y1, z1},
-        {0.0f, 1.0f, 0.0f}, blockStateId, ao, flags, outVertices);
+    // +Y face (bit 2)
+    if (faceMask & (1u << 2))
+    {
+        emitQuad(
+            {x0, y1, z0}, {x1, y1, z0}, {x1, y1, z1}, {x0, y1, z1},
+            {0.0f, 1.0f, 0.0f}, blockStateId, ao, flags, outVertices);
+    }
 
-    // -Y face
-    emitQuad(
-        {x0, y0, z1}, {x1, y0, z1}, {x1, y0, z0}, {x0, y0, z0},
-        {0.0f, -1.0f, 0.0f}, blockStateId, ao, flags, outVertices);
+    // -Y face (bit 3)
+    if (faceMask & (1u << 3))
+    {
+        emitQuad(
+            {x0, y0, z1}, {x1, y0, z1}, {x1, y0, z0}, {x0, y0, z0},
+            {0.0f, -1.0f, 0.0f}, blockStateId, ao, flags, outVertices);
+    }
 
-    // +Z face
-    emitQuad(
-        {x1, y0, z1}, {x0, y0, z1}, {x0, y1, z1}, {x1, y1, z1},
-        {0.0f, 0.0f, 1.0f}, blockStateId, ao, flags, outVertices);
+    // +Z face (bit 4)
+    if (faceMask & (1u << 4))
+    {
+        emitQuad(
+            {x1, y0, z1}, {x0, y0, z1}, {x0, y1, z1}, {x1, y1, z1},
+            {0.0f, 0.0f, 1.0f}, blockStateId, ao, flags, outVertices);
+    }
 
-    // -Z face
-    emitQuad(
-        {x0, y0, z0}, {x1, y0, z0}, {x1, y1, z0}, {x0, y1, z0},
-        {0.0f, 0.0f, -1.0f}, blockStateId, ao, flags, outVertices);
+    // -Z face (bit 5)
+    if (faceMask & (1u << 5))
+    {
+        emitQuad(
+            {x0, y0, z0}, {x1, y0, z0}, {x1, y1, z0}, {x0, y1, z0},
+            {0.0f, 0.0f, -1.0f}, blockStateId, ao, flags, outVertices);
+    }
 }
 
 void ModelMesher::generateSlab(
@@ -85,7 +104,9 @@ void ModelMesher::generateSlab(
     int z,
     const world::BlockDefinition& blockDef,
     const world::StateMap& state,
+    uint16_t stateId,
     uint8_t ao,
+    uint8_t faceMask,
     std::vector<ModelVertex>& outVertices)
 {
     auto it = state.find("half");
@@ -97,7 +118,7 @@ void ModelMesher::generateSlab(
 
     uint8_t flags = static_cast<uint8_t>((blockDef.tintIndex & 0x1) | ((blockDef.waving & 0x3) << 1));
 
-    emitBox(offset, minCorner, maxCorner, blockDef.baseStateId, ao, flags, outVertices);
+    emitBox(offset, minCorner, maxCorner, stateId, ao, flags, faceMask, outVertices);
 }
 
 void ModelMesher::generateCross(
@@ -105,6 +126,7 @@ void ModelMesher::generateCross(
     int y,
     int z,
     const world::BlockDefinition& blockDef,
+    uint16_t stateId,
     std::vector<ModelVertex>& outVertices)
 {
     float fx = static_cast<float>(x);
@@ -112,7 +134,6 @@ void ModelMesher::generateCross(
     float fz = static_cast<float>(z);
 
     uint8_t flags = static_cast<uint8_t>((blockDef.tintIndex & 0x1) | ((blockDef.waving & 0x3) << 1));
-    uint16_t stateId = blockDef.baseStateId;
 
     // Diagonal quad normals (perpendicular to each diagonal plane)
     glm::vec3 normalA = glm::normalize(glm::vec3(-1.0f, 0.0f, 1.0f));
@@ -157,6 +178,8 @@ void ModelMesher::generateTorch(
     int z,
     const world::BlockDefinition& blockDef,
     const world::StateMap& state,
+    uint16_t stateId,
+    uint8_t faceMask,
     std::vector<ModelVertex>& outVertices)
 {
     float fx = static_cast<float>(x);
@@ -196,7 +219,7 @@ void ModelMesher::generateTorch(
     glm::vec3 minCorner(TORCH_MIN_XZ, 0.0f, TORCH_MIN_XZ);
     glm::vec3 maxCorner(TORCH_MAX_XZ, TORCH_HEIGHT, TORCH_MAX_XZ);
 
-    emitBox(offset, minCorner, maxCorner, blockDef.baseStateId, 3, flags, outVertices);
+    emitBox(offset, minCorner, maxCorner, stateId, 3, flags, faceMask, outVertices);
 }
 
 } // namespace voxel::renderer

@@ -124,6 +124,8 @@ struct ModelVertex
     uint8_t flags = 0;  // Bit 0: tint index LSB, Bits 1-2: waving type
 };
 
+static_assert(sizeof(ModelVertex) == 36, "ModelVertex must be 36 bytes for GPU upload");
+
 /// Mesh data for a single chunk section.
 struct ChunkMesh
 {

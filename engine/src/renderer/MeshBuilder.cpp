@@ -147,13 +147,12 @@ void buildCubicOpacityPad(
         {
             for (int px = 0; px < PAD; ++px)
             {
-                int blockIdx = (py * PAD + pz) * PAD + px;
-                int opacIdx = padIndex(px, py, pz);
-                uint16_t blockId = blockPad[blockIdx];
+                int idx = padIndex(px, py, pz);
+                uint16_t blockId = blockPad[idx];
                 if (blockId != world::BLOCK_AIR)
                 {
                     const world::BlockDefinition& def = registry.getBlockType(blockId);
-                    cubicOpacity[opacIdx] = !def.isTransparent && def.modelType == world::ModelType::FullCube;
+                    cubicOpacity[idx] = !def.isTransparent && def.modelType == world::ModelType::FullCube;
                 }
             }
         }
@@ -670,7 +669,7 @@ ChunkMesh MeshBuilder::buildGreedy(
 
 void MeshBuilder::buildNonCubicPass(
     const world::ChunkSection& section,
-    [[maybe_unused]] const std::array<const world::ChunkSection*, 6>& neighbors,
+    const std::array<const world::ChunkSection*, 6>& neighbors,
     ChunkMesh& mesh) const
 {
     constexpr int SIZE = world::ChunkSection::SIZE;
@@ -693,8 +692,26 @@ void MeshBuilder::buildNonCubicPass(
                     continue;
                 }
 
+                // Compute face visibility mask: cull faces occluded by solid FullCube neighbors.
+                uint8_t faceMask = 0;
+                for (uint8_t f = 0; f < BLOCK_FACE_COUNT; ++f)
+                {
+                    uint16_t neighborId =
+                        getAdjacentBlock(section, neighbors, x, y, z, static_cast<BlockFace>(f));
+                    bool occluded = false;
+                    if (neighborId != world::BLOCK_AIR)
+                    {
+                        const world::BlockDefinition& neighborDef = m_registry.getBlockType(neighborId);
+                        occluded = !neighborDef.isTransparent && neighborDef.modelType == world::ModelType::FullCube;
+                    }
+                    if (!occluded)
+                    {
+                        faceMask |= static_cast<uint8_t>(1u << f);
+                    }
+                }
+
                 world::StateMap state = m_registry.getStateValues(blockId);
-                m_modelRegistry.getModelVertices(x, y, z, blockDef, state, mesh.modelVertices);
+                m_modelRegistry.getModelVertices(x, y, z, blockDef, state, blockId, faceMask, mesh.modelVertices);
             }
         }
     }

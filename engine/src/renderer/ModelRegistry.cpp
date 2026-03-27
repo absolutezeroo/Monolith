@@ -12,20 +12,22 @@ void ModelRegistry::getModelVertices(
     int z,
     const world::BlockDefinition& blockDef,
     const world::StateMap& state,
+    uint16_t stateId,
+    uint8_t faceMask,
     std::vector<ModelVertex>& outVertices) const
 {
     switch (blockDef.modelType)
     {
     case world::ModelType::Slab:
-        ModelMesher::generateSlab(x, y, z, blockDef, state, 3, outVertices);
+        ModelMesher::generateSlab(x, y, z, blockDef, state, stateId, 3, faceMask, outVertices);
         break;
 
     case world::ModelType::Cross:
-        ModelMesher::generateCross(x, y, z, blockDef, outVertices);
+        ModelMesher::generateCross(x, y, z, blockDef, stateId, outVertices);
         break;
 
     case world::ModelType::Torch:
-        ModelMesher::generateTorch(x, y, z, blockDef, state, outVertices);
+        ModelMesher::generateTorch(x, y, z, blockDef, state, stateId, faceMask, outVertices);
         break;
 
     case world::ModelType::FullCube:

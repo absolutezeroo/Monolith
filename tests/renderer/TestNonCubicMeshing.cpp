@@ -122,45 +122,24 @@ TEST_CASE("Non-cubic meshing", "[renderer][meshing][non-cubic]")
         REQUIRE_FALSE(mesh.isEmpty());
     }
 
-    SECTION("slab on stone — stone top face emitted, slab bottom not emitted via model")
+    SECTION("slab on stone — face culling between cubic and non-cubic blocks")
     {
         uint16_t slabId = registerSlab(registry);
         ChunkSection section;
-        // Stone at (8, 7, 8), slab at (8, 8, 8)
+        // Stone at (8, 7, 8), bottom slab at (8, 8, 8)
         section.setBlock(8, 7, 8, stoneId);
         section.setBlock(8, 8, 8, slabId);
 
         ChunkMesh mesh = builder.buildNaive(section, NO_NEIGHBORS);
 
-        // Stone block: all 6 faces. The PosY face toward slab should be emitted
-        // because slab (bottom half by default) doesn't fully cover NegY.
-        // Actually, default slab state is "bottom", so isFullFace(NegY=3) = true (bottom face is full),
-        // and isFullFace(PosY=2) = false (top face is NOT full).
-        // So stone's PosY face: neighbor is slab, opposite face = NegY.
-        // slab.isFullFace(NegY=3, state={half=bottom}) = true → stone's PosY face is NOT emitted.
-        // Wait — that's the opposite of what AC6 says.
-        //
-        // AC6: "slab on stone → stone's top face toward slab IS emitted (slab doesn't fully cover)"
-        // The slab sits ON TOP of stone. Default state is "half=bottom".
-        // The slab's BOTTOM face (NegY) is at y=8+0=8, which fully covers the boundary.
-        // But from the perspective of face culling: stone's PosY face looks at slab, which is half-height.
-        // The slab's NegY face IS full (it covers the whole 1x1 boundary at the bottom of the slab block).
-        // So stone's PosY face IS culled by the slab's full NegY face.
-        //
-        // Re-reading AC6 more carefully: "slab on stone → stone's top face toward slab IS emitted"
-        // This implies the slab doesn't fully cover the face. This would be true for a TOP slab,
-        // not a BOTTOM slab. With half=top: slab from y=0.5 to y=1, NegY face is NOT full.
-        //
-        // For default state (half=bottom): slab NegY IS full → stone's top IS culled.
-        // AC6 describes the general case; let's verify the concrete half=top case.
-
-        // With default state (bottom slab):
-        // Stone has 6 faces, slab's NegY (opposite of stone's PosY) IS full → stone loses PosY.
-        // Stone emits 5 faces.
+        // Default slab state is "half=bottom" → slab from y=0 to y=0.5 in local space.
+        // Stone's PosY: neighbor is slab, opposite face = NegY.
+        // slab.isFullFace(NegY=3, {half=bottom}) = true → stone's PosY face is culled.
         REQUIRE(countFace(mesh, BlockFace::PosY) == 0); // culled by slab's full bottom
 
-        // Slab emits 36 model vertices (full box geometry, no face culling in V1).
-        REQUIRE(mesh.modelVertexCount == 36);
+        // Slab's NegY: neighbor is stone (FullCube, opaque) → culled.
+        // Slab emits 5 visible faces × 6 vertices = 30 model vertices.
+        REQUIRE(mesh.modelVertexCount == 30);
     }
 
     SECTION("cross block (flower) produces 24 model vertices (4 quads × 6 verts)")
@@ -219,8 +198,10 @@ TEST_CASE("Non-cubic meshing", "[renderer][meshing][non-cubic]")
 
         // Stone: 6 faces. PosX neighbor is slab. Slab NegX is NOT full → stone PosX IS emitted.
         REQUIRE(mesh.quadCount == 6); // only stone generates quads
-        // Slab (36 verts) + flower (24 verts) = 60 model vertices
-        REQUIRE(mesh.modelVertexCount == 60);
+        // Slab: NegX neighbor is stone (FullCube, opaque) → NegX culled → 5 faces × 6 = 30 verts.
+        // Flower: cross geometry = 24 verts (no face culling for diagonal quads).
+        // Total: 30 + 24 = 54 model vertices.
+        REQUIRE(mesh.modelVertexCount == 54);
         REQUIRE_FALSE(mesh.isEmpty());
     }
 }
