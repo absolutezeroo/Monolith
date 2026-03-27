@@ -172,8 +172,12 @@ epics:
         assigned_to: dev-agent
       - id: "5.3"
         title: "Binary Greedy Meshing Implementation"
-        status: in-progress
+        status: review
         assigned_to: dev-agent
+      - id: "5.3b"
+        title: "Quad Format Fix + Registry Safety Hardening"
+        status: backlog
+        assigned_to: null
       - id: "5.4"
         title: "Non-Cubic Block Model Meshing"
         status: ready-for-dev

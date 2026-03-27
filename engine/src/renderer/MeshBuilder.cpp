@@ -25,12 +25,47 @@ struct MeshWorkspace
     std::array<uint16_t, PAD_VOLUME> blockPad{};
     std::array<bool, OPACITY_PAD_VOLUME> opacityPad{};
     std::array<uint16_t, 6 * S * S> faceMasks{};
-    std::array<uint16_t, S * S> sliceBlockTypes{};
 };
 
 inline int blockPadIndex(int px, int py, int pz)
 {
     return (py * PAD + pz) * PAD + px;
+}
+
+/// Stride-based pad access for eliminating per-element switch in inner loops.
+/// For each face direction and a given slice value, provides base index + row/col strides
+/// for linear traversal of the padded arrays without branching.
+struct FaceSliceStrides
+{
+    int base;           // padded index for (row=0, col=0) in this slice
+    int rowStride;      // padded index delta per row increment
+    int colStride;      // padded index delta per col increment
+    int neighborOffset; // padded index delta to reach neighbor in face direction
+};
+
+/// Compute stride-based access parameters for a given face direction and slice.
+/// Both opacity and blockPad arrays use identical indexing: (py*18+pz)*18+px.
+inline FaceSliceStrides getSliceStrides(uint8_t faceIdx, int slice)
+{
+    // Pad offset: row=0,col=0 maps to padded coord +1 on each axis.
+    // Strides depend on which world axis maps to row vs col vs slice.
+    switch (faceIdx)
+    {
+    case 0: // PosX: slice=X, row=Y, col=Z; neighbor +X
+        return {PAD * PAD + PAD + (slice + 1), PAD * PAD, PAD, 1};
+    case 1: // NegX: slice=X(rev), row=Y, col=Z; neighbor -X
+        return {PAD * PAD + PAD + (S - slice), PAD * PAD, PAD, -1};
+    case 2: // PosY: slice=Y, row=X, col=Z; neighbor +Y
+        return {(slice + 1) * PAD * PAD + PAD + 1, 1, PAD, PAD * PAD};
+    case 3: // NegY: slice=Y(rev), row=X, col=Z; neighbor -Y
+        return {(S - slice) * PAD * PAD + PAD + 1, 1, PAD, -(PAD * PAD)};
+    case 4: // PosZ: slice=Z, row=Y, col=X; neighbor +Z
+        return {PAD * PAD + (slice + 1) * PAD + 1, PAD * PAD, 1, PAD};
+    case 5: // NegZ: slice=Z(rev), row=Y, col=X; neighbor -Z
+        return {PAD * PAD + (S - slice) * PAD + 1, PAD * PAD, 1, -PAD};
+    default:
+        return {0, 0, 0, 0};
+    }
 }
 
 /// Build 18^3 padded block ID array from section + neighbors.
@@ -97,153 +132,34 @@ void buildBlockPad(
     }
 }
 
-/// Build face masks for one face direction. Produces 16 slices x 16 rows of uint16_t bitmasks.
-/// faceMasks output: faceMasks[slice * 16 + row] = bitmask along col axis.
+/// Build face masks for one face direction using stride-based pad access (no per-element switch).
+/// Produces 16 slices x 16 rows of uint16_t bitmasks.
+/// outMasks[slice * 16 + row] = bitmask along col axis; bit=1 if face is visible.
 void buildFaceMasks(
     uint8_t faceIdx,
     const std::array<bool, OPACITY_PAD_VOLUME>& opacity,
     uint16_t* outMasks)
 {
-    // For each face: iterate slices perpendicular to normal, rows and cols in the tangent plane.
-    // Bit is set if: block here is opaque AND neighbor in face direction is not opaque.
-    //
-    // Axis mapping (slice, row, col) -> padded (px, py, pz):
-    //   PosX(0): slice=x, row=y, col=z, neighbor at x+1
-    //   NegX(1): slice=x, row=y, col=z, neighbor at x-1 (slice reversed)
-    //   PosY(2): slice=y, row=x, col=z, neighbor at y+1
-    //   NegY(3): slice=y, row=x, col=z, neighbor at y-1 (slice reversed)
-    //   PosZ(4): slice=z, row=y, col=x, neighbor at z+1
-    //   NegZ(5): slice=z, row=y, col=x, neighbor at z-1 (slice reversed)
-
     for (int slice = 0; slice < S; ++slice)
     {
+        FaceSliceStrides st = getSliceStrides(faceIdx, slice);
+
         for (int row = 0; row < S; ++row)
         {
             uint16_t bits = 0;
+            int idx = st.base + row * st.rowStride;
+
             for (int col = 0; col < S; ++col)
             {
-                int px = 0;
-                int py = 0;
-                int pz = 0;
-                int npx = 0;
-                int npy = 0;
-                int npz = 0;
-
-                switch (faceIdx)
-                {
-                case 0: // PosX
-                    px = slice + 1;
-                    py = row + 1;
-                    pz = col + 1;
-                    npx = px + 1;
-                    npy = py;
-                    npz = pz;
-                    break;
-                case 1: // NegX
-                    px = (S - 1 - slice) + 1;
-                    py = row + 1;
-                    pz = col + 1;
-                    npx = px - 1;
-                    npy = py;
-                    npz = pz;
-                    break;
-                case 2: // PosY
-                    px = row + 1;
-                    py = slice + 1;
-                    pz = col + 1;
-                    npx = px;
-                    npy = py + 1;
-                    npz = pz;
-                    break;
-                case 3: // NegY
-                    px = row + 1;
-                    py = (S - 1 - slice) + 1;
-                    pz = col + 1;
-                    npx = px;
-                    npy = py - 1;
-                    npz = pz;
-                    break;
-                case 4: // PosZ
-                    px = col + 1;
-                    py = row + 1;
-                    pz = slice + 1;
-                    npx = px;
-                    npy = py;
-                    npz = pz + 1;
-                    break;
-                case 5: // NegZ
-                    px = col + 1;
-                    py = row + 1;
-                    pz = (S - 1 - slice) + 1;
-                    npx = px;
-                    npy = py;
-                    npz = pz - 1;
-                    break;
-                }
-
-                bool hereSolid = opacity[padIndex(px, py, pz)];
-                bool neighborSolid = opacity[padIndex(npx, npy, npz)];
+                bool hereSolid = opacity[idx];
+                bool neighborSolid = opacity[idx + st.neighborOffset];
                 if (hereSolid && !neighborSolid)
                 {
                     bits |= static_cast<uint16_t>(1u << col);
                 }
+                idx += st.colStride;
             }
             outMasks[slice * S + row] = bits;
-        }
-    }
-}
-
-/// Build the block type cache for one slice of one face direction.
-/// sliceTypes[row * 16 + col] = blockId at that position.
-void buildSliceBlockTypes(
-    uint8_t faceIdx,
-    int slice,
-    const std::array<uint16_t, PAD_VOLUME>& blockPad,
-    uint16_t* outTypes)
-{
-    for (int row = 0; row < S; ++row)
-    {
-        for (int col = 0; col < S; ++col)
-        {
-            int px = 0;
-            int py = 0;
-            int pz = 0;
-
-            switch (faceIdx)
-            {
-            case 0: // PosX
-                px = slice + 1;
-                py = row + 1;
-                pz = col + 1;
-                break;
-            case 1: // NegX
-                px = (S - 1 - slice) + 1;
-                py = row + 1;
-                pz = col + 1;
-                break;
-            case 2: // PosY
-                px = row + 1;
-                py = slice + 1;
-                pz = col + 1;
-                break;
-            case 3: // NegY
-                px = row + 1;
-                py = (S - 1 - slice) + 1;
-                pz = col + 1;
-                break;
-            case 4: // PosZ
-                px = col + 1;
-                py = row + 1;
-                pz = slice + 1;
-                break;
-            case 5: // NegZ
-                px = col + 1;
-                py = row + 1;
-                pz = (S - 1 - slice) + 1;
-                break;
-            }
-
-            outTypes[row * S + col] = blockPad[blockPadIndex(px, py, pz)];
         }
     }
 }
@@ -285,6 +201,27 @@ void sliceToLocal(uint8_t faceIdx, int slice, int row, int col, int& x, int& y, 
         break;
     }
 }
+
+/// Per-face mapping: for each AO corner index, which block in the merged quad provides that corner.
+/// AO_CORNER_BLOCK[face][corner] = {row_uses_max, col_uses_max} where 0=min pos, 1=max pos.
+/// Derived from analyzing AO_OFFSETS tangent axis signs per face/corner.
+// clang-format off
+constexpr int AO_CORNER_BLOCK[6][4][2] = {
+    // PosX(0): row=Y, col=Z — corners: (−Y,−Z) (−Y,+Z) (+Y,+Z) (+Y,−Z) ... wait
+    // PosX corners: c0(-Y,-Z), c1(+Y,-Z), c2(+Y,+Z), c3(-Y,+Z)
+    {{0,0}, {1,0}, {1,1}, {0,1}},
+    // NegX(1): row=Y, col=Z — c0(-Y,+Z), c1(+Y,+Z), c2(+Y,-Z), c3(-Y,-Z)
+    {{0,1}, {1,1}, {1,0}, {0,0}},
+    // PosY(2): row=X, col=Z — c0(-X,-Z), c1(+X,-Z), c2(+X,+Z), c3(-X,+Z)
+    {{0,0}, {1,0}, {1,1}, {0,1}},
+    // NegY(3): row=X, col=Z — c0(-X,-Z), c1(+X,-Z), c2(+X,+Z), c3(-X,+Z)
+    {{0,0}, {1,0}, {1,1}, {0,1}},
+    // PosZ(4): row=Y, col=X — c0(-X,-Y), c1(+X,-Y), c2(+X,+Y), c3(-X,+Y)
+    {{0,0}, {0,1}, {1,1}, {1,0}},
+    // NegZ(5): row=Y, col=X — c0(+X,-Y), c1(-X,-Y), c2(-X,+Y), c3(+X,+Y)
+    {{0,1}, {0,0}, {1,0}, {1,1}},
+};
+// clang-format on
 
 } // anonymous namespace
 
@@ -464,9 +401,7 @@ ChunkMesh MeshBuilder::buildGreedy(
 
         for (int slice = 0; slice < S; ++slice)
         {
-            // Build block type cache for this slice.
-            buildSliceBlockTypes(faceIdx, slice, ws.blockPad, ws.sliceBlockTypes.data());
-
+            FaceSliceStrides st = getSliceStrides(faceIdx, slice);
             uint16_t* sliceMasks = &masks[slice * S];
 
             for (int row = 0; row < S; ++row)
@@ -475,14 +410,15 @@ ChunkMesh MeshBuilder::buildGreedy(
                 while (bits != 0)
                 {
                     int col = std::countr_zero(static_cast<uint16_t>(bits));
-                    uint16_t type = ws.sliceBlockTypes[row * S + col];
+                    int rowBase = st.base + row * st.rowStride;
+                    uint16_t type = ws.blockPad[rowBase + col * st.colStride];
 
                     // Extend width: consecutive same-type set bits.
                     int width = 1;
                     uint16_t scanBits = static_cast<uint16_t>(bits >> (col + 1));
                     while (scanBits & 1u)
                     {
-                        if (ws.sliceBlockTypes[row * S + col + width] != type)
+                        if (ws.blockPad[rowBase + (col + width) * st.colStride] != type)
                         {
                             break;
                         }
@@ -501,10 +437,11 @@ ChunkMesh MeshBuilder::buildGreedy(
                             break;
                         }
 
+                        int r2Base = st.base + r2 * st.rowStride;
                         bool allSameType = true;
                         for (int c = col; c < col + width; ++c)
                         {
-                            if (ws.sliceBlockTypes[r2 * S + c] != type)
+                            if (ws.blockPad[r2Base + c * st.colStride] != type)
                             {
                                 allSameType = false;
                                 break;
@@ -528,18 +465,17 @@ ChunkMesh MeshBuilder::buildGreedy(
                     sliceToLocal(faceIdx, slice, row, col, lx, ly, lz);
 
                     // Compute AO at the 4 physical corners of the merged quad.
-                    // Corner positions depend on face direction's row/col axes.
-                    // We sample AO at the 4 extremes of the merged rectangle.
-                    int cornerRow[4] = {row, row, row + height, row + height};
-                    int cornerCol[4] = {col, col + width, col + width, col};
-
+                    // Each corner i of the merged quad physically coincides with corner i
+                    // of a specific block in the merged region, determined by face direction.
                     std::array<uint8_t, 4> ao{};
                     for (int ci = 0; ci < 4; ++ci)
                     {
+                        int blockRow = row + AO_CORNER_BLOCK[faceIdx][ci][0] * (height - 1);
+                        int blockCol = col + AO_CORNER_BLOCK[faceIdx][ci][1] * (width - 1);
                         int cx = 0;
                         int cy = 0;
                         int cz = 0;
-                        sliceToLocal(faceIdx, slice, cornerRow[ci], cornerCol[ci], cx, cy, cz);
+                        sliceToLocal(faceIdx, slice, blockRow, blockCol, cx, cy, cz);
                         ao[ci] = computeFaceAO(faceIdx, cx, cy, cz, ws.opacityPad)[ci];
                     }
 
