@@ -13,7 +13,7 @@ struct ChunkSection;
 namespace voxel::renderer
 {
 
-/// Builds chunk meshes using naive face culling (one quad per visible face, no merging).
+/// Builds chunk meshes using naive face culling or binary greedy meshing.
 class MeshBuilder
 {
   public:
@@ -28,6 +28,19 @@ class MeshBuilder
     ///        nullptr = treat boundary as air (emit face).
     /// @return The generated mesh data.
     [[nodiscard]] ChunkMesh buildNaive(
+        const world::ChunkSection& section,
+        const std::array<const world::ChunkSection*, 6>& neighbors) const;
+
+    /// Build a mesh for a chunk section using binary greedy meshing.
+    /// Merges coplanar adjacent faces of the same block type into larger quads.
+    /// Same inputs/output as buildNaive() — callers can swap freely.
+    ///
+    /// @param section The section to mesh (16x16x16 voxels).
+    /// @param neighbors The 6 neighbor sections for boundary face culling.
+    ///        Uses BlockFace ordering: [PosX, NegX, PosY, NegY, PosZ, NegZ].
+    ///        nullptr = treat boundary as air (emit face).
+    /// @return The generated mesh data with merged quads.
+    [[nodiscard]] ChunkMesh buildGreedy(
         const world::ChunkSection& section,
         const std::array<const world::ChunkSection*, 6>& neighbors) const;
 

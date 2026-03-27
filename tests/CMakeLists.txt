@@ -13,6 +13,7 @@ add_executable(VoxelTests
     renderer/TestCamera.cpp
     renderer/TestMeshBuilder.cpp
     renderer/TestAmbientOcclusion.cpp
+    renderer/TestGreedyMeshing.cpp
     world/TestChunkSection.cpp
     world/TestChunkColumn.cpp
     world/TestBlockRegistry.cpp
