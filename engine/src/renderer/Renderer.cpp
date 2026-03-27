@@ -4,6 +4,7 @@
 #include "voxel/core/Log.h"
 #include "voxel/game/Window.h"
 #include "voxel/renderer/Camera.h"
+#include "voxel/renderer/DescriptorAllocator.h"
 #include "voxel/renderer/ImGuiBackend.h"
 #include "voxel/renderer/StagingBuffer.h"
 #include "voxel/renderer/VulkanContext.h"
@@ -31,47 +32,6 @@ core::Result<void> Renderer::init(const std::string& shaderDir, game::Window& wi
         return std::unexpected(frameResult.error());
     }
 
-    // Create pipeline layout (shared by fill and wireframe pipelines)
-    VkPipelineLayoutCreateInfo layoutInfo{};
-    layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    VkResult layoutResult =
-        vkCreatePipelineLayout(m_vulkanContext.getDevice(), &layoutInfo, nullptr, &m_pipelineLayout);
-    if (layoutResult != VK_SUCCESS)
-    {
-        VX_LOG_ERROR("Failed to create pipeline layout: {}", static_cast<int>(layoutResult));
-        return std::unexpected(
-            core::EngineError::vulkan(static_cast<int32_t>(layoutResult), "Failed to create pipeline layout"));
-    }
-
-    std::string vertPath = shaderDir + "/triangle.vert.spv";
-    std::string fragPath = shaderDir + "/triangle.frag.spv";
-
-    // Fill pipeline (required)
-    auto fillResult = buildPipeline({VK_POLYGON_MODE_FILL, true, true, vertPath, fragPath});
-    if (!fillResult.has_value())
-    {
-        return std::unexpected(fillResult.error());
-    }
-    m_pipeline = fillResult.value();
-
-    // Wireframe pipeline (optional)
-    auto wireResult = buildPipeline({VK_POLYGON_MODE_LINE, true, true, vertPath, fragPath});
-    if (!wireResult.has_value())
-    {
-        VX_LOG_WARN("Wireframe pipeline creation failed — wireframe mode disabled");
-    }
-    else
-    {
-        m_wireframePipeline = wireResult.value();
-    }
-
-    // Create depth buffer and other extent-dependent resources
-    auto swapResResult = createSwapchainResources();
-    if (!swapResResult.has_value())
-    {
-        return std::unexpected(swapResResult.error());
-    }
-
     // Create staging buffer for CPU→GPU uploads
     auto stagingResult = StagingBuffer::create(m_vulkanContext);
     if (!stagingResult.has_value())
@@ -87,6 +47,113 @@ core::Result<void> Renderer::init(const std::string& shaderDir, game::Window& wi
         return std::unexpected(gigaResult.error());
     }
     m_gigabuffer = std::move(gigaResult.value());
+
+    VkDevice device = m_vulkanContext.getDevice();
+
+    // Create descriptor allocator
+    m_descriptorAllocator = std::make_unique<DescriptorAllocator>(device);
+
+    // Build chunk descriptor set layout:
+    //   binding 0 = SSBO (gigabuffer, vertex stage)
+    //   binding 1 = SSBO (ChunkRenderInfo per-draw data, vertex stage)
+    DescriptorLayoutBuilder layoutBuilder;
+    auto chunkLayoutResult = layoutBuilder
+                                 .addBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT)
+                                 .addBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT)
+                                 .build(device);
+    if (!chunkLayoutResult.has_value())
+    {
+        return std::unexpected(chunkLayoutResult.error());
+    }
+    m_chunkDescriptorSetLayout = chunkLayoutResult.value();
+
+    // Define push constant range for VP matrix + time
+    VkPushConstantRange pushRange{};
+    pushRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    pushRange.offset = 0;
+    pushRange.size = sizeof(ChunkPushConstants);
+
+    // Create pipeline layout with descriptor set layout and push constants
+    VkPipelineLayoutCreateInfo layoutInfo{};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    layoutInfo.setLayoutCount = 1;
+    layoutInfo.pSetLayouts = &m_chunkDescriptorSetLayout;
+    layoutInfo.pushConstantRangeCount = 1;
+    layoutInfo.pPushConstantRanges = &pushRange;
+
+    VkResult layoutResult = vkCreatePipelineLayout(device, &layoutInfo, nullptr, &m_pipelineLayout);
+    if (layoutResult != VK_SUCCESS)
+    {
+        VX_LOG_ERROR("Failed to create pipeline layout: {}", static_cast<int>(layoutResult));
+        return std::unexpected(
+            core::EngineError::vulkan(static_cast<int32_t>(layoutResult), "Failed to create pipeline layout"));
+    }
+
+    std::string vertPath = shaderDir + "/triangle.vert.spv";
+    std::string fragPath = shaderDir + "/triangle.frag.spv";
+
+    // Fill pipeline (required)
+    PipelineConfig fillConfig;
+    fillConfig.polygonMode = VK_POLYGON_MODE_FILL;
+    fillConfig.depthTestEnable = true;
+    fillConfig.depthWriteEnable = true;
+    fillConfig.vertShaderPath = vertPath;
+    fillConfig.fragShaderPath = fragPath;
+    fillConfig.descriptorSetLayouts = {m_chunkDescriptorSetLayout};
+    fillConfig.pushConstantRanges = {pushRange};
+
+    auto fillResult = buildPipeline(fillConfig);
+    if (!fillResult.has_value())
+    {
+        return std::unexpected(fillResult.error());
+    }
+    m_pipeline = fillResult.value();
+
+    // Wireframe pipeline (optional)
+    PipelineConfig wireConfig = fillConfig;
+    wireConfig.polygonMode = VK_POLYGON_MODE_LINE;
+
+    auto wireResult = buildPipeline(wireConfig);
+    if (!wireResult.has_value())
+    {
+        VX_LOG_WARN("Wireframe pipeline creation failed — wireframe mode disabled");
+    }
+    else
+    {
+        m_wireframePipeline = wireResult.value();
+    }
+
+    // Allocate chunk descriptor set and write gigabuffer to binding 0
+    auto descriptorSetResult = m_descriptorAllocator->allocate(m_chunkDescriptorSetLayout);
+    if (!descriptorSetResult.has_value())
+    {
+        return std::unexpected(descriptorSetResult.error());
+    }
+    m_chunkDescriptorSet = descriptorSetResult.value();
+
+    // Write binding 0: gigabuffer SSBO
+    VkDescriptorBufferInfo gigabufferInfo{};
+    gigabufferInfo.buffer = m_gigabuffer->getBuffer();
+    gigabufferInfo.offset = 0;
+    gigabufferInfo.range = VK_WHOLE_SIZE;
+
+    VkWriteDescriptorSet descriptorWrite{};
+    descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrite.dstSet = m_chunkDescriptorSet;
+    descriptorWrite.dstBinding = 0;
+    descriptorWrite.descriptorCount = 1;
+    descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    descriptorWrite.pBufferInfo = &gigabufferInfo;
+
+    vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
+    // Binding 1 left unwritten — ChunkRenderInfo SSBO created in Story 6.3
+
+    // Create depth buffer and other extent-dependent resources
+    auto swapResResult = createSwapchainResources();
+    if (!swapResResult.has_value())
+    {
+        return std::unexpected(swapResResult.error());
+    }
 
     // Initialize ImGui
     auto imguiResult = ImGuiBackend::create(m_vulkanContext, window.getHandle());
@@ -780,6 +847,16 @@ void Renderer::shutdown()
     {
         vkDestroyPipeline(device, m_pipeline, nullptr);
         m_pipeline = VK_NULL_HANDLE;
+    }
+
+    // Destroy descriptor infrastructure (pools first, then layout, then pipeline layout)
+    m_chunkDescriptorSet = VK_NULL_HANDLE; // owned by pool, destroyed with it
+    m_descriptorAllocator.reset();
+
+    if (m_chunkDescriptorSetLayout != VK_NULL_HANDLE)
+    {
+        vkDestroyDescriptorSetLayout(device, m_chunkDescriptorSetLayout, nullptr);
+        m_chunkDescriptorSetLayout = VK_NULL_HANDLE;
     }
 
     if (m_pipelineLayout != VK_NULL_HANDLE)

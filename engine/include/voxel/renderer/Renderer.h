@@ -7,6 +7,8 @@
 #include <vk_mem_alloc.h>
 #include <volk.h>
 
+#include <glm/glm.hpp>
+
 #include <array>
 #include <cstdint>
 #include <memory>
@@ -22,9 +24,19 @@ namespace voxel::renderer
 {
 
 class Camera;
+class DescriptorAllocator;
 class ImGuiBackend;
 class StagingBuffer;
 class VulkanContext;
+
+/// Push constants for chunk rendering: VP matrix + animation time.
+struct ChunkPushConstants
+{
+    glm::mat4 viewProjection; // 64 bytes
+    float time;               // 4 bytes
+    float padding[3];         // 12 bytes (align to 16)
+};
+static_assert(sizeof(ChunkPushConstants) == 80);
 
 /**
  * @brief Per-frame synchronization and command recording resources.
@@ -102,6 +114,11 @@ class Renderer
     /// Requests a screenshot to be captured after the next present. Saved as PNG to the given path.
     void requestScreenshot(const std::string& outputPath);
 
+    [[nodiscard]] VkDescriptorSetLayout getChunkDescriptorSetLayout() const { return m_chunkDescriptorSetLayout; }
+    [[nodiscard]] VkDescriptorSet getChunkDescriptorSet() const { return m_chunkDescriptorSet; }
+    [[nodiscard]] DescriptorAllocator& getDescriptorAllocator() { return *m_descriptorAllocator; }
+    [[nodiscard]] VkPipelineLayout getPipelineLayout() const { return m_pipelineLayout; }
+
   private:
     /// Extent-dependent resources that must be recreated on swapchain resize.
     struct SwapchainResources
@@ -119,6 +136,8 @@ class Renderer
         bool depthWriteEnable = true;
         std::string vertShaderPath;
         std::string fragShaderPath;
+        std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
+        std::vector<VkPushConstantRange> pushConstantRanges;
     };
 
     core::Result<void> createFrameResources();
@@ -141,6 +160,10 @@ class Renderer
     VkPipelineLayout m_pipelineLayout = VK_NULL_HANDLE;
     VkPipeline m_pipeline = VK_NULL_HANDLE;
     VkPipeline m_wireframePipeline = VK_NULL_HANDLE;
+
+    std::unique_ptr<DescriptorAllocator> m_descriptorAllocator;
+    VkDescriptorSetLayout m_chunkDescriptorSetLayout = VK_NULL_HANDLE;
+    VkDescriptorSet m_chunkDescriptorSet = VK_NULL_HANDLE;
 
     std::unique_ptr<StagingBuffer> m_stagingBuffer;
     std::unique_ptr<Gigabuffer> m_gigabuffer;

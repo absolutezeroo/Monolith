@@ -9,6 +9,7 @@ add_library(VoxelEngine STATIC
         src/game/GameLoop.cpp
         src/renderer/VmaImpl.cpp
         src/renderer/VulkanContext.cpp
+        src/renderer/DescriptorAllocator.cpp
         src/renderer/Renderer.cpp
         src/renderer/Gigabuffer.cpp
         src/renderer/StagingBuffer.cpp

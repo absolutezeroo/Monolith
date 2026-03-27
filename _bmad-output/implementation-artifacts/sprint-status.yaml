@@ -5,7 +5,7 @@
 project: VoxelForge
 methodology: BMAD v6 + Game Dev Studio
 created: 2026-03-24
-last_updated: 2026-03-27  # Story 5.7 → done (code review passed)
+last_updated: 2026-03-27  # Story 6.0 → review
 
 # Status values: backlog | ready | in-progress | review | done | blocked
 
@@ -203,11 +203,11 @@ epics:
     stories:
       - id: "6.0"
         title: "Vulkan Descriptor Infrastructure"
-        status: ready-for-dev
+        status: review
         assigned_to: dev-agent
       - id: "6.1"
         title: "Shared Quad Index Buffer"
-        status: ready-for-dev
+        status: in-progress
         assigned_to: dev-agent
       - id: "6.2"
         title: "Vertex Pulling Shader (chunk.vert / chunk.frag)"

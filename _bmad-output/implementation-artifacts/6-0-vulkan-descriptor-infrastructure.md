@@ -1,6 +1,6 @@
 # Story 6.0: Vulkan Descriptor Infrastructure
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -24,57 +24,57 @@ so that Stories 6.2–6.6 can bind SSBOs and texture arrays without each one rei
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: Create DescriptorAllocator** (AC: #1)
-  - [ ] 1.1 Create `engine/include/voxel/renderer/DescriptorAllocator.h`
-  - [ ] 1.2 Create `engine/src/renderer/DescriptorAllocator.cpp`
-  - [ ] 1.3 Constructor takes `VkDevice`
-  - [ ] 1.4 Implement `allocate(VkDescriptorSetLayout) → Result<VkDescriptorSet>` — tries current pool, creates new pool on `VK_ERROR_OUT_OF_POOL_MEMORY` or `VK_ERROR_FRAGMENTED_POOL`
-  - [ ] 1.5 Implement `resetPools()` — resets all pools via `vkResetDescriptorPool`, moves all to free list
-  - [ ] 1.6 Implement destructor — `vkDestroyDescriptorPool` for all pools
-  - [ ] 1.7 Pool creation uses sensible defaults: 1000 max sets, balanced type counts (see Design section)
+- [x] **Task 1: Create DescriptorAllocator** (AC: #1)
+  - [x] 1.1 Create `engine/include/voxel/renderer/DescriptorAllocator.h`
+  - [x] 1.2 Create `engine/src/renderer/DescriptorAllocator.cpp`
+  - [x] 1.3 Constructor takes `VkDevice`
+  - [x] 1.4 Implement `allocate(VkDescriptorSetLayout) → Result<VkDescriptorSet>` — tries current pool, creates new pool on `VK_ERROR_OUT_OF_POOL_MEMORY` or `VK_ERROR_FRAGMENTED_POOL`
+  - [x] 1.5 Implement `resetPools()` — resets all pools via `vkResetDescriptorPool`, moves all to free list
+  - [x] 1.6 Implement destructor — `vkDestroyDescriptorPool` for all pools
+  - [x] 1.7 Pool creation uses sensible defaults: 1000 max sets, balanced type counts (see Design section)
 
-- [ ] **Task 2: Create DescriptorLayoutBuilder** (AC: #2)
-  - [ ] 2.1 Define `DescriptorLayoutBuilder` struct in `DescriptorAllocator.h` (small helper, same header is fine)
-  - [ ] 2.2 `addBinding(uint32_t binding, VkDescriptorType type, VkShaderStageFlags stageFlags, uint32_t count = 1) → DescriptorLayoutBuilder&`
-  - [ ] 2.3 `build(VkDevice device) → Result<VkDescriptorSetLayout>`
-  - [ ] 2.4 `clear()` — resets bindings for reuse
+- [x] **Task 2: Create DescriptorLayoutBuilder** (AC: #2)
+  - [x] 2.1 Define `DescriptorLayoutBuilder` struct in `DescriptorAllocator.h` (small helper, same header is fine)
+  - [x] 2.2 `addBinding(uint32_t binding, VkDescriptorType type, VkShaderStageFlags stageFlags, uint32_t count = 1) → DescriptorLayoutBuilder&`
+  - [x] 2.3 `build(VkDevice device) → Result<VkDescriptorSetLayout>`
+  - [x] 2.4 `clear()` — resets bindings for reuse
 
-- [ ] **Task 3: Update PipelineConfig and buildPipeline()** (AC: #3, #5)
-  - [ ] 3.1 Add `std::vector<VkDescriptorSetLayout> descriptorSetLayouts` to `PipelineConfig`
-  - [ ] 3.2 Add `std::vector<VkPushConstantRange> pushConstantRanges` to `PipelineConfig`
-  - [ ] 3.3 In `Renderer::init()`, move pipeline layout creation into `buildPipeline()` or create a separate `createPipelineLayout()` method that uses PipelineConfig fields
-  - [ ] 3.4 Update `buildPipeline()` to pass `descriptorSetLayouts` and `pushConstantRanges` to `VkPipelineLayoutCreateInfo`
-  - [ ] 3.5 Both `m_pipeline` and `m_wireframePipeline` share the same layout (already the case)
+- [x] **Task 3: Update PipelineConfig and buildPipeline()** (AC: #3, #5)
+  - [x] 3.1 Add `std::vector<VkDescriptorSetLayout> descriptorSetLayouts` to `PipelineConfig`
+  - [x] 3.2 Add `std::vector<VkPushConstantRange> pushConstantRanges` to `PipelineConfig`
+  - [x] 3.3 In `Renderer::init()`, move pipeline layout creation into `buildPipeline()` or create a separate `createPipelineLayout()` method that uses PipelineConfig fields
+  - [x] 3.4 Update `buildPipeline()` to pass `descriptorSetLayouts` and `pushConstantRanges` to `VkPipelineLayoutCreateInfo`
+  - [x] 3.5 Both `m_pipeline` and `m_wireframePipeline` share the same layout (already the case)
 
-- [ ] **Task 4: Create chunk rendering descriptor set layout** (AC: #4)
-  - [ ] 4.1 In `Renderer::init()`, use `DescriptorLayoutBuilder` to create the chunk layout:
+- [x] **Task 4: Create chunk rendering descriptor set layout** (AC: #4)
+  - [x] 4.1 In `Renderer::init()`, use `DescriptorLayoutBuilder` to create the chunk layout:
     - Binding 0: `VK_DESCRIPTOR_TYPE_STORAGE_BUFFER`, `VK_SHADER_STAGE_VERTEX_BIT` (gigabuffer)
     - Binding 1: `VK_DESCRIPTOR_TYPE_STORAGE_BUFFER`, `VK_SHADER_STAGE_VERTEX_BIT` (ChunkRenderInfo per-draw data)
-  - [ ] 4.2 Store as `m_chunkDescriptorSetLayout` on Renderer
-  - [ ] 4.3 Destroy in `Renderer::shutdown()` via `vkDestroyDescriptorSetLayout`
+  - [x] 4.2 Store as `m_chunkDescriptorSetLayout` on Renderer
+  - [x] 4.3 Destroy in `Renderer::shutdown()` via `vkDestroyDescriptorSetLayout`
 
-- [ ] **Task 5: Define push constant range** (AC: #5)
-  - [ ] 5.1 Define `ChunkPushConstants` struct: `glm::mat4 viewProjection` (64 bytes) + `float time` (4 bytes) + `float padding[3]` (12 bytes) = 80 bytes total
-  - [ ] 5.2 Create `VkPushConstantRange` for vertex stage, offset 0, size 80 bytes
-  - [ ] 5.3 Pass to PipelineConfig alongside the descriptor set layout
+- [x] **Task 5: Define push constant range** (AC: #5)
+  - [x] 5.1 Define `ChunkPushConstants` struct: `glm::mat4 viewProjection` (64 bytes) + `float time` (4 bytes) + `float padding[3]` (12 bytes) = 80 bytes total
+  - [x] 5.2 Create `VkPushConstantRange` for vertex stage, offset 0, size 80 bytes
+  - [x] 5.3 Pass to PipelineConfig alongside the descriptor set layout
 
-- [ ] **Task 6: Allocate and write chunk descriptor set** (AC: #6)
-  - [ ] 6.1 Create `DescriptorAllocator` instance (owned by Renderer)
-  - [ ] 6.2 Allocate a descriptor set from the chunk layout
-  - [ ] 6.3 Write binding 0: `VkDescriptorBufferInfo` with `Gigabuffer::getBuffer()`, offset=0, range=`VK_WHOLE_SIZE`
-  - [ ] 6.4 Write binding 1 with a dummy/placeholder (null buffer or skip) — Story 6.3 will provide the real ChunkRenderInfo SSBO
-  - [ ] 6.5 Store as `m_chunkDescriptorSet` on Renderer
+- [x] **Task 6: Allocate and write chunk descriptor set** (AC: #6)
+  - [x] 6.1 Create `DescriptorAllocator` instance (owned by Renderer)
+  - [x] 6.2 Allocate a descriptor set from the chunk layout
+  - [x] 6.3 Write binding 0: `VkDescriptorBufferInfo` with `Gigabuffer::getBuffer()`, offset=0, range=`VK_WHOLE_SIZE`
+  - [x] 6.4 Write binding 1 with a dummy/placeholder (null buffer or skip) — Story 6.3 will provide the real ChunkRenderInfo SSBO
+  - [x] 6.5 Store as `m_chunkDescriptorSet` on Renderer
 
-- [ ] **Task 7: Expose descriptor infrastructure for downstream stories** (AC: #4, #6)
-  - [ ] 7.1 Add public accessor: `VkDescriptorSetLayout getChunkDescriptorSetLayout() const`
-  - [ ] 7.2 Add public accessor: `VkDescriptorSet getChunkDescriptorSet() const`
-  - [ ] 7.3 Add public accessor: `DescriptorAllocator& getDescriptorAllocator()`
-  - [ ] 7.4 Add public accessor: `VkPipelineLayout getPipelineLayout() const`
+- [x] **Task 7: Expose descriptor infrastructure for downstream stories** (AC: #4, #6)
+  - [x] 7.1 Add public accessor: `VkDescriptorSetLayout getChunkDescriptorSetLayout() const`
+  - [x] 7.2 Add public accessor: `VkDescriptorSet getChunkDescriptorSet() const`
+  - [x] 7.3 Add public accessor: `DescriptorAllocator& getDescriptorAllocator()`
+  - [x] 7.4 Add public accessor: `VkPipelineLayout getPipelineLayout() const`
 
-- [ ] **Task 8: Build system** (AC: all)
-  - [ ] 8.1 Add `src/renderer/DescriptorAllocator.cpp` to `engine/CMakeLists.txt`
-  - [ ] 8.2 Verify build succeeds with zero Vulkan validation errors on startup
-  - [ ] 8.3 Verify all existing tests still pass (no regressions)
+- [x] **Task 8: Build system** (AC: all)
+  - [x] 8.1 Add `src/renderer/DescriptorAllocator.cpp` to `engine/CMakeLists.txt`
+  - [x] 8.2 Verify build succeeds with zero Vulkan validation errors on startup
+  - [x] 8.3 Verify all existing tests still pass (no regressions)
 
 ## Dev Notes
 
@@ -486,8 +486,34 @@ The following features are enabled in VulkanContext.cpp and are relevant to this
 
 ### Agent Model Used
 
+Claude Opus 4.6
+
 ### Debug Log References
+
+- Build: 0 errors, 0 warnings
+- Tests: 158 test cases, 482,958 assertions — all passed, zero regressions
 
 ### Completion Notes List
 
+- Created `DescriptorAllocator` with automatic pool growth (SETS_PER_POOL=1000), balanced pool sizes (SSBO 2x, UBO 1x, sampler 1x, storage image 0.5x), RAII cleanup
+- Created `DescriptorLayoutBuilder` with chained `addBinding()` API and `build()` returning `Result<VkDescriptorSetLayout>`
+- Extended `PipelineConfig` with `descriptorSetLayouts` and `pushConstantRanges` vectors
+- Defined `ChunkPushConstants` struct (80 bytes: mat4 VP + float time + float[3] padding) with `static_assert`
+- Built chunk descriptor set layout: binding 0 = SSBO (gigabuffer), binding 1 = SSBO (ChunkRenderInfo)
+- Pipeline layout now includes chunk descriptor set layout + push constant range
+- Allocated chunk descriptor set, wrote gigabuffer to binding 0 via `vkUpdateDescriptorSets`; binding 1 left unwritten (Story 6.3)
+- Added 4 public accessors on Renderer for downstream stories
+- Reordered `init()`: staging buffer and gigabuffer created before descriptor setup (gigabuffer needed for descriptor write)
+- Shutdown destroys in safe order: pools → descriptor set layout → pipeline layout
+
+### Change Log
+
+- 2026-03-27: Implemented Story 6.0 — Vulkan descriptor infrastructure for GPU-driven rendering (all 8 tasks)
+
 ### File List
+
+- `engine/include/voxel/renderer/DescriptorAllocator.h` (NEW)
+- `engine/src/renderer/DescriptorAllocator.cpp` (NEW)
+- `engine/include/voxel/renderer/Renderer.h` (MODIFIED)
+- `engine/src/renderer/Renderer.cpp` (MODIFIED)
+- `engine/CMakeLists.txt` (MODIFIED)
