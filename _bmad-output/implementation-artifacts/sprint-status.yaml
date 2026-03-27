@@ -5,7 +5,7 @@
 project: VoxelForge
 methodology: BMAD v6 + Game Dev Studio
 created: 2026-03-24
-last_updated: 2026-03-27  # Story 5.5 → review
+last_updated: 2026-03-27  # Story 5.5 → done
 
 # Status values: backlog | ready | in-progress | review | done | blocked
 
@@ -184,7 +184,7 @@ epics:
         assigned_to: dev-agent
       - id: "5.5"
         title: "Block Tinting + Waving Animation in Vertex Format"
-        status: review
+        status: done
         assigned_to: dev-agent
       - id: "5.6"
         title: "Async Mesh Jobs via enkiTS"
@@ -198,13 +198,13 @@ epics:
   - id: 6
     name: "GPU-Driven Rendering"
     priority: P0
-    status: backlog
+    status: in-progress
     dependencies: [ 2, 5 ]
     stories:
       - id: "6.0"
         title: "Vulkan Descriptor Infrastructure"
-        status: backlog
-        assigned_to: null
+        status: ready-for-dev
+        assigned_to: dev-agent
       - id: "6.1"
         title: "Shared Quad Index Buffer"
         status: backlog
@@ -378,6 +378,6 @@ summary:
     ready-for-dev: 4
     in_progress: 0
     review: 0
-    done: 29
+    done: 30
     blocked: 0
   implementation_order: "5.3 (ready) → 5.3 (ready) → 5.4 (ready) → 5.5 (ready) → 5.6 → ..."

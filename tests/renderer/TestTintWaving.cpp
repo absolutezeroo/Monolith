@@ -212,6 +212,70 @@ TEST_CASE("Meshing integration with tint and waving", "[renderer][meshing][tint]
     }
 }
 
+// ── Greedy mesher tint/waving propagation ───────────────────────────────────
+
+TEST_CASE("Greedy mesher propagates tint and waving", "[renderer][meshing][tint]")
+{
+    BlockRegistry registry;
+    uint16_t stoneId = registerBlock(registry, "base:stone", 0, 0);
+    uint16_t grassId = registerBlock(registry, "base:grass_block", 1, 2);
+    MeshBuilder builder(registry);
+
+    SECTION("grass block quads carry tintIndex=1, wavingType=2 via greedy")
+    {
+        ChunkSection section;
+        section.setBlock(8, 8, 8, grassId);
+
+        ChunkMesh mesh = builder.buildGreedy(section, NO_NEIGHBORS);
+
+        REQUIRE(mesh.quadCount == 6);
+        for (const uint64_t quad : mesh.quads)
+        {
+            REQUIRE(unpackTintIndex(quad) == 1);
+            REQUIRE(unpackWavingType(quad) == 2);
+        }
+    }
+
+    SECTION("stone block quads carry tintIndex=0, wavingType=0 via greedy")
+    {
+        ChunkSection section;
+        section.setBlock(8, 8, 8, stoneId);
+
+        ChunkMesh mesh = builder.buildGreedy(section, NO_NEIGHBORS);
+
+        REQUIRE(mesh.quadCount == 6);
+        for (const uint64_t quad : mesh.quads)
+        {
+            REQUIRE(unpackTintIndex(quad) == 0);
+            REQUIRE(unpackWavingType(quad) == 0);
+        }
+    }
+
+    SECTION("mixed blocks carry correct tint/waving per block type via greedy")
+    {
+        ChunkSection section;
+        section.setBlock(4, 8, 8, stoneId);
+        section.setBlock(8, 8, 8, grassId);
+
+        ChunkMesh mesh = builder.buildGreedy(section, NO_NEIGHBORS);
+
+        for (const uint64_t quad : mesh.quads)
+        {
+            uint16_t blockId = unpackBlockStateId(quad);
+            if (blockId == stoneId)
+            {
+                REQUIRE(unpackTintIndex(quad) == 0);
+                REQUIRE(unpackWavingType(quad) == 0);
+            }
+            else if (blockId == grassId)
+            {
+                REQUIRE(unpackTintIndex(quad) == 1);
+                REQUIRE(unpackWavingType(quad) == 2);
+            }
+        }
+    }
+}
+
 // ── AC8: TintPalette tests ─────────────────────────────────────────────────
 
 TEST_CASE("TintPalette", "[renderer][tint]")

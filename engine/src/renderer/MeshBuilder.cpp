@@ -316,6 +316,7 @@ void greedyMergeFace(
     uint16_t* sliceMasks,
     const uint8_t* aoKeys,
     const std::array<uint16_t, PAD_VOLUME>& blockPad,
+    const world::BlockRegistry& registry,
     std::vector<uint64_t>& outQuads)
 {
     for (int slice = 0; slice < S; ++slice)
@@ -403,6 +404,7 @@ void greedyMergeFace(
                 std::array<uint8_t, 4> ao = {ao0, ao1, ao2, ao3};
                 bool flip = shouldFlipQuad(ao);
 
+                const world::BlockDefinition& blockDef = registry.getBlockType(type);
                 uint64_t quad = packQuad(
                     static_cast<uint8_t>(lx),
                     static_cast<uint8_t>(ly),
@@ -415,7 +417,9 @@ void greedyMergeFace(
                     ao1,
                     ao2,
                     ao3,
-                    flip);
+                    flip,
+                    blockDef.tintIndex,
+                    blockDef.waving);
                 outQuads.push_back(quad);
             }
         }
@@ -647,7 +651,7 @@ ChunkMesh MeshBuilder::buildGreedy(
 
         buildFaceMasks(faceIdx, ws.cubicOpacityPad, masks);
         buildAOKeys(faceIdx, masks, ws.opacityPad, aoKeys);
-        greedyMergeFace(faceIdx, masks, aoKeys, ws.blockPad, mesh.quads);
+        greedyMergeFace(faceIdx, masks, aoKeys, ws.blockPad, m_registry, mesh.quads);
     }
 
     // Pass 2 — Transparent FullCube blocks: separate face masks, same AO-aware merge.
@@ -658,7 +662,7 @@ ChunkMesh MeshBuilder::buildGreedy(
 
         buildTransparentFaceMasks(faceIdx, ws.blockPad, ws.opacityPad, m_registry, masks);
         buildAOKeys(faceIdx, masks, ws.opacityPad, aoKeys);
-        greedyMergeFace(faceIdx, masks, aoKeys, ws.blockPad, mesh.quads);
+        greedyMergeFace(faceIdx, masks, aoKeys, ws.blockPad, m_registry, mesh.quads);
     }
 
     mesh.quadCount = static_cast<uint32_t>(mesh.quads.size());

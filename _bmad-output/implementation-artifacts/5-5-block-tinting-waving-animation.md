@@ -1,6 +1,6 @@
 # Story 5.5: Block Tinting + Waving Animation in Vertex Format
 
-Status: review
+Status: done
 
 ## Story
 
@@ -70,18 +70,18 @@ Bit range   Width   Field                  Set by      Status
 [0:5]       6       X position (0-63)      Story 5.1   Done
 [6:11]      6       Y position (0-63)      Story 5.1   Done
 [12:17]     6       Z position (0-63)      Story 5.1   Done
-[18:23]     6       Width - 1 (0-63)       Story 5.3   Ready
-[24:29]     6       Height - 1 (0-63)      Story 5.3   Ready
-[30:39]     10      Block state ID         Story 5.1   Done
-[40:42]     3       Face direction (0-5)   Story 5.1   Done
-[43:44]     2       AO corner 0 (0-3)     Story 5.2   Review
-[45:46]     2       AO corner 1 (0-3)     Story 5.2   Review
-[47:48]     2       AO corner 2 (0-3)     Story 5.2   Review
-[49:50]     2       AO corner 3 (0-3)     Story 5.2   Review
-[51]        1       Quad diagonal flip     Story 5.2   Review
-[52:54]     3       Tint index (0-7)       Story 5.5   THIS STORY
-[55:56]     2       Waving type (0-3)      Story 5.5   THIS STORY
-[57:63]     7       Reserved               —           Future
+[18:23]     6       Width - 1 (0-63)       Story 5.3   Done
+[24:29]     6       Height - 1 (0-63)      Story 5.3   Done
+[30:45]     16      Block state ID (0-65535) Story 5.1 Done
+[46:48]     3       Face direction (0-5)   Story 5.1   Done
+[49:50]     2       AO corner 0 (0-3)     Story 5.2   Done
+[51:52]     2       AO corner 1 (0-3)     Story 5.2   Done
+[53:54]     2       AO corner 2 (0-3)     Story 5.2   Done
+[55:56]     2       AO corner 3 (0-3)     Story 5.2   Done
+[57]        1       Quad diagonal flip     Story 5.2   Done
+[58]        1       Non-cubic flag         Story 5.4   Done
+[59:61]     3       Tint index (0-7)       Story 5.5   THIS STORY
+[62:63]     2       Waving type (0-3)      Story 5.5   THIS STORY
 ```
 
 **Known constraint**: Future Story 8.0 needs 8 bits for light data (sky:4 + block:4) but only 7 reserved bits remain. Story 8.0 will need to either reduce light precision to 7 bits total (sky:4 + block:3 or sky:3 + block:4), or restructure the format (e.g., reduce AO from 2-bit to 1-bit per corner, freeing 4 bits). This is Story 8.0's problem — do NOT preemptively solve it here.
@@ -408,8 +408,13 @@ Claude Opus 4.6
 - Created TintPalette class with buildForBiome() factory for all 8 BiomeType values
 - 168 assertions in 3 new test cases (roundtrip, meshing integration, TintPalette)
 - Full regression suite: 474,563 assertions in 135 test cases — all pass
-- Greedy mesher not modified per story spec — uses default tint=0/waving=0 via defaulted params
 - Non-cubic ModelVertex flags field not wired (out of scope, existing comment documents intent)
+
+### Code Review Fixes Applied
+- Wired tint/waving into greedy mesher: `greedyMergeFace()` now accepts `BlockRegistry` and passes `blockDef.tintIndex`/`blockDef.waving` to `packQuad()` — both opaque and transparent passes
+- Added greedy mesher tint/waving test case (3 sections: grass, stone, mixed blocks)
+- Fixed story bit layout table: corrected blockStateId to 16-bit [30:45], updated all downstream bit offsets to match actual code
+- Full regression suite: 474,619 assertions in 136 test cases — all pass
 
 ### File List
 
