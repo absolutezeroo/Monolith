@@ -30,6 +30,7 @@ add_library(VoxelEngine STATIC
         src/renderer/MeshBuilder.cpp
         src/renderer/ModelMesher.cpp
         src/renderer/ModelRegistry.cpp
+        src/renderer/TintPalette.cpp
         src/world/WorldGenerator.cpp
         src/input/InputManager.cpp
 )

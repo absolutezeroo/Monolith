@@ -542,7 +542,9 @@ ChunkMesh MeshBuilder::buildNaive(
                             ao[1],
                             ao[2],
                             ao[3],
-                            flip);
+                            flip,
+                            blockDef.tintIndex,
+                            blockDef.waving);
                         mesh.quads.push_back(quad);
                     }
                 }

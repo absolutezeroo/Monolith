@@ -38,9 +38,8 @@ static constexpr uint8_t BLOCK_FACE_COUNT = 6;
 ///   [55:56] AO corner 3 (0-3)
 ///   [57]    Quad diagonal flip
 ///   [58]    Is non-cubic model (Story 5.4)
-///   [59:60] Tint index (Story 5.5)
-///   [61]    Waving flag (Story 5.5)
-///   [62:63] Reserved
+///   [59:61] Tint index (0-7)
+///   [62:63] Waving type (0-3)
 
 /// Pack a quad into the 64-bit format. Width and height default to 1 (no merge).
 /// AO corners default to 3 (no occlusion). All other future fields default to 0.
@@ -56,7 +55,9 @@ inline constexpr uint64_t packQuad(
     uint8_t ao1 = 3,
     uint8_t ao2 = 3,
     uint8_t ao3 = 3,
-    bool flip = false)
+    bool flip = false,
+    uint8_t tintIndex = 0,
+    uint8_t wavingType = 0)
 {
     uint64_t q = 0;
     q |= static_cast<uint64_t>(x & 0x3F);
@@ -71,6 +72,8 @@ inline constexpr uint64_t packQuad(
     q |= static_cast<uint64_t>(ao2 & 0x3) << 53;
     q |= static_cast<uint64_t>(ao3 & 0x3) << 55;
     q |= static_cast<uint64_t>(flip ? 1 : 0) << 57;
+    q |= static_cast<uint64_t>(tintIndex & 0x7) << 59;
+    q |= static_cast<uint64_t>(wavingType & 0x3) << 62;
     return q;
 }
 
@@ -111,6 +114,12 @@ inline constexpr std::array<uint8_t, 4> unpackAO(uint64_t quad)
 
 /// Unpack quad diagonal flip flag.
 inline constexpr bool unpackFlip(uint64_t quad) { return ((quad >> 57) & 0x1) != 0; }
+
+/// Unpack tint index (0-7).
+inline constexpr uint8_t unpackTintIndex(uint64_t quad) { return static_cast<uint8_t>((quad >> 59) & 0x7); }
+
+/// Unpack waving type (0-3).
+inline constexpr uint8_t unpackWavingType(uint64_t quad) { return static_cast<uint8_t>((quad >> 62) & 0x3); }
 
 /// Vertex format for non-cubic block models (slabs, crosses, torches, etc.).
 /// Used alongside the packed quad buffer for FullCube blocks.
