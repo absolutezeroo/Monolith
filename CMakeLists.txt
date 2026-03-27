@@ -35,7 +35,8 @@ compile_shaders(Shaders
 
 add_dependencies(VoxelGame Shaders)
 
-# Pass shader output directory to C++ so Renderer can find .spv files
+# Pass shader output directory and assets directory to C++ so the game can find resources
 target_compile_definitions(VoxelGame PRIVATE
     VX_SHADER_DIR="${CMAKE_BINARY_DIR}/shaders"
+    VX_ASSETS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets"
 )

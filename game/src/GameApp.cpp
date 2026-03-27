@@ -104,7 +104,8 @@ voxel::core::Result<void> GameApp::init(const std::string& shaderDir, std::optio
 
     // Register basic terrain blocks
     using voxel::world::BlockDefinition;
-    auto loadBlocksResult = m_blockRegistry.loadFromJson("assets/scripts/base/blocks.json");
+    std::string blocksPath = std::string(VX_ASSETS_DIR) + "/scripts/base/blocks.json";
+    auto loadBlocksResult = m_blockRegistry.loadFromJson(blocksPath);
     if (!loadBlocksResult.has_value())
     {
         return std::unexpected(loadBlocksResult.error());

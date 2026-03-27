@@ -1,6 +1,6 @@
 # Story 5.7: Mesh Upload to Gigabuffer
 
-Status: review
+Status: done
 
 ## Story
 
@@ -536,6 +536,7 @@ Claude Opus 4.6
 
 ### Change Log
 - 2026-03-27: Implemented Story 5.7 — Mesh Upload to Gigabuffer (all 10 tasks complete)
+- 2026-03-27: Code review fixes — (1) changed `isEmpty()` to `quadCount == 0` per AC9 to avoid 0-byte allocation for model-vertex-only sections, (2) added staging buffer `pendingTransferCount()` guard in `uploadSingle` to prevent silent rate-limit data corruption
 
 ### File List
 - engine/include/voxel/renderer/ChunkRenderInfo.h (NEW)

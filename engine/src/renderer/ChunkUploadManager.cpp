@@ -27,8 +27,8 @@ void ChunkUploadManager::processUploads(world::ChunkManager& chunkManager, const
     {
         SectionKey skey{entry.key.coord, entry.key.sectionY};
 
-        // Empty mesh — store None state, no allocation
-        if (entry.mesh->isEmpty())
+        // Empty mesh (no quads) — store None state, no allocation (AC9)
+        if (entry.mesh->quadCount == 0)
         {
             // If there was an existing Resident allocation, queue deferred free
             auto it = m_renderInfos.find(skey);
@@ -116,7 +116,13 @@ bool ChunkUploadManager::uploadSingle(const SectionKey& key, const ChunkMesh& me
         return true; // "consumed" the upload — caller should erase
     }
 
-    // 2. Stage the upload
+    // 2. Stage the upload — guard against silent rate-limit success (Pitfall #1)
+    if (m_stagingBuffer.pendingTransferCount() >= MAX_UPLOADS_PER_FRAME)
+    {
+        m_gigabuffer.free(*allocResult);
+        return false; // Staging budget exhausted — retry next frame
+    }
+
     auto uploadResult =
         m_stagingBuffer.uploadToGigabuffer(mesh.quads.data(), mesh.quadCount * sizeof(uint64_t), allocResult->offset);
     if (!uploadResult.has_value())

@@ -5,7 +5,7 @@
 project: VoxelForge
 methodology: BMAD v6 + Game Dev Studio
 created: 2026-03-24
-last_updated: 2026-03-27  # Story 5.7 → review
+last_updated: 2026-03-27  # Story 5.7 → done (code review passed)
 
 # Status values: backlog | ready | in-progress | review | done | blocked
 
@@ -192,7 +192,7 @@ epics:
         assigned_to: dev-agent
       - id: "5.7"
         title: "Mesh Upload to Gigabuffer"
-        status: review
+        status: done
         assigned_to: dev-agent
 
   - id: 6
@@ -375,9 +375,9 @@ summary:
     P2: 4
   by_status:
     backlog: 35
-    ready-for-dev: 4
+    ready-for-dev: 3
     in_progress: 0
     review: 0
-    done: 31
+    done: 32
     blocked: 0
   implementation_order: "5.3 (ready) → 5.3 (ready) → 5.4 (ready) → 5.5 (ready) → 5.6 → ..."

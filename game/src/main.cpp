@@ -58,7 +58,8 @@ int main(int argc, char* argv[])
         auto initResult = app.init(VX_SHADER_DIR, cliSeed);
         if (!initResult.has_value())
         {
-            VX_FATAL("Failed to initialize renderer");
+            VX_LOG_CRITICAL("Init failed: {}", initResult.error().message);
+            VX_FATAL("Failed to initialize");
         }
 
         app.run();
