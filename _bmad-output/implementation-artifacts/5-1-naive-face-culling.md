@@ -1,6 +1,6 @@
 # Story 5.1: Naive Face Culling (Baseline Mesher)
 
-Status: review
+Status: done
 
 ## Story
 
@@ -267,6 +267,8 @@ Claude Opus 4.6
 - `tests/renderer/TestMeshBuilder.cpp` (new)
 - `engine/CMakeLists.txt` (modified — added MeshBuilder.cpp)
 - `tests/CMakeLists.txt` (modified — added TestMeshBuilder.cpp)
+- `game/src/GameApp.cpp` (modified — replaced inline block registration with `loadFromJson()`)
 
 ### Change Log
 - 2026-03-27: Implemented Story 5.1 — Naive Face Culling (Baseline Mesher). All ACs satisfied, all tests pass.
+- 2026-03-27: [Code Review] Documented GameApp.cpp change (inline block registration → `loadFromJson()`).

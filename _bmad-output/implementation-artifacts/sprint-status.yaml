@@ -5,7 +5,7 @@
 project: VoxelForge
 methodology: BMAD v6 + Game Dev Studio
 created: 2026-03-24
-last_updated: 2026-03-27  # Story 5.3 (Binary Greedy Meshing) — ready-for-dev
+last_updated: 2026-03-27  # Story 5.1 code review passed — done
 
 # Status values: backlog | ready | in-progress | review | done | blocked
 
@@ -164,7 +164,7 @@ epics:
     stories:
       - id: "5.1"
         title: "Naive Face Culling (Baseline Mesher)"
-        status: review
+        status: done
         assigned_to: dev-agent
       - id: "5.2"
         title: "Ambient Occlusion Calculation"
@@ -370,10 +370,10 @@ summary:
     P1: 21
     P2: 4
   by_status:
-    backlog: 40
-    ready-for-dev: 4
+    backlog: 38
+    ready-for-dev: 2
     in_progress: 0
     review: 0
-    done: 25
+    done: 28
     blocked: 0
-  implementation_order: "4.3 (ready) → 4.4 (ready) → 4.5 (ready) → Epic 5..."
+  implementation_order: "5.2 (ready) → 5.3 (ready) → 5.4 → ..."
