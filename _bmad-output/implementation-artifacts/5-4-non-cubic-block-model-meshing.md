@@ -1,6 +1,6 @@
 # Story 5.4: Non-Cubic Block Model Meshing
 
-Status: review
+Status: done
 
 ## Story
 
@@ -278,14 +278,21 @@ Claude Opus 4.6
 - MSVC C4100 warning for unused `neighbors` parameter in `buildNonCubicPass()` — fixed with `[[maybe_unused]]`
 - Test failure: `getIdByName()` returns type index, not base state ID — when multi-state blocks (slab with 2 states) are registered before single-state blocks, the type index diverges from the base state ID. Fixed test helpers to use `registerBlock()` return value directly.
 
+### Code Review Fixes (Claude Opus 4.6)
+
+- **[M1] State ID passthrough**: All ModelMesher generators were using `blockDef.baseStateId` instead of the actual block state ID. Fixed by threading `stateId` (the real `blockId` from `section.getBlock()`) through `ModelRegistry::getModelVertices()` → `ModelMesher::generate*()`. Top slab state variants now report correct `blockStateId` in `ModelVertex`.
+- **[M2] Non-cubic face culling**: `buildNonCubicPass()` now computes a per-block `faceMask` by checking each of the 6 face neighbors. Faces occluded by a solid opaque `FullCube` neighbor are excluded. `emitBox()` only emits faces whose bit is set in the mask. Slab-on-stone now correctly culls the slab's bottom face (30 model vertices instead of 36).
+- **[L1] static_assert**: Added `static_assert(sizeof(ModelVertex) == 36)` to `ChunkMesh.h`.
+- **[L2] Redundant index**: Removed duplicate index computation in `buildCubicOpacityPad()`.
+
 ### Completion Notes List
 
-- **ModelVertex struct**: 36 bytes (position vec3, normal vec3, uv vec2, blockStateId u16, ao u8, flags u8). Stored in separate `modelVertices` vector on `ChunkMesh` alongside packed quads.
+- **ModelVertex struct**: 36 bytes (position vec3, normal vec3, uv vec2, blockStateId u16, ao u8, flags u8). Stored in separate `modelVertices` vector on `ChunkMesh` alongside packed quads. Compile-time size assertion added.
 - **isFullFace()**: Implemented as inline method on `BlockDefinition` taking `uint8_t faceIndex` (not `BlockFace`) to avoid world→renderer namespace dependency. Accepts optional `StateMap` for state-dependent models (slab half).
-- **ModelMesher**: Static methods generate triangle-list vertices (6 per face). Slab = 36 verts (half-height box), Cross = 24 verts (2 diagonal quads × front+back), Torch = 36 verts (thin box with wall offset).
-- **ModelRegistry**: Delegates to ModelMesher for Slab/Cross/Torch. Stubs log VX_LOG_WARN for unimplemented types. Appends directly to output vector (no intermediate allocation).
-- **MeshBuilder integration**: Naive mesher: cubic pass skips non-FullCube blocks and uses `isFullFace()` for neighbor face culling; `buildNonCubicPass()` emits model vertices. Greedy mesher: added `buildCubicOpacityPad()` that only marks FullCube opaque blocks, ensuring non-cubic blocks are excluded from face mask generation and greedy merging.
-- **Tests**: 130 test cases, 474,330 assertions, all pass. Non-cubic specific: 53 assertions across 3 test cases covering empty section, slab, cross, torch, face culling, ModelVertex fields, isFullFace truth table, ChunkMesh::isEmpty, greedy mesher non-cubic exclusion.
+- **ModelMesher**: Static methods generate triangle-list vertices (6 per face). Slab = up to 36 verts (half-height box, face-culled), Cross = 24 verts (2 diagonal quads × front+back), Torch = up to 36 verts (thin box with wall offset, face-culled). `emitBox()` accepts `faceMask` to skip occluded faces.
+- **ModelRegistry**: Delegates to ModelMesher for Slab/Cross/Torch, passing `stateId` and `faceMask`. Stubs log VX_LOG_WARN for unimplemented types. Appends directly to output vector (no intermediate allocation).
+- **MeshBuilder integration**: Naive mesher: cubic pass skips non-FullCube blocks and uses `isFullFace()` for neighbor face culling; `buildNonCubicPass()` computes per-block face visibility mask and emits model vertices. Greedy mesher: added `buildCubicOpacityPad()` that only marks FullCube opaque blocks, ensuring non-cubic blocks are excluded from face mask generation and greedy merging.
+- **Tests**: 132 test cases, 474,395 assertions, all pass. Non-cubic specific: 53 assertions across 3 test cases covering empty section, slab, cross, torch, face culling, ModelVertex fields, isFullFace truth table, ChunkMesh::isEmpty, greedy mesher non-cubic exclusion.
 
 ### File List
 
