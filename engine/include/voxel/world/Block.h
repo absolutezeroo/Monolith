@@ -119,6 +119,32 @@ struct BlockDefinition
     std::vector<BlockStateProperty> properties;
     uint16_t baseStateId = 0;
     uint16_t stateCount = 1;
+
+    /// Returns whether the given face fully covers the 1x1 block boundary.
+    /// Used for face culling between cubic and non-cubic blocks.
+    /// @param faceIndex Face direction index (matches BlockFace enum: PosX=0..NegZ=5).
+    /// @param state Current block state properties (needed for state-dependent models like Slab).
+    [[nodiscard]] bool isFullFace(uint8_t faceIndex, const StateMap& state = {}) const
+    {
+        switch (modelType)
+        {
+        case ModelType::FullCube:
+            return true;
+        case ModelType::Slab:
+        {
+            // PosY=2, NegY=3
+            auto it = state.find("half");
+            bool isTop = (it != state.end() && it->second == "top");
+            if (faceIndex == 2) // PosY
+                return isTop;
+            if (faceIndex == 3) // NegY
+                return !isTop;
+            return false; // Side faces are half-height
+        }
+        default:
+            return false;
+        }
+    }
 };
 
 } // namespace voxel::world

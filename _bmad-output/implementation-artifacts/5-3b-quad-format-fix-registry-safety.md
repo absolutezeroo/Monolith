@@ -1,6 +1,6 @@
 # Story 5.3b: Quad Format Fix + Registry Safety Hardening
 
-Status: review
+Status: done
 
 ## Story
 
@@ -65,10 +65,9 @@ engine/include/voxel/renderer/ChunkMesh.h        — quad format (pack/unpack/co
 engine/include/voxel/renderer/AmbientOcclusion.h  — getBlock → getBlockType (7 sites)
 engine/include/voxel/world/BlockRegistry.h         — rename getBlock → getBlockByTypeIndex
 engine/src/world/BlockRegistry.cpp                 — rename + safe fallback
-engine/src/renderer/MeshBuilder.cpp                — getBlock → getBlockType (1 site)
+engine/src/renderer/MeshBuilder.cpp                — getBlock → getBlockType (1 site), removed duplicate blockPadIndex() (uses padIndex from AO header), added default case to sliceToLocal switch
 tests/world/TestBlockRegistry.cpp                  — getBlock → getBlockByTypeIndex (~10 sites)
 tests/renderer/TestAmbientOcclusion.cpp            — add 2 cross-boundary tests
-tests/renderer/TestMeshBuilder.cpp                 — roundtrip tests verify new bit layout
 ```
 
 ### What NOT to do
@@ -112,6 +111,7 @@ Claude Opus 4.6
 ### Change Log
 
 - 2026-03-27: Implemented Story 5.3b — Quad format expanded to 16-bit state ID, registry access corrected, safe fallback added, cross-boundary AO tests added
+- 2026-03-27: Code review fix — Removed false TestMeshBuilder.cpp reference from Dev Notes (file was not modified); documented MeshBuilder.cpp cleanup (blockPadIndex removal, default switch case); added 5-3 story and sprint-status to File List
 
 ### File List
 
@@ -119,7 +119,9 @@ Claude Opus 4.6
 - engine/include/voxel/renderer/AmbientOcclusion.h (modified — getBlock → getBlockType, 7 sites)
 - engine/include/voxel/world/BlockRegistry.h (modified — rename getBlock → getBlockByTypeIndex)
 - engine/src/world/BlockRegistry.cpp (modified — rename + safe fallback in getBlockType)
-- engine/src/renderer/MeshBuilder.cpp (modified — getBlock → getBlockType, 1 site)
+- engine/src/renderer/MeshBuilder.cpp (modified — getBlock → getBlockType, removed duplicate blockPadIndex, added default switch case)
 - tests/world/TestBlockRegistry.cpp (modified — getBlock → getBlockByTypeIndex, ~30 sites + new out-of-range test)
 - tests/renderer/TestAmbientOcclusion.cpp (modified — 2 new cross-boundary tests)
 - _bmad-output/planning-artifacts/epics/epic-05-meshing-pipeline.md (modified — quad format table updated)
+- _bmad-output/implementation-artifacts/5-3-binary-greedy-meshing-implementation.md (modified — status → done, quad format table corrected to 5.2 layout)
+- _bmad-output/implementation-artifacts/sprint-status.yaml (modified — 5.3 → done, 5.3b → review)

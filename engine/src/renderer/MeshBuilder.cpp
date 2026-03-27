@@ -1,6 +1,7 @@
 #include "voxel/renderer/MeshBuilder.h"
 
 #include "voxel/renderer/AmbientOcclusion.h"
+#include "voxel/renderer/ModelRegistry.h"
 #include "voxel/world/Block.h"
 #include "voxel/world/BlockRegistry.h"
 #include "voxel/world/ChunkSection.h"
@@ -23,7 +24,8 @@ constexpr int S = world::ChunkSection::SIZE; // 16
 struct MeshWorkspace
 {
     std::array<uint16_t, PAD_VOLUME> blockPad{};
-    std::array<bool, OPACITY_PAD_VOLUME> opacityPad{};
+    std::array<bool, OPACITY_PAD_VOLUME> opacityPad{};     // Full opacity (for AO)
+    std::array<bool, OPACITY_PAD_VOLUME> cubicOpacityPad{}; // FullCube-only opacity (for face masks)
     std::array<uint16_t, 6 * S * S> faceMasks{};
 };
 
@@ -125,6 +127,35 @@ void buildBlockPad(
         for (int y = 0; y < S; ++y)
             for (int x = 0; x < S; ++x)
                 blockPad[padIndex(x + 1, y + 1, 0)] = neighbors[5]->getBlock(x, y, S - 1);
+    }
+}
+
+/// Build 18^3 padded opacity array that only marks FullCube opaque blocks as solid.
+/// Non-cubic blocks (slab, cross, torch, etc.) are treated as transparent for face mask generation,
+/// so cubic blocks always emit faces toward them and non-cubic blocks don't get face mask bits.
+void buildCubicOpacityPad(
+    std::array<bool, OPACITY_PAD_VOLUME>& cubicOpacity,
+    const std::array<uint16_t, PAD_VOLUME>& blockPad,
+    const world::BlockRegistry& registry)
+{
+    cubicOpacity.fill(false);
+
+    for (int py = 0; py < PAD; ++py)
+    {
+        for (int pz = 0; pz < PAD; ++pz)
+        {
+            for (int px = 0; px < PAD; ++px)
+            {
+                int blockIdx = (py * PAD + pz) * PAD + px;
+                int opacIdx = padIndex(px, py, pz);
+                uint16_t blockId = blockPad[blockIdx];
+                if (blockId != world::BLOCK_AIR)
+                {
+                    const world::BlockDefinition& def = registry.getBlockType(blockId);
+                    cubicOpacity[opacIdx] = !def.isTransparent && def.modelType == world::ModelType::FullCube;
+                }
+            }
+        }
     }
 }
 
@@ -250,6 +281,9 @@ ChunkMesh MeshBuilder::buildNaive(
     std::array<bool, OPACITY_PAD_VOLUME> opacity{};
     buildOpacityPad(opacity, section, neighbors, m_registry);
 
+    // Opposite face direction lookup: PosX↔NegX, PosY↔NegY, PosZ↔NegZ.
+    constexpr uint8_t OPPOSITE_FACE[6] = {1, 0, 3, 2, 5, 4};
+
     // Iterate in Y-Z-X order for cache-friendly access (matches flat array layout y*256 + z*16 + x).
     for (int y = 0; y < SIZE; ++y)
     {
@@ -265,13 +299,21 @@ ChunkMesh MeshBuilder::buildNaive(
                     continue;
                 }
 
+                const world::BlockDefinition& blockDef = m_registry.getBlockType(blockId);
+
+                // Skip non-cubic blocks — they are handled in buildNonCubicPass().
+                if (blockDef.modelType != world::ModelType::FullCube)
+                {
+                    continue;
+                }
+
                 // Check each of the 6 faces.
                 for (uint8_t f = 0; f < BLOCK_FACE_COUNT; ++f)
                 {
                     BlockFace face = static_cast<BlockFace>(f);
                     uint16_t neighborId = getAdjacentBlock(section, neighbors, x, y, z, face);
 
-                    // Emit face if neighbor is air or transparent.
+                    // Emit face if neighbor is air, transparent, or doesn't fully cover this face.
                     bool shouldEmit = false;
                     if (neighborId == world::BLOCK_AIR)
                     {
@@ -280,7 +322,16 @@ ChunkMesh MeshBuilder::buildNaive(
                     else
                     {
                         const world::BlockDefinition& neighborDef = m_registry.getBlockType(neighborId);
-                        shouldEmit = neighborDef.isTransparent;
+                        if (neighborDef.isTransparent)
+                        {
+                            shouldEmit = true;
+                        }
+                        else if (neighborDef.modelType != world::ModelType::FullCube)
+                        {
+                            // Non-cubic neighbor: check if it fully covers the opposite face.
+                            world::StateMap neighborState = m_registry.getStateValues(neighborId);
+                            shouldEmit = !neighborDef.isFullFace(OPPOSITE_FACE[f], neighborState);
+                        }
                     }
 
                     if (shouldEmit)
@@ -309,6 +360,10 @@ ChunkMesh MeshBuilder::buildNaive(
     }
 
     mesh.quadCount = static_cast<uint32_t>(mesh.quads.size());
+
+    // Second pass: generate model vertices for non-cubic blocks.
+    buildNonCubicPass(section, neighbors, mesh);
+
     return mesh;
 }
 
@@ -389,12 +444,15 @@ ChunkMesh MeshBuilder::buildGreedy(
     MeshWorkspace ws;
     buildBlockPad(ws.blockPad, section, neighbors);
     buildOpacityPad(ws.opacityPad, section, neighbors, m_registry);
+    buildCubicOpacityPad(ws.cubicOpacityPad, ws.blockPad, m_registry);
 
     // Phase 1 & 2: For each face direction, build face masks then greedy merge per slice.
+    // Uses cubicOpacityPad so only FullCube blocks generate face quads.
+    // Non-cubic blocks are handled by buildNonCubicPass.
     for (uint8_t faceIdx = 0; faceIdx < BLOCK_FACE_COUNT; ++faceIdx)
     {
         uint16_t* masks = &ws.faceMasks[faceIdx * S * S];
-        buildFaceMasks(faceIdx, ws.opacityPad, masks);
+        buildFaceMasks(faceIdx, ws.cubicOpacityPad, masks);
 
         for (int slice = 0; slice < S; ++slice)
         {
@@ -498,7 +556,45 @@ ChunkMesh MeshBuilder::buildGreedy(
     }
 
     mesh.quadCount = static_cast<uint32_t>(mesh.quads.size());
+
+    // Non-cubic pass for greedy mesher too.
+    buildNonCubicPass(section, neighbors, mesh);
+
     return mesh;
+}
+
+void MeshBuilder::buildNonCubicPass(
+    const world::ChunkSection& section,
+    [[maybe_unused]] const std::array<const world::ChunkSection*, 6>& neighbors,
+    ChunkMesh& mesh) const
+{
+    constexpr int SIZE = world::ChunkSection::SIZE;
+
+    for (int y = 0; y < SIZE; ++y)
+    {
+        for (int z = 0; z < SIZE; ++z)
+        {
+            for (int x = 0; x < SIZE; ++x)
+            {
+                uint16_t blockId = section.getBlock(x, y, z);
+                if (blockId == world::BLOCK_AIR)
+                {
+                    continue;
+                }
+
+                const world::BlockDefinition& blockDef = m_registry.getBlockType(blockId);
+                if (blockDef.modelType == world::ModelType::FullCube)
+                {
+                    continue;
+                }
+
+                world::StateMap state = m_registry.getStateValues(blockId);
+                m_modelRegistry.getModelVertices(x, y, z, blockDef, state, mesh.modelVertices);
+            }
+        }
+    }
+
+    mesh.modelVertexCount = static_cast<uint32_t>(mesh.modelVertices.size());
 }
 
 } // namespace voxel::renderer

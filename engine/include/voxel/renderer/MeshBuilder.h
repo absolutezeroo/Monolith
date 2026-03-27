@@ -1,6 +1,7 @@
 #pragma once
 
 #include "voxel/renderer/ChunkMesh.h"
+#include "voxel/renderer/ModelRegistry.h"
 
 #include <array>
 
@@ -14,6 +15,7 @@ namespace voxel::renderer
 {
 
 /// Builds chunk meshes using naive face culling or binary greedy meshing.
+/// Handles both cubic (quad path) and non-cubic (ModelVertex path) blocks.
 class MeshBuilder
 {
   public:
@@ -21,6 +23,7 @@ class MeshBuilder
 
     /// Build a mesh for a chunk section using naive face culling.
     /// Each visible face produces one quad (width=1, height=1, per-vertex AO computed).
+    /// Non-cubic blocks are emitted as ModelVertex data via a second pass.
     ///
     /// @param section The section to mesh (16x16x16 voxels).
     /// @param neighbors The 6 neighbor sections for boundary face culling.
@@ -33,6 +36,7 @@ class MeshBuilder
 
     /// Build a mesh for a chunk section using binary greedy meshing.
     /// Merges coplanar adjacent faces of the same block type into larger quads.
+    /// Non-cubic blocks are excluded from greedy merging and emitted via ModelVertex path.
     /// Same inputs/output as buildNaive() — callers can swap freely.
     ///
     /// @param section The section to mesh (16x16x16 voxels).
@@ -46,6 +50,7 @@ class MeshBuilder
 
   private:
     const world::BlockRegistry& m_registry;
+    ModelRegistry m_modelRegistry;
 
     /// Get the block ID adjacent to (x,y,z) in the given face direction.
     /// Returns the block from the neighbor section for boundary coordinates.
@@ -56,6 +61,12 @@ class MeshBuilder
         int y,
         int z,
         BlockFace face) const;
+
+    /// Build model vertices for all non-cubic blocks in the section.
+    void buildNonCubicPass(
+        const world::ChunkSection& section,
+        const std::array<const world::ChunkSection*, 6>& neighbors,
+        ChunkMesh& mesh) const;
 };
 
 } // namespace voxel::renderer

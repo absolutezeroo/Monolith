@@ -1,5 +1,7 @@
 #pragma once
 
+#include <glm/glm.hpp>
+
 #include <array>
 #include <cstdint>
 #include <vector>
@@ -110,11 +112,29 @@ inline constexpr std::array<uint8_t, 4> unpackAO(uint64_t quad)
 /// Unpack quad diagonal flip flag.
 inline constexpr bool unpackFlip(uint64_t quad) { return ((quad >> 57) & 0x1) != 0; }
 
+/// Vertex format for non-cubic block models (slabs, crosses, torches, etc.).
+/// Used alongside the packed quad buffer for FullCube blocks.
+struct ModelVertex
+{
+    glm::vec3 position; // World-relative position within chunk (0-16 range)
+    glm::vec3 normal;   // Face normal for lighting
+    glm::vec2 uv;       // Texture coordinates (0-1)
+    uint16_t blockStateId = 0;
+    uint8_t ao = 3;     // Ambient occlusion (0-3, same scale as quad AO)
+    uint8_t flags = 0;  // Bit 0: tint index LSB, Bits 1-2: waving type
+};
+
 /// Mesh data for a single chunk section.
 struct ChunkMesh
 {
     std::vector<uint64_t> quads;
     uint32_t quadCount = 0;
+
+    std::vector<ModelVertex> modelVertices;
+    uint32_t modelVertexCount = 0;
+
+    /// Returns true when the mesh contains no geometry at all.
+    [[nodiscard]] bool isEmpty() const { return quadCount == 0 && modelVertexCount == 0; }
 };
 
 } // namespace voxel::renderer

@@ -28,6 +28,8 @@ add_library(VoxelEngine STATIC
         src/world/SplineCurve.cpp
         src/world/StructureGenerator.cpp
         src/renderer/MeshBuilder.cpp
+        src/renderer/ModelMesher.cpp
+        src/renderer/ModelRegistry.cpp
         src/world/WorldGenerator.cpp
         src/input/InputManager.cpp
 )
