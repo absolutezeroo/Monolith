@@ -5,6 +5,7 @@
 #include "voxel/renderer/MeshJobTypes.h"
 #include "voxel/world/Block.h"
 #include "voxel/world/BlockRegistry.h"
+#include "voxel/world/ChunkManager.h"
 #include "voxel/world/ChunkSection.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -187,6 +188,44 @@ TEST_CASE("End-to-end: snapshot → dispatch via JobSystem → poll result", "[r
     refSection.setBlock(4, 4, 4, stoneId);
     ChunkMesh refMesh = builder.buildGreedy(refSection, NO_NEIGHBORS);
     REQUIRE(result->mesh.quadCount == refMesh.quadCount);
+
+    js.shutdown();
+}
+
+// ── Cancellation test (AC10) ────────────────────────────────────────────────────
+
+TEST_CASE("Cancellation: unloaded chunk results are discarded (AC10)", "[renderer][meshing][async]")
+{
+    BlockRegistry registry;
+    uint16_t stoneId = registerStone(registry);
+    MeshBuilder builder(registry);
+
+    JobSystem js;
+    auto initResult = js.init();
+    REQUIRE(initResult.has_value());
+
+    ChunkManager mgr;
+    mgr.setJobSystem(&js);
+    mgr.setMeshBuilder(&builder);
+
+    // Load chunk at (5,5) and place a block to make section 0 dirty
+    mgr.loadChunk({5, 5});
+    mgr.setBlock({5 * 16 + 8, 8, 5 * 16 + 8}, stoneId);
+
+    // Dispatch mesh task via update
+    mgr.update(glm::dvec3(88.0, 8.0, 88.0));
+
+    // Wait for in-flight tasks to complete — result is now in the queue
+    mgr.shutdown();
+
+    // Unload the chunk BEFORE polling results
+    mgr.unloadChunk({5, 5});
+
+    // Poll results — should discard because chunk is no longer loaded
+    mgr.update(glm::dvec3(0.0, 0.0, 0.0));
+
+    // Verify no mesh stored for the unloaded chunk
+    REQUIRE(mgr.getMesh({5, 5}, 0) == nullptr);
 
     js.shutdown();
 }

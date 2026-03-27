@@ -232,6 +232,77 @@ TEST_CASE("ChunkManager: setBlock marks correct section dirty", "[world][chunkma
     REQUIRE_FALSE(column->isSectionDirty(4));
 }
 
+TEST_CASE("ChunkManager: setBlock at X boundary marks neighbor chunk dirty (AC8)", "[world][chunkmanager]")
+{
+    ChunkManager mgr;
+    mgr.loadChunk({0, 0});
+    mgr.loadChunk({-1, 0});
+    mgr.loadChunk({1, 0});
+
+    SECTION("block at local x=0 marks NegX neighbor dirty")
+    {
+        // worldPos (0, 5, 5) → chunk (0,0), local (0, 5, 5) → x=0 boundary
+        mgr.setBlock({0, 5, 5}, 10);
+
+        REQUIRE(mgr.getChunk({0, 0})->isSectionDirty(0));
+        REQUIRE(mgr.getChunk({-1, 0})->isSectionDirty(0));
+        REQUIRE_FALSE(mgr.getChunk({1, 0})->isSectionDirty(0));
+    }
+
+    SECTION("block at local x=15 marks PosX neighbor dirty")
+    {
+        // worldPos (15, 5, 5) → chunk (0,0), local (15, 5, 5) → x=15 boundary
+        mgr.setBlock({15, 5, 5}, 10);
+
+        REQUIRE(mgr.getChunk({0, 0})->isSectionDirty(0));
+        REQUIRE(mgr.getChunk({1, 0})->isSectionDirty(0));
+        REQUIRE_FALSE(mgr.getChunk({-1, 0})->isSectionDirty(0));
+    }
+}
+
+TEST_CASE("ChunkManager: setBlock at Z boundary marks neighbor chunk dirty (AC8)", "[world][chunkmanager]")
+{
+    ChunkManager mgr;
+    mgr.loadChunk({0, 0});
+    mgr.loadChunk({0, -1});
+    mgr.loadChunk({0, 1});
+
+    SECTION("block at local z=0 marks NegZ neighbor dirty")
+    {
+        // worldPos (5, 5, 0) → chunk (0,0), local (5, 5, 0) → z=0 boundary
+        mgr.setBlock({5, 5, 0}, 10);
+
+        REQUIRE(mgr.getChunk({0, 0})->isSectionDirty(0));
+        REQUIRE(mgr.getChunk({0, -1})->isSectionDirty(0));
+        REQUIRE_FALSE(mgr.getChunk({0, 1})->isSectionDirty(0));
+    }
+
+    SECTION("block at local z=15 marks PosZ neighbor dirty")
+    {
+        // worldPos (5, 5, 15) → chunk (0,0), local (5, 5, 15) → z=15 boundary
+        mgr.setBlock({5, 5, 15}, 10);
+
+        REQUIRE(mgr.getChunk({0, 0})->isSectionDirty(0));
+        REQUIRE(mgr.getChunk({0, 1})->isSectionDirty(0));
+        REQUIRE_FALSE(mgr.getChunk({0, -1})->isSectionDirty(0));
+    }
+}
+
+TEST_CASE("ChunkManager: setBlock at interior position doesn't mark neighbor chunks dirty", "[world][chunkmanager]")
+{
+    ChunkManager mgr;
+    mgr.loadChunk({0, 0});
+    mgr.loadChunk({1, 0});
+    mgr.loadChunk({0, 1});
+
+    // worldPos (8, 5, 8) → chunk (0,0), local (8, 5, 8) — interior, no boundary
+    mgr.setBlock({8, 5, 8}, 10);
+
+    REQUIRE(mgr.getChunk({0, 0})->isSectionDirty(0));
+    REQUIRE_FALSE(mgr.getChunk({1, 0})->isSectionDirty(0));
+    REQUIRE_FALSE(mgr.getChunk({0, 1})->isSectionDirty(0));
+}
+
 TEST_CASE("ChunkManager: setBlock roundtrip with getBlock", "[world][chunkmanager]")
 {
     ChunkManager mgr;

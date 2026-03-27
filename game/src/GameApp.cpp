@@ -34,9 +34,10 @@ GameApp::GameApp(voxel::game::Window& window, voxel::renderer::VulkanContext& vu
 
 GameApp::~GameApp()
 {
-    // Shut down the job system BEFORE ChunkManager is destroyed.
-    // In-flight mesh tasks reference the MeshBuilder and push to ChunkManager's queue,
-    // so all tasks must complete before those objects are destroyed.
+    // Wait for all in-flight mesh tasks BEFORE any member destruction.
+    // Tasks hold non-owning pointers to MeshBuilder and push to ChunkManager's queue,
+    // so all tasks must complete while those objects are still alive.
+    m_chunkManager.shutdown();
     m_jobSystem.shutdown();
 
     // Save config on exit — sync all persisted settings back before writing

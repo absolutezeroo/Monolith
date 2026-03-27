@@ -126,6 +126,10 @@ class ChunkManager
     /// Number of chunk columns with at least one dirty section.
     [[nodiscard]] size_t dirtyChunkCount() const;
 
+    /// Wait for all in-flight mesh tasks to complete and clear tracking state.
+    /// Must be called before destruction when async meshing is active.
+    void shutdown();
+
     /// Main-thread update: poll completed mesh results, dispatch dirty sections for async meshing.
     /// playerPos is used for distance-based priority.
     void update(const glm::dvec3& playerPos);

@@ -156,6 +156,23 @@ size_t ChunkManager::dirtyChunkCount() const
     return count;
 }
 
+void ChunkManager::shutdown()
+{
+    if (m_jobSystem == nullptr)
+    {
+        return;
+    }
+
+    // Wait for every in-flight task so worker threads no longer reference
+    // MeshBuilder or the ConcurrentQueue owned by this ChunkManager.
+    for (auto& task : m_inFlightTasks)
+    {
+        m_jobSystem->getScheduler().WaitforTask(task.get());
+    }
+    m_inFlightTasks.clear();
+    m_inFlightKeys.clear();
+}
+
 void ChunkManager::update(const glm::dvec3& playerPos)
 {
     if (m_jobSystem == nullptr || m_meshBuilder == nullptr)

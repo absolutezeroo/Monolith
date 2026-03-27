@@ -1,6 +1,6 @@
 # Story 5.6: Async Mesh Jobs via enkiTS
 
-Status: review
+Status: done
 
 ## Story
 
@@ -685,3 +685,9 @@ Claude Opus 4.6
 
 ### Change Log
 - 2026-03-27: Story 5.6 implementation complete — all 12 tasks done, 145 test cases pass (0 regressions)
+- 2026-03-27: Code review fixes applied (3 issues):
+  - [H1] Added ChunkManager::shutdown() — waits for in-flight tasks before destruction, fixing use-after-free race on exit
+  - [M1] Added cancellation path test (AC10) — verifies unloaded chunk results are discarded
+  - [M2] Added X/Z boundary neighbor dirty invalidation tests (AC8) — 3 new test cases
+  - Updated GameApp::~GameApp() to call m_chunkManager.shutdown() before m_jobSystem.shutdown()
+  - 149 test cases pass (482,905 assertions, 0 regressions)
