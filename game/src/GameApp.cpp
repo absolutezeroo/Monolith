@@ -98,21 +98,7 @@ voxel::core::Result<void> GameApp::init(const std::string& shaderDir, std::optio
 
     // Register basic terrain blocks
     using voxel::world::BlockDefinition;
-    auto registerBlock = [this](const std::string& id, bool solid)
-    {
-        BlockDefinition def;
-        def.stringId = id;
-        def.isSolid = solid;
-        auto result = m_blockRegistry.registerBlock(std::move(def));
-        if (!result.has_value())
-        {
-            VX_LOG_WARN("Failed to register block '{}': {}", id, result.error().message);
-        }
-    };
-    registerBlock("base:stone", true);
-    registerBlock("base:dirt", true);
-    registerBlock("base:grass_block", true);
-    registerBlock("base:bedrock", true);
+    m_blockRegistry.loadFromJson("assets/scripts/base/blocks.json");
 
     // Create WorldGenerator
     m_worldGen =

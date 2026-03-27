@@ -27,6 +27,7 @@ add_library(VoxelEngine STATIC
         src/world/CaveCarver.cpp
         src/world/SplineCurve.cpp
         src/world/StructureGenerator.cpp
+        src/renderer/MeshBuilder.cpp
         src/world/WorldGenerator.cpp
         src/input/InputManager.cpp
 )

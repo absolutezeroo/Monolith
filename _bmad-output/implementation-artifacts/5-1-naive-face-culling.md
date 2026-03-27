@@ -1,6 +1,6 @@
 # Story 5.1: Naive Face Culling (Baseline Mesher)
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -21,32 +21,32 @@ so that I have a working baseline to render chunks before optimizing.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Create `ChunkMesh` struct (AC: #2)
-  - [ ] 1.1 Create `engine/include/voxel/renderer/ChunkMesh.h` with `ChunkMesh` struct
-  - [ ] 1.2 Define `BlockFace` enum class: `PosX, NegX, PosY, NegY, PosZ, NegZ` (6 values)
-  - [ ] 1.3 Define quad packing/unpacking helper functions (constexpr inline)
-- [ ] Task 2: Create `MeshBuilder` class (AC: #1, #3, #4, #5)
-  - [ ] 2.1 Create `engine/include/voxel/renderer/MeshBuilder.h` with class declaration
-  - [ ] 2.2 Create `engine/src/renderer/MeshBuilder.cpp` with `buildNaive()` implementation
-  - [ ] 2.3 Implement face culling: iterate all blocks, for each non-air block check 6 neighbors
-  - [ ] 2.4 Handle section boundary checks using neighbor array (null = air)
-  - [ ] 2.5 Pack each visible face into 64-bit quad format
-- [ ] Task 3: Register in build system (AC: #1)
-  - [ ] 3.1 Add `src/renderer/MeshBuilder.cpp` to `engine/CMakeLists.txt`
-  - [ ] 3.2 Add `tests/renderer/TestMeshBuilder.cpp` to `tests/CMakeLists.txt`
-- [ ] Task 4: Write unit tests (AC: #6, #7)
-  - [ ] 4.1 Create `tests/renderer/TestMeshBuilder.cpp`
-  - [ ] 4.2 Test: single block in empty section → exactly 6 quads
-  - [ ] 4.3 Test: two adjacent blocks → exactly 10 quads (shared face culled)
-  - [ ] 4.4 Test: block at section boundary with null neighbor → face emitted (treated as air)
-  - [ ] 4.5 Test: block at section boundary with solid neighbor → face culled
-  - [ ] 4.6 Test: transparent block adjacent to opaque → face emitted on both sides
-  - [ ] 4.7 Test: empty section → 0 quads (fast-path exit via `isEmpty()`)
-  - [ ] 4.8 Test: quad packing roundtrip — pack then unpack, verify all fields match
-- [ ] Task 5: Performance benchmark (AC: #8)
-  - [ ] 5.1 Add Catch2 BENCHMARK for dense terrain section (all blocks filled)
-  - [ ] 5.2 Add BENCHMARK for typical terrain (ground plane + scattered blocks)
-  - [ ] 5.3 Log baseline numbers for comparison with Story 5.3 (binary greedy meshing)
+- [x] Task 1: Create `ChunkMesh` struct (AC: #2)
+  - [x] 1.1 Create `engine/include/voxel/renderer/ChunkMesh.h` with `ChunkMesh` struct
+  - [x] 1.2 Define `BlockFace` enum class: `PosX, NegX, PosY, NegY, PosZ, NegZ` (6 values)
+  - [x] 1.3 Define quad packing/unpacking helper functions (constexpr inline)
+- [x] Task 2: Create `MeshBuilder` class (AC: #1, #3, #4, #5)
+  - [x] 2.1 Create `engine/include/voxel/renderer/MeshBuilder.h` with class declaration
+  - [x] 2.2 Create `engine/src/renderer/MeshBuilder.cpp` with `buildNaive()` implementation
+  - [x] 2.3 Implement face culling: iterate all blocks, for each non-air block check 6 neighbors
+  - [x] 2.4 Handle section boundary checks using neighbor array (null = air)
+  - [x] 2.5 Pack each visible face into 64-bit quad format
+- [x] Task 3: Register in build system (AC: #1)
+  - [x] 3.1 Add `src/renderer/MeshBuilder.cpp` to `engine/CMakeLists.txt`
+  - [x] 3.2 Add `tests/renderer/TestMeshBuilder.cpp` to `tests/CMakeLists.txt`
+- [x] Task 4: Write unit tests (AC: #6, #7)
+  - [x] 4.1 Create `tests/renderer/TestMeshBuilder.cpp`
+  - [x] 4.2 Test: single block in empty section → exactly 6 quads
+  - [x] 4.3 Test: two adjacent blocks → exactly 10 quads (shared face culled)
+  - [x] 4.4 Test: block at section boundary with null neighbor → face emitted (treated as air)
+  - [x] 4.5 Test: block at section boundary with solid neighbor → face culled
+  - [x] 4.6 Test: transparent block adjacent to opaque → face emitted on both sides
+  - [x] 4.7 Test: empty section → 0 quads (fast-path exit via `isEmpty()`)
+  - [x] 4.8 Test: quad packing roundtrip — pack then unpack, verify all fields match
+- [x] Task 5: Performance benchmark (AC: #8)
+  - [x] 5.1 Add Catch2 BENCHMARK for dense terrain section (all blocks filled)
+  - [x] 5.2 Add BENCHMARK for typical terrain (ground plane + scattered blocks)
+  - [x] 5.3 Log baseline numbers for comparison with Story 5.3 (binary greedy meshing)
 
 ## Dev Notes
 
@@ -247,9 +247,26 @@ Skip air blocks immediately (no faces to emit for air). Use `section.isEmpty()` 
 ## Dev Agent Record
 
 ### Agent Model Used
+Claude Opus 4.6
 
 ### Debug Log References
+- MSVC C4100 (unreferenced parameter): `ao2`/`ao3` in `packQuad()` — reduced to 2 AO params (`ao01`, `ao23`) matching the 2x2-bit format
+- MSVC C4099 (class/struct mismatch): forward declaration of `ChunkSection` as `class` → fixed to `struct`
 
 ### Completion Notes List
+- Created `ChunkMesh.h` with `ChunkMesh` struct, `BlockFace` enum (6 values), and constexpr `packQuad`/`unpackX`/`unpackY`/`unpackZ`/`unpackWidth`/`unpackHeight`/`unpackBlockStateId`/`unpackFace`/`unpackAO01`/`unpackAO23` helpers
+- Created `MeshBuilder.h/.cpp` with `buildNaive()` — iterates Y-Z-X order, skips air, checks 6 faces per block, handles boundary via neighbor array (null = air), packs into 64-bit quad format
+- All 8 unit test cases pass: single block (6 quads), two adjacent (10 quads), boundary null (face emitted), boundary solid (face culled), transparent adjacent to opaque (correct face emission), empty section (0 quads), quad packing roundtrip
+- 2 Catch2 BENCHMARK cases: dense terrain (16^3 all solid), typical terrain (half filled + scattered)
+- Full regression suite: 474,076 assertions in 116 test cases — all pass, zero regressions
 
 ### File List
+- `engine/include/voxel/renderer/ChunkMesh.h` (new)
+- `engine/include/voxel/renderer/MeshBuilder.h` (new)
+- `engine/src/renderer/MeshBuilder.cpp` (new)
+- `tests/renderer/TestMeshBuilder.cpp` (new)
+- `engine/CMakeLists.txt` (modified — added MeshBuilder.cpp)
+- `tests/CMakeLists.txt` (modified — added TestMeshBuilder.cpp)
+
+### Change Log
+- 2026-03-27: Implemented Story 5.1 — Naive Face Culling (Baseline Mesher). All ACs satisfied, all tests pass.

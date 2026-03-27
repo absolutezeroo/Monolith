@@ -11,6 +11,7 @@ add_executable(VoxelTests
     renderer/TestGigabuffer.cpp
     renderer/TestStagingBuffer.cpp
     renderer/TestCamera.cpp
+    renderer/TestMeshBuilder.cpp
     world/TestChunkSection.cpp
     world/TestChunkColumn.cpp
     world/TestBlockRegistry.cpp
