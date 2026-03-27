@@ -1,10 +1,12 @@
 #pragma once
 
 #include "voxel/core/ConfigManager.h"
+#include "voxel/core/JobSystem.h"
 #include "voxel/core/Result.h"
 #include "voxel/game/GameLoop.h"
 #include "voxel/input/InputManager.h"
 #include "voxel/renderer/Camera.h"
+#include "voxel/renderer/MeshBuilder.h"
 #include "voxel/renderer/Renderer.h"
 #include "voxel/world/BlockRegistry.h"
 #include "voxel/world/ChunkManager.h"
@@ -55,8 +57,12 @@ class GameApp : public voxel::game::GameLoop
 
     std::unique_ptr<voxel::input::InputManager> m_input;
 
-    // World systems
+    // World systems — declaration order matters for destruction:
+    // JobSystem must outlive ChunkManager (in-flight tasks reference it).
+    // MeshBuilder must outlive ChunkManager (tasks reference it).
     voxel::world::BlockRegistry m_blockRegistry;
+    voxel::core::JobSystem m_jobSystem;
+    std::unique_ptr<voxel::renderer::MeshBuilder> m_meshBuilder;
     std::unique_ptr<voxel::world::WorldGenerator> m_worldGen;
     voxel::world::ChunkManager m_chunkManager;
 

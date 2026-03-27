@@ -18,6 +18,7 @@
     "lz4",
     "sol2",
     "luajit",
-    "nlohmann-json"
+    "nlohmann-json",
+    "enkits"
   ]
 }

@@ -221,13 +221,14 @@ TEST_CASE("ChunkManager: setBlock marks correct section dirty", "[world][chunkma
     ChunkManager mgr;
     mgr.loadChunk({0, 0});
 
-    // y=48 → section 3
+    // y=48 → section 3, localY = 48 % 16 = 0 (Y-boundary)
+    // Neighbor invalidation: localY==0 && sectionY>0 → section 2 also dirty
     mgr.setBlock({5, 48, 5}, 10);
 
     ChunkColumn* column = mgr.getChunk({0, 0});
     REQUIRE(column->isSectionDirty(3));
+    REQUIRE(column->isSectionDirty(2));     // Y-boundary neighbor invalidation
     REQUIRE_FALSE(column->isSectionDirty(0));
-    REQUIRE_FALSE(column->isSectionDirty(2));
     REQUIRE_FALSE(column->isSectionDirty(4));
 }
 

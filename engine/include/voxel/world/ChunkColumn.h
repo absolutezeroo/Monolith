@@ -37,6 +37,7 @@ class ChunkColumn
 
     // Dirty tracking
     [[nodiscard]] bool isSectionDirty(int sectionY) const;
+    void markDirty(int sectionY);
     void clearDirty(int sectionY);
 
     // Queries

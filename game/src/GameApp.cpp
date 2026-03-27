@@ -34,6 +34,11 @@ GameApp::GameApp(voxel::game::Window& window, voxel::renderer::VulkanContext& vu
 
 GameApp::~GameApp()
 {
+    // Shut down the job system BEFORE ChunkManager is destroyed.
+    // In-flight mesh tasks reference the MeshBuilder and push to ChunkManager's queue,
+    // so all tasks must complete before those objects are destroyed.
+    m_jobSystem.shutdown();
+
     // Save config on exit — sync all persisted settings back before writing
     if (!m_configPath.empty())
     {
@@ -98,7 +103,11 @@ voxel::core::Result<void> GameApp::init(const std::string& shaderDir, std::optio
 
     // Register basic terrain blocks
     using voxel::world::BlockDefinition;
-    m_blockRegistry.loadFromJson("assets/scripts/base/blocks.json");
+    auto loadBlocksResult = m_blockRegistry.loadFromJson("assets/scripts/base/blocks.json");
+    if (!loadBlocksResult.has_value())
+    {
+        return std::unexpected(loadBlocksResult.error());
+    }
 
     // Create WorldGenerator
     m_worldGen =
@@ -106,6 +115,16 @@ voxel::core::Result<void> GameApp::init(const std::string& shaderDir, std::optio
 
     // Inject WorldGenerator into ChunkManager
     m_chunkManager.setWorldGenerator(m_worldGen.get());
+
+    // Initialize async meshing pipeline
+    auto jobResult = m_jobSystem.init();
+    if (!jobResult.has_value())
+    {
+        return std::unexpected(jobResult.error());
+    }
+    m_meshBuilder = std::make_unique<voxel::renderer::MeshBuilder>(m_blockRegistry);
+    m_chunkManager.setJobSystem(&m_jobSystem);
+    m_chunkManager.setMeshBuilder(m_meshBuilder.get());
 
     // Apply config to camera
     m_camera.setFov(m_config.getFov());
@@ -233,6 +252,9 @@ void GameApp::tick(double dt)
     // Sync camera state to overlay for display
     m_overlayState.fov = m_camera.getFov();
     m_overlayState.sensitivity = m_camera.getSensitivity();
+
+    // Async meshing: poll results and dispatch dirty sections
+    m_chunkManager.update(m_camera.getPosition());
 
     // Clear edge flags and update hold timers at end of tick.
     // Edge flags were set by pollEvents callbacks, read above, and now cleared

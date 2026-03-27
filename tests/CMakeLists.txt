@@ -6,6 +6,8 @@ add_executable(VoxelTests
     TestPlaceholder.cpp
     core/TestResult.cpp
     core/TestLog.cpp
+    core/TestConcurrentQueue.cpp
+    core/TestJobSystem.cpp
     math/TestAABB.cpp
     math/TestCoordUtils.cpp
     renderer/TestGigabuffer.cpp
@@ -16,6 +18,7 @@ add_executable(VoxelTests
     renderer/TestGreedyMeshing.cpp
     renderer/TestNonCubicMeshing.cpp
     renderer/TestTintWaving.cpp
+    renderer/TestAsyncMeshing.cpp
     world/TestChunkSection.cpp
     world/TestChunkColumn.cpp
     world/TestBlockRegistry.cpp

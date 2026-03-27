@@ -3,6 +3,7 @@
 add_library(VoxelEngine STATIC
         src/core/CoreModule.cpp
         src/core/ConfigManager.cpp
+        src/core/JobSystem.cpp
         src/core/Log.cpp
         src/game/Window.cpp
         src/game/GameLoop.cpp
@@ -57,6 +58,7 @@ find_package(imgui CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(lz4 CONFIG REQUIRED)
 find_package(Stb REQUIRED)
+find_package(enkiTS CONFIG REQUIRED)
 
 target_link_libraries(VoxelEngine
         PUBLIC glm::glm
@@ -70,6 +72,7 @@ target_link_libraries(VoxelEngine
         PRIVATE imgui::imgui
         PRIVATE nlohmann_json::nlohmann_json
         PRIVATE lz4::lz4
+        PUBLIC enkiTS::enkiTS
 )
 target_include_directories(VoxelEngine PRIVATE ${Stb_INCLUDE_DIR})
 
@@ -118,6 +121,7 @@ target_precompile_headers(VoxelEngine PRIVATE
         <entt/entt.hpp>
         <GLFW/glfw3.h>
         <imgui.h>
+        <enkiTS/TaskScheduler.h>
 )
 
 # ImGui backends: locate source files from vcpkg buildtrees.

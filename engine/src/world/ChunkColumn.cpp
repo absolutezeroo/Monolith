@@ -71,6 +71,12 @@ bool ChunkColumn::isSectionDirty(int sectionY) const
     return m_dirty[sectionY];
 }
 
+void ChunkColumn::markDirty(int sectionY)
+{
+    VX_ASSERT(sectionY >= 0 && sectionY < SECTIONS_PER_COLUMN, "sectionY out of bounds");
+    m_dirty[sectionY] = true;
+}
+
 void ChunkColumn::clearDirty(int sectionY)
 {
     VX_ASSERT(sectionY >= 0 && sectionY < SECTIONS_PER_COLUMN, "sectionY out of bounds");
