@@ -20,6 +20,7 @@ add_executable(VoxelTests
     renderer/TestTintWaving.cpp
     renderer/TestAsyncMeshing.cpp
     renderer/TestChunkUpload.cpp
+    renderer/TestQuadIndexBuffer.cpp
     world/TestChunkSection.cpp
     world/TestChunkColumn.cpp
     world/TestBlockRegistry.cpp

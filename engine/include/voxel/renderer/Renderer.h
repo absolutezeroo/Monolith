@@ -26,6 +26,7 @@ namespace voxel::renderer
 class Camera;
 class DescriptorAllocator;
 class ImGuiBackend;
+class QuadIndexBuffer;
 class StagingBuffer;
 class VulkanContext;
 
@@ -118,6 +119,7 @@ class Renderer
     [[nodiscard]] VkDescriptorSet getChunkDescriptorSet() const { return m_chunkDescriptorSet; }
     [[nodiscard]] DescriptorAllocator& getDescriptorAllocator() { return *m_descriptorAllocator; }
     [[nodiscard]] VkPipelineLayout getPipelineLayout() const { return m_pipelineLayout; }
+    [[nodiscard]] const QuadIndexBuffer* getQuadIndexBuffer() const { return m_quadIndexBuffer.get(); }
 
   private:
     /// Extent-dependent resources that must be recreated on swapchain resize.
@@ -167,6 +169,7 @@ class Renderer
 
     std::unique_ptr<StagingBuffer> m_stagingBuffer;
     std::unique_ptr<Gigabuffer> m_gigabuffer;
+    std::unique_ptr<QuadIndexBuffer> m_quadIndexBuffer;
     std::unique_ptr<ImGuiBackend> m_imguiBackend;
 
     SwapchainResources m_swapchainResources{};

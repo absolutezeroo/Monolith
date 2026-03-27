@@ -6,6 +6,7 @@
 #include "voxel/renderer/Camera.h"
 #include "voxel/renderer/DescriptorAllocator.h"
 #include "voxel/renderer/ImGuiBackend.h"
+#include "voxel/renderer/QuadIndexBuffer.h"
 #include "voxel/renderer/StagingBuffer.h"
 #include "voxel/renderer/VulkanContext.h"
 
@@ -47,6 +48,14 @@ core::Result<void> Renderer::init(const std::string& shaderDir, game::Window& wi
         return std::unexpected(gigaResult.error());
     }
     m_gigabuffer = std::move(gigaResult.value());
+
+    // Create shared quad index buffer for indexed drawing
+    auto indexResult = QuadIndexBuffer::create(m_vulkanContext);
+    if (!indexResult.has_value())
+    {
+        return std::unexpected(indexResult.error());
+    }
+    m_quadIndexBuffer = std::move(indexResult.value());
 
     VkDevice device = m_vulkanContext.getDevice();
 
@@ -832,6 +841,8 @@ void Renderer::shutdown()
     m_imguiBackend.reset();
 
     m_stagingBuffer.reset();
+
+    m_quadIndexBuffer.reset();
 
     m_gigabuffer.reset();
 
