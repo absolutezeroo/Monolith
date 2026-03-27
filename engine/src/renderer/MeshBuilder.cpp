@@ -20,13 +20,14 @@ constexpr int PAD = 18;
 constexpr int PAD_VOLUME = PAD * PAD * PAD;
 constexpr int S = world::ChunkSection::SIZE; // 16
 
-/// Pre-allocated workspace for greedy meshing to avoid per-call heap allocation (~20 KB total).
+/// Pre-allocated workspace for greedy meshing to avoid per-call heap allocation (~44 KB total).
 struct MeshWorkspace
 {
     std::array<uint16_t, PAD_VOLUME> blockPad{};
     std::array<bool, OPACITY_PAD_VOLUME> opacityPad{};     // Full opacity (for AO)
     std::array<bool, OPACITY_PAD_VOLUME> cubicOpacityPad{}; // FullCube-only opacity (for face masks)
     std::array<uint16_t, 6 * S * S> faceMasks{};
+    std::array<uint8_t, 6 * S * S * S> aoKeys{};           // Packed AO per visible face (4 corners, 2 bits each)
 };
 
 
@@ -228,6 +229,197 @@ void sliceToLocal(uint8_t faceIdx, int slice, int row, int col, int& x, int& y, 
         break;
     default: // Unreachable — all 6 faces covered.
         break;
+    }
+}
+
+/// Pre-compute packed AO key for every visible face in a single face direction.
+/// aoKeys[faceIdx * S³ + slice*S² + row*S + col] = (ao0<<6)|(ao1<<4)|(ao2<<2)|ao3.
+/// Only computes for bits set in faceMasks; unset entries stay 0.
+void buildAOKeys(
+    uint8_t faceIdx,
+    const uint16_t* faceMasks,
+    const std::array<bool, OPACITY_PAD_VOLUME>& opacityPad,
+    uint8_t* outKeys)
+{
+    for (int slice = 0; slice < S; ++slice)
+    {
+        for (int row = 0; row < S; ++row)
+        {
+            uint16_t bits = faceMasks[slice * S + row];
+            while (bits != 0)
+            {
+                int col = std::countr_zero(static_cast<uint16_t>(bits));
+                bits &= static_cast<uint16_t>(bits - 1); // clear lowest set bit
+
+                int lx = 0;
+                int ly = 0;
+                int lz = 0;
+                sliceToLocal(faceIdx, slice, row, col, lx, ly, lz);
+
+                std::array<uint8_t, 4> ao = computeFaceAO(faceIdx, lx, ly, lz, opacityPad);
+                outKeys[slice * S * S + row * S + col] =
+                    static_cast<uint8_t>((ao[0] << 6) | (ao[1] << 4) | (ao[2] << 2) | ao[3]);
+            }
+        }
+    }
+}
+
+/// Build face masks for transparent FullCube blocks in one face direction.
+/// A transparent face is visible when its neighbor is air or a different transparent block.
+void buildTransparentFaceMasks(
+    uint8_t faceIdx,
+    const std::array<uint16_t, PAD_VOLUME>& blockPad,
+    const std::array<bool, OPACITY_PAD_VOLUME>& opacityPad,
+    const world::BlockRegistry& registry,
+    uint16_t* outMasks)
+{
+    for (int slice = 0; slice < S; ++slice)
+    {
+        FaceSliceStrides st = getSliceStrides(faceIdx, slice);
+
+        for (int row = 0; row < S; ++row)
+        {
+            uint16_t bits = 0;
+            int opIdx = st.base + row * st.rowStride;
+            // blockPad uses identical layout: (py*18+pz)*18+px
+            int bpIdx = opIdx;
+
+            for (int col = 0; col < S; ++col)
+            {
+                uint16_t blockId = blockPad[bpIdx];
+                if (blockId != world::BLOCK_AIR && !opacityPad[opIdx])
+                {
+                    // Current block is transparent — check it's FullCube.
+                    const world::BlockDefinition& def = registry.getBlockType(blockId);
+                    if (def.modelType == world::ModelType::FullCube)
+                    {
+                        // Neighbor must be air or transparent (not opaque).
+                        bool neighborOpaque = opacityPad[opIdx + st.neighborOffset];
+                        uint16_t neighborId = blockPad[bpIdx + st.neighborOffset];
+                        if (!neighborOpaque && neighborId != blockId)
+                        {
+                            bits |= static_cast<uint16_t>(1u << col);
+                        }
+                    }
+                }
+                opIdx += st.colStride;
+                bpIdx += st.colStride;
+            }
+            outMasks[slice * S + row] = bits;
+        }
+    }
+}
+
+/// Greedy merge one face direction: extends quads in width then height, constrained by
+/// same block type AND same AO key. Emits packed quads into outQuads.
+void greedyMergeFace(
+    uint8_t faceIdx,
+    uint16_t* sliceMasks,
+    const uint8_t* aoKeys,
+    const std::array<uint16_t, PAD_VOLUME>& blockPad,
+    std::vector<uint64_t>& outQuads)
+{
+    for (int slice = 0; slice < S; ++slice)
+    {
+        FaceSliceStrides st = getSliceStrides(faceIdx, slice);
+        uint16_t* masks = &sliceMasks[slice * S];
+        const uint8_t* sliceAO = &aoKeys[slice * S * S];
+
+        for (int row = 0; row < S; ++row)
+        {
+            uint16_t bits = masks[row];
+            while (bits != 0)
+            {
+                int col = std::countr_zero(static_cast<uint16_t>(bits));
+                int rowBase = st.base + row * st.rowStride;
+                uint16_t type = blockPad[rowBase + col * st.colStride];
+                uint8_t aoKey = sliceAO[row * S + col];
+
+                // Extend width: consecutive same-type, same-AO set bits.
+                int width = 1;
+                uint16_t scanBits = static_cast<uint16_t>(bits >> (col + 1));
+                while (scanBits & 1u)
+                {
+                    int nextCol = col + width;
+                    if (blockPad[rowBase + nextCol * st.colStride] != type)
+                    {
+                        break;
+                    }
+                    if (sliceAO[row * S + nextCol] != aoKey)
+                    {
+                        break;
+                    }
+                    ++width;
+                    scanBits >>= 1;
+                }
+
+                uint16_t widthMask = static_cast<uint16_t>(((1u << width) - 1) << col);
+
+                // Extend height: subsequent rows with identical pattern, type, and AO.
+                int height = 1;
+                for (int r2 = row + 1; r2 < S; ++r2)
+                {
+                    if ((masks[r2] & widthMask) != widthMask)
+                    {
+                        break;
+                    }
+
+                    int r2Base = st.base + r2 * st.rowStride;
+                    bool allMatch = true;
+                    for (int c = col; c < col + width; ++c)
+                    {
+                        if (blockPad[r2Base + c * st.colStride] != type)
+                        {
+                            allMatch = false;
+                            break;
+                        }
+                        if (sliceAO[r2 * S + c] != aoKey)
+                        {
+                            allMatch = false;
+                            break;
+                        }
+                    }
+                    if (!allMatch)
+                    {
+                        break;
+                    }
+
+                    masks[r2] &= static_cast<uint16_t>(~widthMask);
+                    ++height;
+                }
+
+                bits &= static_cast<uint16_t>(~widthMask);
+
+                // Map to local coordinates.
+                int lx = 0;
+                int ly = 0;
+                int lz = 0;
+                sliceToLocal(faceIdx, slice, row, col, lx, ly, lz);
+
+                // Unpack AO from the key — all blocks in the merged region share the same AO.
+                uint8_t ao0 = static_cast<uint8_t>((aoKey >> 6) & 0x3);
+                uint8_t ao1 = static_cast<uint8_t>((aoKey >> 4) & 0x3);
+                uint8_t ao2 = static_cast<uint8_t>((aoKey >> 2) & 0x3);
+                uint8_t ao3 = static_cast<uint8_t>(aoKey & 0x3);
+                std::array<uint8_t, 4> ao = {ao0, ao1, ao2, ao3};
+                bool flip = shouldFlipQuad(ao);
+
+                uint64_t quad = packQuad(
+                    static_cast<uint8_t>(lx),
+                    static_cast<uint8_t>(ly),
+                    static_cast<uint8_t>(lz),
+                    type,
+                    static_cast<BlockFace>(faceIdx),
+                    static_cast<uint8_t>(width),
+                    static_cast<uint8_t>(height),
+                    ao0,
+                    ao1,
+                    ao2,
+                    ao3,
+                    flip);
+                outQuads.push_back(quad);
+            }
+        }
     }
 }
 
@@ -446,113 +638,26 @@ ChunkMesh MeshBuilder::buildGreedy(
     buildOpacityPad(ws.opacityPad, section, neighbors, m_registry);
     buildCubicOpacityPad(ws.cubicOpacityPad, ws.blockPad, m_registry);
 
-    // Phase 1 & 2: For each face direction, build face masks then greedy merge per slice.
-    // Uses cubicOpacityPad so only FullCube blocks generate face quads.
-    // Non-cubic blocks are handled by buildNonCubicPass.
+    // Pass 1 — Opaque FullCube blocks: face masks from cubicOpacityPad, AO-aware greedy merge.
     for (uint8_t faceIdx = 0; faceIdx < BLOCK_FACE_COUNT; ++faceIdx)
     {
         uint16_t* masks = &ws.faceMasks[faceIdx * S * S];
+        uint8_t* aoKeys = &ws.aoKeys[faceIdx * S * S * S];
+
         buildFaceMasks(faceIdx, ws.cubicOpacityPad, masks);
+        buildAOKeys(faceIdx, masks, ws.opacityPad, aoKeys);
+        greedyMergeFace(faceIdx, masks, aoKeys, ws.blockPad, mesh.quads);
+    }
 
-        for (int slice = 0; slice < S; ++slice)
-        {
-            FaceSliceStrides st = getSliceStrides(faceIdx, slice);
-            uint16_t* sliceMasks = &masks[slice * S];
+    // Pass 2 — Transparent FullCube blocks: separate face masks, same AO-aware merge.
+    for (uint8_t faceIdx = 0; faceIdx < BLOCK_FACE_COUNT; ++faceIdx)
+    {
+        uint16_t* masks = &ws.faceMasks[faceIdx * S * S];
+        uint8_t* aoKeys = &ws.aoKeys[faceIdx * S * S * S];
 
-            for (int row = 0; row < S; ++row)
-            {
-                uint16_t bits = sliceMasks[row];
-                while (bits != 0)
-                {
-                    int col = std::countr_zero(static_cast<uint16_t>(bits));
-                    int rowBase = st.base + row * st.rowStride;
-                    uint16_t type = ws.blockPad[rowBase + col * st.colStride];
-
-                    // Extend width: consecutive same-type set bits.
-                    int width = 1;
-                    uint16_t scanBits = static_cast<uint16_t>(bits >> (col + 1));
-                    while (scanBits & 1u)
-                    {
-                        if (ws.blockPad[rowBase + (col + width) * st.colStride] != type)
-                        {
-                            break;
-                        }
-                        ++width;
-                        scanBits >>= 1;
-                    }
-
-                    uint16_t widthMask = static_cast<uint16_t>(((1u << width) - 1) << col);
-
-                    // Extend height: subsequent rows with identical pattern and type.
-                    int height = 1;
-                    for (int r2 = row + 1; r2 < S; ++r2)
-                    {
-                        if ((sliceMasks[r2] & widthMask) != widthMask)
-                        {
-                            break;
-                        }
-
-                        int r2Base = st.base + r2 * st.rowStride;
-                        bool allSameType = true;
-                        for (int c = col; c < col + width; ++c)
-                        {
-                            if (ws.blockPad[r2Base + c * st.colStride] != type)
-                            {
-                                allSameType = false;
-                                break;
-                            }
-                        }
-                        if (!allSameType)
-                        {
-                            break;
-                        }
-
-                        sliceMasks[r2] &= static_cast<uint16_t>(~widthMask);
-                        ++height;
-                    }
-
-                    bits &= static_cast<uint16_t>(~widthMask);
-
-                    // Map to local coordinates and emit quad.
-                    int lx = 0;
-                    int ly = 0;
-                    int lz = 0;
-                    sliceToLocal(faceIdx, slice, row, col, lx, ly, lz);
-
-                    // Compute AO at the 4 physical corners of the merged quad.
-                    // Each corner i of the merged quad physically coincides with corner i
-                    // of a specific block in the merged region, determined by face direction.
-                    std::array<uint8_t, 4> ao{};
-                    for (int ci = 0; ci < 4; ++ci)
-                    {
-                        int blockRow = row + AO_CORNER_BLOCK[faceIdx][ci][0] * (height - 1);
-                        int blockCol = col + AO_CORNER_BLOCK[faceIdx][ci][1] * (width - 1);
-                        int cx = 0;
-                        int cy = 0;
-                        int cz = 0;
-                        sliceToLocal(faceIdx, slice, blockRow, blockCol, cx, cy, cz);
-                        ao[ci] = computeFaceAO(faceIdx, cx, cy, cz, ws.opacityPad)[ci];
-                    }
-
-                    bool flip = shouldFlipQuad(ao);
-
-                    uint64_t quad = packQuad(
-                        static_cast<uint8_t>(lx),
-                        static_cast<uint8_t>(ly),
-                        static_cast<uint8_t>(lz),
-                        type,
-                        static_cast<BlockFace>(faceIdx),
-                        static_cast<uint8_t>(width),
-                        static_cast<uint8_t>(height),
-                        ao[0],
-                        ao[1],
-                        ao[2],
-                        ao[3],
-                        flip);
-                    mesh.quads.push_back(quad);
-                }
-            }
-        }
+        buildTransparentFaceMasks(faceIdx, ws.blockPad, ws.opacityPad, m_registry, masks);
+        buildAOKeys(faceIdx, masks, ws.opacityPad, aoKeys);
+        greedyMergeFace(faceIdx, masks, aoKeys, ws.blockPad, mesh.quads);
     }
 
     mesh.quadCount = static_cast<uint32_t>(mesh.quads.size());

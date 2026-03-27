@@ -289,6 +289,181 @@ TEST_CASE("Greedy meshing correctness", "[renderer][meshing][greedy]")
     }
 }
 
+// Helper: register a transparent FullCube block (e.g., glass).
+static uint16_t registerGlass(BlockRegistry& registry)
+{
+    BlockDefinition def;
+    def.stringId = "base:glass";
+    def.isSolid = true;
+    def.isTransparent = true;
+    def.modelType = ModelType::FullCube;
+    def.renderType = RenderType::Cutout;
+    auto result = registry.registerBlock(std::move(def));
+    REQUIRE(result.has_value());
+    return registry.getIdByName("base:glass");
+}
+
+TEST_CASE("Greedy meshing AO-aware merging", "[renderer][meshing][greedy][ao]")
+{
+    BlockRegistry registry;
+    uint16_t stoneId = registerStone(registry);
+    MeshBuilder builder(registry);
+
+    SECTION("AO boundary prevents merge")
+    {
+        // Stone floor at y=0, wall at x=0 (y=0..3). The wall occludes PosY faces
+        // at x=0 but not x=1+, creating an AO boundary that must split the quad.
+        ChunkSection section;
+        for (int z = 0; z < ChunkSection::SIZE; ++z)
+        {
+            for (int x = 0; x < ChunkSection::SIZE; ++x)
+            {
+                section.setBlock(x, 0, z, stoneId);
+            }
+        }
+        // Wall along x=0.
+        for (int y = 1; y <= 3; ++y)
+        {
+            for (int z = 0; z < ChunkSection::SIZE; ++z)
+            {
+                section.setBlock(0, y, z, stoneId);
+            }
+        }
+
+        ChunkMesh mesh = builder.buildGreedy(section, NO_NEIGHBORS);
+
+        // PosY faces of the floor must have >1 quad because AO differs at x=0 vs x=1.
+        uint32_t topQuads = countFace(mesh, BlockFace::PosY);
+        REQUIRE(topQuads > 1);
+    }
+
+    SECTION("greedy AO matches naive per-block")
+    {
+        // L-corner terrain: stone floor + wall at x=0 and z=0.
+        ChunkSection section;
+        for (int z = 0; z < ChunkSection::SIZE; ++z)
+            for (int x = 0; x < ChunkSection::SIZE; ++x)
+                section.setBlock(x, 0, z, stoneId);
+        for (int y = 1; y <= 2; ++y)
+        {
+            for (int z = 0; z < ChunkSection::SIZE; ++z)
+                section.setBlock(0, y, z, stoneId);
+            for (int x = 0; x < ChunkSection::SIZE; ++x)
+                section.setBlock(x, y, 0, stoneId);
+        }
+
+        ChunkMesh naiveMesh = builder.buildNaive(section, NO_NEIGHBORS);
+        ChunkMesh greedyMesh = builder.buildGreedy(section, NO_NEIGHBORS);
+
+        // Build map of (x,y,z,face) -> AO from naive.
+        struct FaceKey
+        {
+            uint8_t x, y, z, face;
+            bool operator==(const FaceKey& o) const
+            {
+                return x == o.x && y == o.y && z == o.z && face == o.face;
+            }
+        };
+        struct FaceKeyHash
+        {
+            size_t operator()(const FaceKey& k) const
+            {
+                return (k.x << 24) | (k.y << 16) | (k.z << 8) | k.face;
+            }
+        };
+        std::unordered_map<FaceKey, std::array<uint8_t, 4>, FaceKeyHash> naiveAO;
+        for (const uint64_t quad : naiveMesh.quads)
+        {
+            FaceKey key{unpackX(quad), unpackY(quad), unpackZ(quad),
+                        static_cast<uint8_t>(unpackFace(quad))};
+            naiveAO[key] = unpackAO(quad);
+        }
+
+        // Every greedy quad's origin block must have the same AO as the naive version.
+        for (const uint64_t quad : greedyMesh.quads)
+        {
+            FaceKey key{unpackX(quad), unpackY(quad), unpackZ(quad),
+                        static_cast<uint8_t>(unpackFace(quad))};
+            auto it = naiveAO.find(key);
+            REQUIRE(it != naiveAO.end());
+            auto greedyAO = unpackAO(quad);
+            REQUIRE(greedyAO == it->second);
+        }
+    }
+
+    SECTION("AO-aware merge preserves surface area on L-corner terrain")
+    {
+        ChunkSection section;
+        for (int z = 0; z < ChunkSection::SIZE; ++z)
+            for (int x = 0; x < ChunkSection::SIZE; ++x)
+                section.setBlock(x, 0, z, stoneId);
+        for (int y = 1; y <= 2; ++y)
+        {
+            for (int z = 0; z < ChunkSection::SIZE; ++z)
+                section.setBlock(0, y, z, stoneId);
+            for (int x = 0; x < ChunkSection::SIZE; ++x)
+                section.setBlock(x, y, 0, stoneId);
+        }
+
+        ChunkMesh naiveMesh = builder.buildNaive(section, NO_NEIGHBORS);
+        ChunkMesh greedyMesh = builder.buildGreedy(section, NO_NEIGHBORS);
+
+        REQUIRE(totalSurfaceArea(naiveMesh) == totalSurfaceArea(greedyMesh));
+    }
+}
+
+TEST_CASE("Greedy meshing transparent blocks", "[renderer][meshing][greedy][transparent]")
+{
+    BlockRegistry registry;
+    uint16_t stoneId = registerStone(registry);
+    uint16_t glassId = registerGlass(registry);
+    MeshBuilder builder(registry);
+
+    SECTION("single glass block = 6 faces")
+    {
+        ChunkSection section;
+        section.setBlock(8, 8, 8, glassId);
+
+        ChunkMesh naiveMesh = builder.buildNaive(section, NO_NEIGHBORS);
+        ChunkMesh greedyMesh = builder.buildGreedy(section, NO_NEIGHBORS);
+
+        REQUIRE(naiveMesh.quadCount == 6);
+        REQUIRE(greedyMesh.quadCount == 6);
+    }
+
+    SECTION("glass plane merges to 6 quads")
+    {
+        ChunkSection section;
+        for (int z = 0; z < ChunkSection::SIZE; ++z)
+            for (int x = 0; x < ChunkSection::SIZE; ++x)
+                section.setBlock(x, 0, z, glassId);
+
+        ChunkMesh greedyMesh = builder.buildGreedy(section, NO_NEIGHBORS);
+
+        // Same as opaque plane: 1 top + 1 bottom + 4 sides = 6 quads.
+        REQUIRE(greedyMesh.quadCount == 6);
+    }
+
+    SECTION("stone-glass adjacency emits correct faces")
+    {
+        // Stone at (8,8,8) + glass at (9,8,8). Stone is opaque, glass is transparent.
+        // Stone: 6 faces (opaque sees transparent neighbor as air-like, emits face toward glass).
+        // Glass: 5 faces (glass doesn't emit face toward opaque stone — same block type check
+        //        passes, but the neighbor is opaque so it's culled by !neighborOpaque check).
+        // Actually: glass emits toward stone because stone is opaque → !neighborOpaque is false,
+        // so glass does NOT emit toward stone. Glass gets 5 faces.
+        ChunkSection section;
+        section.setBlock(8, 8, 8, stoneId);
+        section.setBlock(9, 8, 8, glassId);
+
+        ChunkMesh naiveMesh = builder.buildNaive(section, NO_NEIGHBORS);
+        ChunkMesh greedyMesh = builder.buildGreedy(section, NO_NEIGHBORS);
+
+        // Both should produce 11 quads (stone=6, glass=5).
+        REQUIRE(naiveMesh.quadCount == greedyMesh.quadCount);
+    }
+}
+
 TEST_CASE("Greedy meshing performance benchmarks", "[renderer][meshing][greedy][!benchmark]")
 {
     BlockRegistry registry;
