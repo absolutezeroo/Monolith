@@ -20,7 +20,7 @@ class MeshBuilder
     explicit MeshBuilder(const world::BlockRegistry& registry);
 
     /// Build a mesh for a chunk section using naive face culling.
-    /// Each visible face produces one quad (width=1, height=1, AO=3).
+    /// Each visible face produces one quad (width=1, height=1, per-vertex AO computed).
     ///
     /// @param section The section to mesh (16x16x16 voxels).
     /// @param neighbors The 6 neighbor sections for boundary face culling.

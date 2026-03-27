@@ -1,6 +1,6 @@
 # Story 5.2: Ambient Occlusion Calculation
 
-Status: review
+Status: done
 
 <!-- Depends on Story 5.1 being implemented first (MeshBuilder + ChunkMesh must exist). -->
 
@@ -411,6 +411,7 @@ Claude Opus 4.6
 ### Change Log
 
 - 2026-03-27: Story 5.2 implementation complete — AO calculation, quad packing expansion, full test suite.
+- 2026-03-27: [Code Review] 1 HIGH, 1 MEDIUM fixed. Updated epic-05 canonical quad format table to match expanded AO layout (8 bits at [43:50], flip at [51]). Resolved bit budget by reducing tint 3→2 bits, waving 2→1 bit. Fixed stale MeshBuilder.h docstring. Updated epic AC flip formula to canonical 0fps sum-comparison.
 
 ### File List
 

@@ -30,17 +30,20 @@ Bit range   Width   Field                  Set by      Used by
 [24:29]     6       Height - 1 (0–63)      Story 5.3   chunk.vert 6.2
 [30:39]     10      Block state ID         Story 5.1   chunk.frag 6.2 (texture lookup)
 [40:42]     3       Face direction (0–5)   Story 5.1   chunk.vert 6.2 (normal + corner reconstruction)
-[43:44]     2       AO corner 0+1          Story 5.2   chunk.frag 6.2
-[45:46]     2       AO corner 2+3          Story 5.2   chunk.frag 6.2
-[47]        1       Quad diagonal flip     Story 5.2   chunk.vert 6.2 (triangle winding)
-[48]        1       Is non-cubic model     Story 5.4   chunk.vert 6.2 (model vertex path)
-[49:52]     4       Sky light (0–15)       Story 8.0   chunk.frag 6.2 → lighting
-[53:56]     4       Block light (0–15)     Story 8.0   chunk.frag 6.2 → lighting
-[57:59]     3       Tint index (0–7)       Story 5.5   chunk.frag 6.8 (biome color)
-[60:61]     2       Waving type (0–3)      Story 5.5   chunk.vert 6.2 (vertex animation)
-[62:63]     2       Reserved               —           Future: random offset, connected state
+[43:44]     2       AO corner 0 (0–3)     Story 5.2   chunk.frag 6.2
+[45:46]     2       AO corner 1 (0–3)     Story 5.2   chunk.frag 6.2
+[47:48]     2       AO corner 2 (0–3)     Story 5.2   chunk.frag 6.2
+[49:50]     2       AO corner 3 (0–3)     Story 5.2   chunk.frag 6.2
+[51]        1       Quad diagonal flip     Story 5.2   chunk.vert 6.2 (triangle winding)
+[52]        1       Is non-cubic model     Story 5.4   chunk.vert 6.2 (model vertex path)
+[53:56]     4       Sky light (0–15)       Story 8.0   chunk.frag 6.2 → lighting
+[57:60]     4       Block light (0–15)     Story 8.0   chunk.frag 6.2 → lighting
+[61:62]     2       Tint index (0–3)       Story 5.5   chunk.frag 6.8 (biome color)
+[63]        1       Waving flag (0–1)      Story 5.5   chunk.vert 6.2 (vertex animation)
 ```
 All stories that touch the quad format MUST reference this table. Any bit allocation change must update this table first.
+
+> **Note (Story 5.2 review):** AO expanded from 4 bits (2 paired values) to 8 bits (4 individual 2-bit corners) to support the full 0–3 AO gradient per vertex. This shifted all fields after bit 42 by 4 positions. Tint reduced from 3→2 bits (4 tint indices) and waving reduced from 2→1 bit (flag only) to fit within 64 bits. The 2 reserved bits were absorbed. If more tint or waving precision is needed, Story 5.5 can adopt a secondary data channel.
 - Unit test: single block in empty section → 6 faces; two adjacent blocks → 10 faces (shared face culled)
 - Performance baseline measured (expected ~500μs/chunk for dense terrain)
 
@@ -56,7 +59,7 @@ All stories that touch the quad format MUST reference this table. Any bit alloca
 - `vertexAO(bool side1, bool corner, bool side2) → int` (0=full occlusion, 3=none)
 - For each face vertex, sample 3 adjacent blocks (2 sides + 1 corner) from the chunk data
 - AO values packed into quad data (4×2 bits = 8 bits in the packed uint64_t)
-- Quad diagonal flip: when `abs(ao[0]-ao[3]) > abs(ao[1]-ao[2])`, flip the triangulation
+- Quad diagonal flip: when `ao[0]+ao[3] > ao[1]+ao[2]`, flip the triangulation (canonical 0fps.net sum-comparison)
 - Flip flag encoded in quad data so vertex shader can reconstruct correctly
 - Unit test: block in corner of room → AO values match expected pattern; isolated block → all AO=3
 
