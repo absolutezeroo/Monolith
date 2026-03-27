@@ -1,6 +1,6 @@
 # Story 5.7: Mesh Upload to Gigabuffer
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -27,71 +27,71 @@ Story 5.6 delivers async meshing: worker threads produce `ChunkMesh` results, an
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: Create ChunkRenderInfo types** (AC: #1, #4)
-  - [ ] 1.1 Create `engine/include/voxel/renderer/ChunkRenderInfo.h`
-  - [ ] 1.2 Define `RenderState` enum: `None`, `Resident`, `PendingFree`
-  - [ ] 1.3 Define `ChunkRenderInfo` struct (see Design section)
-  - [ ] 1.4 Define `SectionKey` struct + hash for map key
-  - [ ] 1.5 Define `using ChunkRenderInfoMap = std::unordered_map<SectionKey, ChunkRenderInfo, SectionKeyHash>`
+- [x] **Task 1: Create ChunkRenderInfo types** (AC: #1, #4)
+  - [x] 1.1 Create `engine/include/voxel/renderer/ChunkRenderInfo.h`
+  - [x] 1.2 Define `RenderState` enum: `None`, `Resident`, `PendingFree`
+  - [x] 1.3 Define `ChunkRenderInfo` struct (see Design section)
+  - [x] 1.4 Define `SectionKey` struct + hash for map key
+  - [x] 1.5 Define `using ChunkRenderInfoMap = std::unordered_map<SectionKey, ChunkRenderInfo, SectionKeyHash>`
 
-- [ ] **Task 2: Create ChunkUploadManager** (AC: #2, #3, #4, #7, #8, #9)
-  - [ ] 2.1 Create `engine/include/voxel/renderer/ChunkUploadManager.h`
-  - [ ] 2.2 Create `engine/src/renderer/ChunkUploadManager.cpp`
-  - [ ] 2.3 Constructor takes `Gigabuffer&`, `StagingBuffer&` (non-owning references)
-  - [ ] 2.4 Implement `uploadMesh(SectionKey key, ChunkMesh&& mesh)` — allocates + stages
-  - [ ] 2.5 Implement `processUploads(ChunkManager& cm, const glm::dvec3& playerPos)` — polls new meshes from ChunkManager, queues uploads, drains upload queue up to budget
-  - [ ] 2.6 Implement `getRenderInfo(SectionKey key) -> const ChunkRenderInfo*` for Epic 6
-  - [ ] 2.7 Implement `getAllRenderInfos() -> const ChunkRenderInfoMap&` for indirect draw
+- [x] **Task 2: Create ChunkUploadManager** (AC: #2, #3, #4, #7, #8, #9)
+  - [x] 2.1 Create `engine/include/voxel/renderer/ChunkUploadManager.h`
+  - [x] 2.2 Create `engine/src/renderer/ChunkUploadManager.cpp`
+  - [x] 2.3 Constructor takes `Gigabuffer&`, `StagingBuffer&` (non-owning references)
+  - [x] 2.4 Implement `uploadMesh(SectionKey key, ChunkMesh&& mesh)` — allocates + stages
+  - [x] 2.5 Implement `processUploads(ChunkManager& cm, const glm::dvec3& playerPos)` — polls new meshes from ChunkManager, queues uploads, drains upload queue up to budget
+  - [x] 2.6 Implement `getRenderInfo(SectionKey key) -> const ChunkRenderInfo*` for Epic 6
+  - [x] 2.7 Implement `getAllRenderInfos() -> const ChunkRenderInfoMap&` for indirect draw
 
-- [ ] **Task 3: Implement deferred free** (AC: #5, #6)
-  - [ ] 3.1 Add `DeferredFree` struct: `{ GigabufferAllocation alloc; uint32_t framesRemaining; }`
-  - [ ] 3.2 Add `std::vector<DeferredFree> m_deferredFrees` to ChunkUploadManager
-  - [ ] 3.3 Implement `queueDeferredFree(GigabufferAllocation alloc)` — pushes with `framesRemaining = FRAMES_IN_FLIGHT`
-  - [ ] 3.4 Implement `processDeferredFrees()` — called once per frame, decrements counters, frees allocations at 0
-  - [ ] 3.5 On remesh: queue old allocation for deferred free before allocating new
-  - [ ] 3.6 On unload: queue all section allocations for deferred free
+- [x] **Task 3: Implement deferred free** (AC: #5, #6)
+  - [x] 3.1 Add `DeferredFree` struct: `{ GigabufferAllocation alloc; uint32_t framesRemaining; }`
+  - [x] 3.2 Add `std::vector<DeferredFree> m_deferredFrees` to ChunkUploadManager
+  - [x] 3.3 Implement `queueDeferredFree(GigabufferAllocation alloc)` — pushes with `framesRemaining = FRAMES_IN_FLIGHT`
+  - [x] 3.4 Implement `processDeferredFrees()` — called once per frame, decrements counters, frees allocations at 0
+  - [x] 3.5 On remesh: queue old allocation for deferred free before allocating new
+  - [x] 3.6 On unload: queue all section allocations for deferred free
 
-- [ ] **Task 4: Implement upload queue** (AC: #7)
-  - [ ] 4.1 Add `struct PendingUpload { SectionKey key; ChunkMesh mesh; }` to ChunkUploadManager
-  - [ ] 4.2 Add `std::vector<PendingUpload> m_pendingUploads` member
-  - [ ] 4.3 In `processUploads()`: new meshes go to pending queue first, then drain up to `maxUploadsPerFrame` from queue
-  - [ ] 4.4 Closer chunks (by distance to player) should be prioritized in the pending queue
+- [x] **Task 4: Implement upload queue** (AC: #7)
+  - [x] 4.1 Add `struct PendingUpload { SectionKey key; ChunkMesh mesh; }` to ChunkUploadManager
+  - [x] 4.2 Add `std::vector<PendingUpload> m_pendingUploads` member
+  - [x] 4.3 In `processUploads()`: new meshes go to pending queue first, then drain up to `maxUploadsPerFrame` from queue
+  - [x] 4.4 Closer chunks (by distance to player) should be prioritized in the pending queue
 
-- [ ] **Task 5: Handle chunk unload cleanup** (AC: #6)
-  - [ ] 5.1 Add `onChunkUnloaded(glm::ivec2 coord)` method to ChunkUploadManager
-  - [ ] 5.2 Iterates all section indices (0-15), queues deferred frees for any Resident sections
-  - [ ] 5.3 Removes all SectionKey entries for that chunk from the render info map
-  - [ ] 5.4 Removes any pending uploads for that chunk from `m_pendingUploads`
+- [x] **Task 5: Handle chunk unload cleanup** (AC: #6)
+  - [x] 5.1 Add `onChunkUnloaded(glm::ivec2 coord)` method to ChunkUploadManager
+  - [x] 5.2 Iterates all section indices (0-15), queues deferred frees for any Resident sections
+  - [x] 5.3 Removes all SectionKey entries for that chunk from the render info map
+  - [x] 5.4 Removes any pending uploads for that chunk from `m_pendingUploads`
 
-- [ ] **Task 6: Wire into GameApp** (AC: #2, #3)
-  - [ ] 6.1 Add `std::unique_ptr<voxel::renderer::ChunkUploadManager> m_uploadManager` to GameApp.h
-  - [ ] 6.2 In `GameApp::init()`, after renderer init: create ChunkUploadManager with references to renderer's Gigabuffer and StagingBuffer
-  - [ ] 6.3 In `GameApp::tick()`: call `m_uploadManager->processUploads(m_chunkManager, playerPos)` and `m_uploadManager->processDeferredFrees()`
-  - [ ] 6.4 Renderer needs to expose non-const Gigabuffer and StagingBuffer accessors (or pass them during init)
-  - [ ] 6.5 Member declaration order: `m_uploadManager` after `m_renderer` (depends on Renderer's Gigabuffer), before `m_chunkManager` in destruction order doesn't matter since ChunkUploadManager holds non-owning refs
+- [x] **Task 6: Wire into GameApp** (AC: #2, #3)
+  - [x] 6.1 Add `std::unique_ptr<voxel::renderer::ChunkUploadManager> m_uploadManager` to GameApp.h
+  - [x] 6.2 In `GameApp::init()`, after renderer init: create ChunkUploadManager with references to renderer's Gigabuffer and StagingBuffer
+  - [x] 6.3 In `GameApp::tick()`: call `m_uploadManager->processUploads(m_chunkManager, playerPos)` and `m_uploadManager->processDeferredFrees()`
+  - [x] 6.4 Renderer needs to expose non-const Gigabuffer and StagingBuffer accessors (or pass them during init)
+  - [x] 6.5 Member declaration order: `m_uploadManager` after `m_renderer` (depends on Renderer's Gigabuffer), before `m_chunkManager` in destruction order doesn't matter since ChunkUploadManager holds non-owning refs
 
-- [ ] **Task 7: Expose Renderer internals for upload** (AC: #2, #3)
-  - [ ] 7.1 Add `Gigabuffer* getMutableGigabuffer()` to Renderer (or pass Gigabuffer/StagingBuffer at ChunkUploadManager creation time)
-  - [ ] 7.2 Add `StagingBuffer* getMutableStagingBuffer()` to Renderer
-  - [ ] 7.3 These are non-owning pointers — Renderer retains ownership
+- [x] **Task 7: Expose Renderer internals for upload** (AC: #2, #3)
+  - [x] 7.1 Add `Gigabuffer* getMutableGigabuffer()` to Renderer (or pass Gigabuffer/StagingBuffer at ChunkUploadManager creation time)
+  - [x] 7.2 Add `StagingBuffer* getMutableStagingBuffer()` to Renderer
+  - [x] 7.3 These are non-owning pointers — Renderer retains ownership
 
-- [ ] **Task 8: Update debug overlay** (AC: #4)
-  - [ ] 8.1 In `GameApp::buildDebugOverlay()`, add: number of resident sections, pending uploads count, deferred frees count
-  - [ ] 8.2 Add accessor methods to ChunkUploadManager: `residentCount()`, `pendingUploadCount()`, `deferredFreeCount()`
+- [x] **Task 8: Update debug overlay** (AC: #4)
+  - [x] 8.1 In `GameApp::buildDebugOverlay()`, add: number of resident sections, pending uploads count, deferred frees count
+  - [x] 8.2 Add accessor methods to ChunkUploadManager: `residentCount()`, `pendingUploadCount()`, `deferredFreeCount()`
 
-- [ ] **Task 9: Unit tests — ChunkRenderInfo and deferred free** (AC: #10)
-  - [ ] 9.1 Create `tests/renderer/TestChunkUpload.cpp`
-  - [ ] 9.2 Test: DeferredFree queue — add 3 allocations, tick 2 frames, verify all freed on correct frame
-  - [ ] 9.3 Test: ChunkRenderInfo lifecycle — None → Resident → PendingFree (via deferred) → freed
-  - [ ] 9.4 Test: Empty mesh (quadCount=0) stores None state, no gigabuffer allocation
-  - [ ] 9.5 Test: Upload queue drains N per frame — add 20 meshes, verify only 8 uploaded per processUploads call (using mock/fake Gigabuffer with VmaVirtualBlock only)
-  - [ ] 9.6 Test: Remesh — old allocation deferred-freed, new allocation created at different offset
-  - [ ] 9.7 Test: Unload removes all sections and queues deferred frees
+- [x] **Task 9: Unit tests — ChunkRenderInfo and deferred free** (AC: #10)
+  - [x] 9.1 Create `tests/renderer/TestChunkUpload.cpp`
+  - [x] 9.2 Test: DeferredFree queue — add 3 allocations, tick 2 frames, verify all freed on correct frame
+  - [x] 9.3 Test: ChunkRenderInfo lifecycle — None → Resident → PendingFree (via deferred) → freed
+  - [x] 9.4 Test: Empty mesh (quadCount=0) stores None state, no gigabuffer allocation
+  - [x] 9.5 Test: Upload queue drains N per frame — add 20 meshes, verify only 8 uploaded per processUploads call (using mock/fake Gigabuffer with VmaVirtualBlock only)
+  - [x] 9.6 Test: Remesh — old allocation deferred-freed, new allocation created at different offset
+  - [x] 9.7 Test: Unload removes all sections and queues deferred frees
 
-- [ ] **Task 10: Build system updates**
-  - [ ] 10.1 Add `src/renderer/ChunkUploadManager.cpp` to `engine/CMakeLists.txt`
-  - [ ] 10.2 Add `tests/renderer/TestChunkUpload.cpp` to `tests/CMakeLists.txt`
-  - [ ] 10.3 Verify all existing tests still pass
+- [x] **Task 10: Build system updates**
+  - [x] 10.1 Add `src/renderer/ChunkUploadManager.cpp` to `engine/CMakeLists.txt`
+  - [x] 10.2 Add `tests/renderer/TestChunkUpload.cpp` to `tests/CMakeLists.txt`
+  - [x] 10.3 Verify all existing tests still pass
 
 ## Dev Notes
 
@@ -517,9 +517,35 @@ Recent commits follow pattern: `feat(scope): description`. For this story:
 ## Dev Agent Record
 
 ### Agent Model Used
+Claude Opus 4.6
 
 ### Debug Log References
+- Build fix: added missing `<algorithm>` include in TestChunkUpload.cpp
+- Build fix: removed unused variable `a` in test cleanup loop
+- Bug fix: `processDeferredFrees()` — changed to decrement-then-check pattern so items are freed after exactly FRAMES_IN_FLIGHT ticks (matching AC5)
+- Design decision: Used `consumeNewMeshes()` on ChunkManager (Approach B from story notes) for clean mesh-ready signaling without generation counters
 
 ### Completion Notes List
+- Created ChunkRenderInfo.h with RenderState enum, ChunkRenderInfo struct, SectionKey + hash, and ChunkRenderInfoMap typedef
+- Created ChunkUploadManager (header + cpp) with full upload pipeline: processUploads, uploadSingle, deferred free, pending upload queue with distance-based priority, chunk unload cleanup
+- Added `consumeNewMeshes()` API to ChunkManager for efficient new-mesh discovery
+- Added `getMutableGigabuffer()` and `getMutableStagingBuffer()` to Renderer for upload system access
+- Wired ChunkUploadManager into GameApp: creation in init(), processUploads + processDeferredFrees in tick(), debug overlay display
+- 9 unit tests covering: SectionKey equality/hashing, ChunkRenderInfo defaults, map insert/lookup, deferred free FIFO timing, render info lifecycle, empty mesh handling, upload queue draining, remesh allocation replacement, unload cleanup
+- All 482,958 assertions in 158 test cases pass with zero regressions
+
+### Change Log
+- 2026-03-27: Implemented Story 5.7 — Mesh Upload to Gigabuffer (all 10 tasks complete)
 
 ### File List
+- engine/include/voxel/renderer/ChunkRenderInfo.h (NEW)
+- engine/include/voxel/renderer/ChunkUploadManager.h (NEW)
+- engine/src/renderer/ChunkUploadManager.cpp (NEW)
+- engine/include/voxel/renderer/Renderer.h (MODIFIED — added getMutableGigabuffer, getMutableStagingBuffer)
+- engine/include/voxel/world/ChunkManager.h (MODIFIED — added consumeNewMeshes, MeshReadyEntry, m_newMeshKeys)
+- engine/src/world/ChunkManager.cpp (MODIFIED — added consumeNewMeshes impl, track new mesh keys in pollMeshResults)
+- game/src/GameApp.h (MODIFIED — added m_uploadManager member, ChunkUploadManager include)
+- game/src/GameApp.cpp (MODIFIED — create upload manager in init, call in tick, debug overlay display)
+- engine/CMakeLists.txt (MODIFIED — added ChunkUploadManager.cpp)
+- tests/CMakeLists.txt (MODIFIED — added TestChunkUpload.cpp)
+- tests/renderer/TestChunkUpload.cpp (NEW)

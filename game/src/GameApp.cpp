@@ -148,6 +148,10 @@ voxel::core::Result<void> GameApp::init(const std::string& shaderDir, std::optio
         return result;
     }
 
+    // Create mesh upload manager — uses Renderer's Gigabuffer and StagingBuffer
+    m_uploadManager = std::make_unique<voxel::renderer::ChunkUploadManager>(
+        *m_renderer.getMutableGigabuffer(), *m_renderer.getMutableStagingBuffer());
+
     // Start with cursor captured for FPS camera
     m_input->setCursorCaptured(true);
     if (glfwRawMouseMotionSupported())
@@ -257,6 +261,13 @@ void GameApp::tick(double dt)
     // Async meshing: poll results and dispatch dirty sections
     m_chunkManager.update(m_camera.getPosition());
 
+    // Upload completed meshes to gigabuffer via staging buffer
+    if (m_uploadManager)
+    {
+        m_uploadManager->processUploads(m_chunkManager, m_camera.getPosition());
+        m_uploadManager->processDeferredFrees();
+    }
+
     // Clear edge flags and update hold timers at end of tick.
     // Edge flags were set by pollEvents callbacks, read above, and now cleared
     // so subsequent ticks in the same frame won't see stale presses.
@@ -315,6 +326,14 @@ void GameApp::buildDebugOverlay()
         }
         ImGui::Text(
             "Chunks: %zu loaded, %zu dirty", m_chunkManager.loadedChunkCount(), m_chunkManager.dirtyChunkCount());
+        if (m_uploadManager)
+        {
+            ImGui::Text(
+                "GPU Sections: %u resident, %u pending, %u deferred-free",
+                m_uploadManager->residentCount(),
+                m_uploadManager->pendingUploadCount(),
+                m_uploadManager->deferredFreeCount());
+        }
         ImGui::Text("Seed: %lld", static_cast<long long>(m_config.getSeed()));
 
         ImGui::Separator();

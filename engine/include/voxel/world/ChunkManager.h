@@ -137,6 +137,17 @@ class ChunkManager
     /// Retrieve a completed mesh for a given section, or nullptr if not yet available.
     [[nodiscard]] const renderer::ChunkMesh* getMesh(glm::ivec2 coord, int sectionY) const;
 
+    /// Entry describing a newly available mesh for upload.
+    struct MeshReadyEntry
+    {
+        MeshKey key;
+        const renderer::ChunkMesh* mesh = nullptr; // non-owning; valid until next pollMeshResults
+    };
+
+    /// Drain all sections that received new meshes since last call.
+    /// The returned pointers are valid until the next call to update().
+    void consumeNewMeshes(std::vector<MeshReadyEntry>& out);
+
   private:
     /// Create an immutable snapshot of a section and its 6 neighbors for async meshing.
     [[nodiscard]] renderer::MeshJobInput createMeshSnapshot(glm::ivec2 coord, int sectionY) const;
@@ -164,6 +175,9 @@ class ChunkManager
     // In-flight task tracking
     std::vector<std::unique_ptr<renderer::MeshChunkTask>> m_inFlightTasks;
     std::unordered_set<MeshKey, MeshKeyHash> m_inFlightKeys;
+
+    // Keys of meshes updated since last consumeNewMeshes() call
+    std::vector<MeshKey> m_newMeshKeys;
 };
 
 } // namespace voxel::world

@@ -227,7 +227,22 @@ void ChunkManager::pollMeshResults()
 
         MeshKey key{result->chunkCoord, result->sectionY};
         m_meshes[key] = std::move(result->mesh);
+        m_newMeshKeys.push_back(key);
     }
+}
+
+void ChunkManager::consumeNewMeshes(std::vector<MeshReadyEntry>& out)
+{
+    out.clear();
+    for (const auto& key : m_newMeshKeys)
+    {
+        auto it = m_meshes.find(key);
+        if (it != m_meshes.end())
+        {
+            out.push_back({key, &it->second});
+        }
+    }
+    m_newMeshKeys.clear();
 }
 
 void ChunkManager::dispatchDirtySections(const glm::dvec3& playerPos)

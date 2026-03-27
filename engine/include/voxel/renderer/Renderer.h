@@ -93,6 +93,12 @@ class Renderer
     /// Returns the Gigabuffer (non-owning, for stats queries). May be null before init.
     [[nodiscard]] const Gigabuffer* getGigabuffer() const { return m_gigabuffer.get(); }
 
+    /// Returns mutable Gigabuffer for upload operations. Renderer retains ownership.
+    [[nodiscard]] Gigabuffer* getMutableGigabuffer() { return m_gigabuffer.get(); }
+
+    /// Returns mutable StagingBuffer for upload operations. Renderer retains ownership.
+    [[nodiscard]] StagingBuffer* getMutableStagingBuffer() { return m_stagingBuffer.get(); }
+
     /// Requests a screenshot to be captured after the next present. Saved as PNG to the given path.
     void requestScreenshot(const std::string& outputPath);
 

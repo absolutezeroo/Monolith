@@ -6,6 +6,7 @@
 #include "voxel/game/GameLoop.h"
 #include "voxel/input/InputManager.h"
 #include "voxel/renderer/Camera.h"
+#include "voxel/renderer/ChunkUploadManager.h"
 #include "voxel/renderer/MeshBuilder.h"
 #include "voxel/renderer/Renderer.h"
 #include "voxel/world/BlockRegistry.h"
@@ -51,6 +52,7 @@ class GameApp : public voxel::game::GameLoop
 
     voxel::game::Window& m_window;
     voxel::renderer::Renderer m_renderer;
+    std::unique_ptr<voxel::renderer::ChunkUploadManager> m_uploadManager; // destroyed before Renderer
     voxel::renderer::Camera m_camera;
     voxel::renderer::DebugOverlayState m_overlayState;
     voxel::core::ConfigManager m_config;
