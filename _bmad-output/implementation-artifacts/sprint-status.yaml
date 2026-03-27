@@ -176,8 +176,8 @@ epics:
         assigned_to: dev-agent
       - id: "5.3b"
         title: "Quad Format Fix + Registry Safety Hardening"
-        status: backlog
-        assigned_to: null
+        status: ready-for-dev
+        assigned_to: dev-agent
       - id: "5.4"
         title: "Non-Cubic Block Model Meshing"
         status: ready-for-dev
