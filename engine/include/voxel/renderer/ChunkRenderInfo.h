@@ -26,9 +26,11 @@ enum class RenderState : uint8_t
 /// GPU-side render metadata for one chunk section.
 struct ChunkRenderInfo
 {
-    GigabufferAllocation allocation{}; // Gigabuffer sub-allocation
-    uint32_t quadCount = 0;           // Number of quads (for draw command)
-    glm::ivec3 worldBasePos{0};       // Section world origin (chunkX*16, sectionY*16, chunkZ*16)
+    GigabufferAllocation allocation{};      // Gigabuffer sub-allocation (opaque)
+    uint32_t quadCount = 0;                 // Number of opaque quads (for draw command)
+    GigabufferAllocation transAllocation{};  // Gigabuffer sub-allocation (translucent)
+    uint32_t transQuadCount = 0;             // Number of translucent quads
+    glm::ivec3 worldBasePos{0};             // Section world origin (chunkX*16, sectionY*16, chunkZ*16)
     RenderState state = RenderState::None;
 };
 
@@ -36,13 +38,15 @@ struct ChunkRenderInfo
 /// Layout matches GLSL std430 exactly — see cull.comp / chunk.vert.
 struct GpuChunkRenderInfo
 {
-    glm::vec4 boundingSphere;   // xyz = center (world space), w = radius
-    glm::vec4 worldBasePos;     // xyz = section world origin, w = unused
-    uint32_t gigabufferOffset;  // byte offset into gigabuffer
-    uint32_t quadCount;         // number of quads
-    uint32_t pad[2];            // explicit padding to 48 bytes
+    glm::vec4 boundingSphere;       // xyz = center (world space), w = radius  (16 bytes, offset 0)
+    glm::vec4 worldBasePos;         // xyz = section world origin, w = unused  (16 bytes, offset 16)
+    uint32_t gigabufferOffset;      // byte offset into gigabuffer (opaque)    (4 bytes,  offset 32)
+    uint32_t quadCount;             // number of opaque quads                  (4 bytes,  offset 36)
+    uint32_t transGigabufferOffset; // byte offset into gigabuffer (translucent) (4 bytes, offset 40)
+    uint32_t transQuadCount;        // number of translucent quads             (4 bytes,  offset 44)
+    uint32_t pad[4];                // explicit padding to 64 bytes            (16 bytes, offset 48)
 };
-static_assert(sizeof(GpuChunkRenderInfo) == 48, "GpuChunkRenderInfo must be 48 bytes for std430 layout");
+static_assert(sizeof(GpuChunkRenderInfo) == 64, "GpuChunkRenderInfo must be 64 bytes for std430 layout");
 static_assert(offsetof(GpuChunkRenderInfo, quadCount) == 36, "quadCount must be at offset 36");
 
 /// Builds a GpuChunkRenderInfo from the CPU-side ChunkRenderInfo.
@@ -56,7 +60,9 @@ inline GpuChunkRenderInfo buildGpuInfo(const ChunkRenderInfo& info)
         .worldBasePos = glm::vec4(pos, 0.0f),
         .gigabufferOffset = static_cast<uint32_t>(info.allocation.offset),
         .quadCount = info.quadCount,
-        .pad = {0, 0},
+        .transGigabufferOffset = static_cast<uint32_t>(info.transAllocation.offset),
+        .transQuadCount = info.transQuadCount,
+        .pad = {0, 0, 0, 0},
     };
 }
 

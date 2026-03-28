@@ -5,7 +5,7 @@
 project: VoxelForge
 methodology: BMAD v6 + Game Dev Studio
 created: 2026-03-24
-last_updated: 2026-03-29  # Story 6.6 → done (code review passed)
+last_updated: 2026-03-29  # Story 6.7 → in-progress
 
 # Status values: backlog | ready | in-progress | review | done | blocked
 
@@ -231,7 +231,7 @@ epics:
         assigned_to: dev-agent
       - id: "6.7"
         title: "Transparent & Translucent Rendering Pass"
-        status: ready-for-dev
+        status: review
         assigned_to: dev-agent
       - id: "6.8"
         title: "Block Tinting Shader Support"

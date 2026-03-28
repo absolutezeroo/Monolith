@@ -169,6 +169,29 @@ core::Result<void> Renderer::init(const std::string& shaderDir, const std::strin
         m_wireframePipeline = wireResult.value();
     }
 
+    // Translucent forward pipeline: alpha blending, depth test (no write), single swapchain output
+    {
+        std::string transFragPath = shaderDir + "/translucent.frag.spv";
+        PipelineConfig transConfig;
+        transConfig.polygonMode = VK_POLYGON_MODE_FILL;
+        transConfig.depthTestEnable = true;
+        transConfig.depthWriteEnable = false; // depth read only for translucent
+        transConfig.enableBlending = true;
+        transConfig.cullMode = VK_CULL_MODE_NONE; // glass visible from both sides
+        transConfig.vertShaderPath = vertPath;
+        transConfig.fragShaderPath = transFragPath;
+        transConfig.colorAttachmentFormats = {m_vulkanContext.getSwapchainFormat()};
+        transConfig.depthAttachmentFormat = GBUFFER_DEPTH_FORMAT;
+
+        auto transResult = buildPipeline(transConfig);
+        if (!transResult.has_value())
+        {
+            return std::unexpected(transResult.error());
+        }
+        m_translucentPipeline = transResult.value();
+        VX_LOG_INFO("Translucent pipeline created");
+    }
+
     // Create compute pipeline layout — same descriptor set layout, but with compute push constants
     VkPushConstantRange computePushRange{};
     computePushRange.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
@@ -223,6 +246,47 @@ core::Result<void> Renderer::init(const std::string& shaderDir, const std::strin
     }
 
     VX_LOG_INFO("Compute culling pipeline created");
+
+    // Create translucent cull compute pipeline (same layout, different shader)
+    std::string cullTransPath = shaderDir + "/cull_translucent.comp.spv";
+    auto cullTransShaderResult = loadShaderModule(cullTransPath);
+    if (!cullTransShaderResult.has_value())
+    {
+        return std::unexpected(cullTransShaderResult.error());
+    }
+    VkShaderModule cullTransShader = cullTransShaderResult.value();
+
+    VkPipelineShaderStageCreateInfo computeTransStageInfo{};
+    computeTransStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    computeTransStageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+    computeTransStageInfo.module = cullTransShader;
+    computeTransStageInfo.pName = "main";
+
+    VkComputePipelineCreateInfo computeTransPipelineInfo{};
+    computeTransPipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+    computeTransPipelineInfo.stage = computeTransStageInfo;
+    computeTransPipelineInfo.layout = m_computePipelineLayout;
+
+    VkResult cullTransPipelineResult =
+        vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computeTransPipelineInfo, nullptr, &m_cullTranslucentPipeline);
+    vkDestroyShaderModule(device, cullTransShader, nullptr);
+
+    if (cullTransPipelineResult != VK_SUCCESS)
+    {
+        VX_LOG_ERROR("Failed to create translucent culling pipeline: {}", static_cast<int>(cullTransPipelineResult));
+        return std::unexpected(core::EngineError::vulkan(
+            static_cast<int32_t>(cullTransPipelineResult), "Failed to create translucent culling pipeline"));
+    }
+
+    VX_LOG_INFO("Translucent culling pipeline created");
+
+    // Create translucent indirect draw buffer
+    auto transIndirectResult = IndirectDrawBuffer::create(m_vulkanContext, MAX_RENDERABLE_SECTIONS);
+    if (!transIndirectResult.has_value())
+    {
+        return std::unexpected(transIndirectResult.error());
+    }
+    m_transIndirectDrawBuffer = std::move(transIndirectResult.value());
 
     // Allocate chunk descriptor set and write gigabuffer to binding 0
     auto descriptorSetResult = m_descriptorAllocator->allocate(m_chunkDescriptorSetLayout);
@@ -301,6 +365,69 @@ core::Result<void> Renderer::init(const std::string& shaderDir, const std::strin
     descriptorWrites[4].pImageInfo = &textureInfo;
 
     vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+
+    // Allocate translucent descriptor set (same layout, but with translucent indirect buffers)
+    auto transDescResult = m_descriptorAllocator->allocate(m_chunkDescriptorSetLayout);
+    if (!transDescResult.has_value())
+    {
+        return std::unexpected(transDescResult.error());
+    }
+    m_transDescriptorSet = transDescResult.value();
+
+    // Write translucent descriptor set: same gigabuffer + chunkRenderInfo, but different indirect buffers
+    VkDescriptorBufferInfo transIndirectCommandInfo{};
+    transIndirectCommandInfo.buffer = m_transIndirectDrawBuffer->getCommandBuffer();
+    transIndirectCommandInfo.offset = 0;
+    transIndirectCommandInfo.range = VK_WHOLE_SIZE;
+
+    VkDescriptorBufferInfo transIndirectCountInfo{};
+    transIndirectCountInfo.buffer = m_transIndirectDrawBuffer->getCountBuffer();
+    transIndirectCountInfo.offset = 0;
+    transIndirectCountInfo.range = VK_WHOLE_SIZE;
+
+    std::array<VkWriteDescriptorSet, 5> transDescWrites{};
+
+    // Binding 0: same gigabuffer
+    transDescWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    transDescWrites[0].dstSet = m_transDescriptorSet;
+    transDescWrites[0].dstBinding = 0;
+    transDescWrites[0].descriptorCount = 1;
+    transDescWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    transDescWrites[0].pBufferInfo = &gigabufferInfo;
+
+    // Binding 1: same ChunkRenderInfo
+    transDescWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    transDescWrites[1].dstSet = m_transDescriptorSet;
+    transDescWrites[1].dstBinding = 1;
+    transDescWrites[1].descriptorCount = 1;
+    transDescWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    transDescWrites[1].pBufferInfo = &chunkRenderInfoInfo;
+
+    // Binding 2: translucent indirect command buffer
+    transDescWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    transDescWrites[2].dstSet = m_transDescriptorSet;
+    transDescWrites[2].dstBinding = 2;
+    transDescWrites[2].descriptorCount = 1;
+    transDescWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    transDescWrites[2].pBufferInfo = &transIndirectCommandInfo;
+
+    // Binding 3: translucent indirect draw count buffer
+    transDescWrites[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    transDescWrites[3].dstSet = m_transDescriptorSet;
+    transDescWrites[3].dstBinding = 3;
+    transDescWrites[3].descriptorCount = 1;
+    transDescWrites[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    transDescWrites[3].pBufferInfo = &transIndirectCountInfo;
+
+    // Binding 4: same texture array
+    transDescWrites[4].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    transDescWrites[4].dstSet = m_transDescriptorSet;
+    transDescWrites[4].dstBinding = 4;
+    transDescWrites[4].descriptorCount = 1;
+    transDescWrites[4].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    transDescWrites[4].pImageInfo = &textureInfo;
+
+    vkUpdateDescriptorSets(device, static_cast<uint32_t>(transDescWrites.size()), transDescWrites.data(), 0, nullptr);
 
     // Create depth buffer and other extent-dependent resources
     auto swapResResult = createSwapchainResources();
@@ -741,13 +868,23 @@ core::Result<VkPipeline> Renderer::buildPipeline(const PipelineConfig& config)
     msaa.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
     msaa.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
-    // One blend attachment per color attachment — all opaque write-all
+    // One blend attachment per color attachment
     std::vector<VkPipelineColorBlendAttachmentState> blendAttachments(config.colorAttachmentFormats.size());
     for (auto& blend : blendAttachments)
     {
         blend.colorWriteMask =
             VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
         blend.blendEnable = config.enableBlending ? VK_TRUE : VK_FALSE;
+        if (config.enableBlending)
+        {
+            // Standard alpha blending: srcColor * srcAlpha + dstColor * (1 - srcAlpha)
+            blend.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+            blend.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+            blend.colorBlendOp = VK_BLEND_OP_ADD;
+            blend.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+            blend.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+            blend.alphaBlendOp = VK_BLEND_OP_ADD;
+        }
     }
 
     VkPipelineColorBlendStateCreateInfo blendState{};
@@ -1073,6 +1210,8 @@ void Renderer::renderChunksIndirect(
     auto& frame = m_frames[m_frameIndex];
     VkCommandBuffer cmd = frame.commandBuffer;
 
+    m_lastViewProjection = viewProjection;
+
     uint32_t totalSections = m_chunkRenderInfoBuffer->getHighWaterMark();
     if (totalSections == 0)
     {
@@ -1082,8 +1221,9 @@ void Renderer::renderChunksIndirect(
         return;
     }
 
-    // 1. Reset draw count to 0 via vkCmdFillBuffer
+    // 1. Reset draw counts to 0 via vkCmdFillBuffer (opaque + translucent)
     m_indirectDrawBuffer->recordCountReset(cmd);
+    m_transIndirectDrawBuffer->recordCountReset(cmd);
 
     // 2. Barrier: TRANSFER_DST → COMPUTE_SHADER (fill completes before compute reads/writes)
     VkMemoryBarrier2 fillToComputeBarrier{};
@@ -1120,8 +1260,16 @@ void Renderer::renderChunksIndirect(
         sizeof(CullPushConstants),
         &cullPC);
 
-    // 5. Dispatch compute shader: ceil(totalSections / 64)
+    // 5. Dispatch opaque compute shader: ceil(totalSections / 64)
     uint32_t groupCount = (totalSections + 63) / 64;
+    vkCmdDispatch(cmd, groupCount, 1, 1);
+
+    // 5b. Dispatch translucent cull shader
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_cullTranslucentPipeline);
+    vkCmdBindDescriptorSets(
+        cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_computePipelineLayout, 0, 1, &m_transDescriptorSet, 0, nullptr);
+    vkCmdPushConstants(
+        cmd, m_computePipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(CullPushConstants), &cullPC);
     vkCmdDispatch(cmd, groupCount, 1, 1);
 
     // 6. Barrier: COMPUTE → DRAW_INDIRECT + VERTEX_SHADER
@@ -1259,6 +1407,109 @@ void Renderer::endFrame()
 
     vkCmdDraw(cmd, 3, 1, 0, 0); // fullscreen triangle
 
+    vkCmdEndRendering(cmd);
+
+    // ── Translucent forward pass (after lighting, before ImGui) ─────────────
+    // Transition depth from SHADER_READ_ONLY back to DEPTH_READ_ONLY for translucent depth test
+    {
+        VkImageMemoryBarrier2 depthBarrier{};
+        depthBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+        depthBarrier.image = m_swapchainResources.depthImage;
+        depthBarrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        depthBarrier.newLayout = VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL;
+        depthBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        depthBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        depthBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+        depthBarrier.subresourceRange.baseMipLevel = 0;
+        depthBarrier.subresourceRange.levelCount = 1;
+        depthBarrier.subresourceRange.baseArrayLayer = 0;
+        depthBarrier.subresourceRange.layerCount = 1;
+        depthBarrier.srcStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+        depthBarrier.srcAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
+        depthBarrier.dstStageMask =
+            VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
+        depthBarrier.dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+
+        VkDependencyInfo depthDep{};
+        depthDep.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+        depthDep.imageMemoryBarrierCount = 1;
+        depthDep.pImageMemoryBarriers = &depthBarrier;
+        vkCmdPipelineBarrier2(cmd, &depthDep);
+    }
+
+    // Begin translucent render pass: swapchain color (load existing) + depth (read-only)
+    VkRenderingAttachmentInfo transColorAttach{};
+    transColorAttach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+    transColorAttach.imageView = m_vulkanContext.getSwapchainImageViews()[m_currentImageIndex];
+    transColorAttach.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    transColorAttach.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD; // preserve lighting output
+    transColorAttach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+
+    VkRenderingAttachmentInfo transDepthAttach{};
+    transDepthAttach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+    transDepthAttach.imageView = m_swapchainResources.depthImageView;
+    transDepthAttach.imageLayout = VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL;
+    transDepthAttach.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD; // read existing depth
+    transDepthAttach.storeOp = VK_ATTACHMENT_STORE_OP_NONE;
+
+    VkRenderingInfo transRenderInfo{};
+    transRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+    transRenderInfo.renderArea.offset = {0, 0};
+    transRenderInfo.renderArea.extent = extent;
+    transRenderInfo.layerCount = 1;
+    transRenderInfo.colorAttachmentCount = 1;
+    transRenderInfo.pColorAttachments = &transColorAttach;
+    transRenderInfo.pDepthAttachment = &transDepthAttach;
+
+    vkCmdBeginRendering(cmd, &transRenderInfo);
+
+    vkCmdSetViewport(cmd, 0, 1, &viewport);
+    vkCmdSetScissor(cmd, 0, 1, &scissor);
+
+    // Bind translucent pipeline and draw
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_translucentPipeline);
+    vkCmdBindDescriptorSets(
+        cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout, 0, 1, &m_transDescriptorSet, 0, nullptr);
+    m_quadIndexBuffer->bind(cmd);
+
+    float currentTime = static_cast<float>(glfwGetTime());
+    ChunkPushConstants transPC{};
+    transPC.viewProjection = m_lastViewProjection;
+    transPC.time = currentTime;
+    vkCmdPushConstants(
+        cmd, m_pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+        0, sizeof(ChunkPushConstants), &transPC);
+
+    vkCmdDrawIndexedIndirectCount(
+        cmd,
+        m_transIndirectDrawBuffer->getCommandBuffer(),
+        0,
+        m_transIndirectDrawBuffer->getCountBuffer(),
+        0,
+        MAX_RENDERABLE_SECTIONS,
+        sizeof(VkDrawIndexedIndirectCommand));
+
+    vkCmdEndRendering(cmd);
+
+    // ── Begin final swapchain pass for ImGui ────────────────────────────────
+    VkRenderingAttachmentInfo imguiAttach{};
+    imguiAttach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+    imguiAttach.imageView = m_vulkanContext.getSwapchainImageViews()[m_currentImageIndex];
+    imguiAttach.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    imguiAttach.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+    imguiAttach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+
+    VkRenderingInfo imguiRenderInfo{};
+    imguiRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+    imguiRenderInfo.renderArea.offset = {0, 0};
+    imguiRenderInfo.renderArea.extent = extent;
+    imguiRenderInfo.layerCount = 1;
+    imguiRenderInfo.colorAttachmentCount = 1;
+    imguiRenderInfo.pColorAttachments = &imguiAttach;
+    imguiRenderInfo.pDepthAttachment = nullptr;
+
+    vkCmdBeginRendering(cmd, &imguiRenderInfo);
+
     // ── Render ImGui on top of the composited result ────────────────────────
     m_imguiBackend->render(cmd);
 
@@ -1371,6 +1622,7 @@ void Renderer::shutdown()
     m_textureArray.reset();
 
     // Destroy indirect/ChunkRenderInfo buffers before DescriptorAllocator (they are referenced by descriptors)
+    m_transIndirectDrawBuffer.reset();
     m_indirectDrawBuffer.reset();
     m_chunkRenderInfoBuffer.reset();
 
@@ -1393,10 +1645,22 @@ void Renderer::shutdown()
         m_pipeline = VK_NULL_HANDLE;
     }
 
+    if (m_cullTranslucentPipeline != VK_NULL_HANDLE)
+    {
+        vkDestroyPipeline(device, m_cullTranslucentPipeline, nullptr);
+        m_cullTranslucentPipeline = VK_NULL_HANDLE;
+    }
+
     if (m_cullPipeline != VK_NULL_HANDLE)
     {
         vkDestroyPipeline(device, m_cullPipeline, nullptr);
         m_cullPipeline = VK_NULL_HANDLE;
+    }
+
+    if (m_translucentPipeline != VK_NULL_HANDLE)
+    {
+        vkDestroyPipeline(device, m_translucentPipeline, nullptr);
+        m_translucentPipeline = VK_NULL_HANDLE;
     }
 
     if (m_lightingPipeline != VK_NULL_HANDLE)
@@ -1407,6 +1671,7 @@ void Renderer::shutdown()
 
     // Destroy descriptor infrastructure (pools first, then layout, then pipeline layout)
     m_chunkDescriptorSet = VK_NULL_HANDLE;    // owned by pool, destroyed with it
+    m_transDescriptorSet = VK_NULL_HANDLE;    // owned by pool, destroyed with it
     m_lightingDescriptorSet = VK_NULL_HANDLE; // owned by pool, destroyed with it
     m_descriptorAllocator.reset();
 

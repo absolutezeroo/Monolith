@@ -28,9 +28,9 @@ inline const float SECTION_BOUNDING_RADIUS = std::sqrt(192.0f);
 inline constexpr VkDeviceSize INDIRECT_COMMAND_BUFFER_SIZE =
     static_cast<VkDeviceSize>(MAX_RENDERABLE_SECTIONS) * sizeof(VkDrawIndexedIndirectCommand);
 
-/// Size in bytes of the ChunkRenderInfo SSBO (MAX_RENDERABLE_SECTIONS * 48 bytes per entry).
+/// Size in bytes of the ChunkRenderInfo SSBO (MAX_RENDERABLE_SECTIONS * 64 bytes per entry).
 inline constexpr VkDeviceSize CHUNK_RENDER_INFO_BUFFER_SIZE =
-    static_cast<VkDeviceSize>(MAX_RENDERABLE_SECTIONS) * 48;
+    static_cast<VkDeviceSize>(MAX_RENDERABLE_SECTIONS) * 64;
 
 /// Pixel dimensions of each block texture (square).
 inline constexpr uint32_t BLOCK_TEXTURE_SIZE = 16;

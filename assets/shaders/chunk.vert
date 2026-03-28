@@ -9,12 +9,13 @@ layout(std430, set = 0, binding = 0) readonly buffer Gigabuffer {
 // ── ChunkRenderInfo SSBO (binding 1) ────────────────────────────────────────
 // Per-chunk metadata uploaded by CPU, indexed by gl_InstanceIndex (= firstInstance from compute cull).
 struct ChunkRenderInfo {
-    vec4 boundingSphere;   // xyz = center, w = radius
-    vec4 worldBasePos;     // xyz = section world origin, w = unused
-    uint gigabufferOffset;
-    uint quadCount;
-    uint _pad0;
-    uint _pad1;
+    vec4 boundingSphere;       // xyz = center, w = radius
+    vec4 worldBasePos;         // xyz = section world origin, w = unused
+    uint gigabufferOffset;     // opaque
+    uint quadCount;            // opaque
+    uint transGigabufferOffset;// translucent
+    uint transQuadCount;       // translucent
+    uint _pad0, _pad1, _pad2, _pad3; // pad to 64 bytes
 };
 layout(std430, set = 0, binding = 1) readonly buffer ChunkInfoSSBO {
     ChunkRenderInfo infos[];

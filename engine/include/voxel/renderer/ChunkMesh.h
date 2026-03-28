@@ -141,11 +141,17 @@ struct ChunkMesh
     std::vector<uint64_t> quads;
     uint32_t quadCount = 0;
 
+    std::vector<uint64_t> translucentQuads;
+    uint32_t translucentQuadCount = 0;
+
     std::vector<ModelVertex> modelVertices;
     uint32_t modelVertexCount = 0;
 
     /// Returns true when the mesh contains no geometry at all.
-    [[nodiscard]] bool isEmpty() const { return quadCount == 0 && modelVertexCount == 0; }
+    [[nodiscard]] bool isEmpty() const
+    {
+        return quadCount == 0 && translucentQuadCount == 0 && modelVertexCount == 0;
+    }
 };
 
 } // namespace voxel::renderer

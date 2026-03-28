@@ -170,10 +170,10 @@ TEST_CASE("MeshBuilder naive face culling", "[renderer][meshing]")
 
         ChunkMesh mesh = builder.buildNaive(section, NO_NEIGHBORS);
 
-        // Stone block: 5 normal faces + PosX face is adjacent to glass (transparent → emit). Total = 6.
-        // Glass block: 5 normal faces + NegX face is adjacent to stone (opaque → NOT transparent → cull). Total = 5.
-        // Total = 6 + 5 = 11.
-        REQUIRE(mesh.quadCount == 11);
+        // Stone block: 6 faces (PosX toward glass emitted — glass is transparent).
+        // Glass block: 6 faces (NegX toward stone emitted — transparent sees opaque surface).
+        // Total = 6 + 6 = 12.
+        REQUIRE(mesh.quadCount == 12);
 
         // Verify: stone's PosX face is emitted (glass is transparent).
         bool foundStonePosX = false;
@@ -191,8 +191,8 @@ TEST_CASE("MeshBuilder naive face culling", "[renderer][meshing]")
             }
         }
         REQUIRE(foundStonePosX);
-        // Glass NegX face: neighbor is stone which is NOT transparent, so culled.
-        REQUIRE_FALSE(foundGlassNegX);
+        // Glass NegX face: transparent toward opaque → emitted.
+        REQUIRE(foundGlassNegX);
     }
 
     SECTION("quad packing roundtrip preserves all fields")
@@ -224,6 +224,60 @@ TEST_CASE("MeshBuilder naive face culling", "[renderer][meshing]")
         REQUIRE(ao[2] == ao2);
         REQUIRE(ao[3] == ao3);
         REQUIRE(unpackFlip(quad) == true);
+    }
+}
+
+// Helper: register a translucent block (e.g., water).
+static uint16_t registerWater(BlockRegistry& registry)
+{
+    BlockDefinition def;
+    def.stringId = "base:water";
+    def.isSolid = false;
+    def.isTransparent = true;
+    def.renderType = RenderType::Translucent;
+    def.modelType = ModelType::FullCube;
+    def.textureIndices[0] = 11;
+    def.textureIndices[1] = 11;
+    def.textureIndices[2] = 11;
+    def.textureIndices[3] = 11;
+    def.textureIndices[4] = 11;
+    def.textureIndices[5] = 11;
+    auto result = registry.registerBlock(std::move(def));
+    REQUIRE(result.has_value());
+    return registry.getIdByName("base:water");
+}
+
+TEST_CASE("Naive meshing translucent quad routing", "[renderer][meshing][translucent]")
+{
+    BlockRegistry registry;
+    uint16_t stoneId = registerStone(registry);
+    uint16_t waterId = registerWater(registry);
+    MeshBuilder builder(registry);
+
+    SECTION("translucent block routes to translucentQuads")
+    {
+        ChunkSection section;
+        section.setBlock(8, 8, 8, waterId);
+
+        ChunkMesh mesh = builder.buildNaive(section, NO_NEIGHBORS);
+
+        REQUIRE(mesh.quadCount == 0);
+        REQUIRE(mesh.translucentQuadCount == 6);
+        REQUIRE(mesh.translucentQuads.size() == 6);
+    }
+
+    SECTION("opaque + translucent adjacency separates correctly")
+    {
+        ChunkSection section;
+        section.setBlock(7, 8, 8, stoneId);
+        section.setBlock(8, 8, 8, waterId);
+
+        ChunkMesh mesh = builder.buildNaive(section, NO_NEIGHBORS);
+
+        // Stone: 6 opaque quads (PosX toward water emitted)
+        // Water: 6 translucent quads (NegX toward stone emitted — transparent sees opaque)
+        REQUIRE(mesh.quadCount == 6);
+        REQUIRE(mesh.translucentQuadCount == 6);
     }
 }
 

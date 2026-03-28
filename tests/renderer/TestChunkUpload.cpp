@@ -351,16 +351,18 @@ TEST_CASE("Remesh — old allocation deferred-freed, new allocation at different
 
 TEST_CASE("GpuChunkRenderInfo has correct size and layout", "[renderer][chunk-upload]")
 {
-    static_assert(sizeof(GpuChunkRenderInfo) == 48);
+    static_assert(sizeof(GpuChunkRenderInfo) == 64);
     static_assert(offsetof(GpuChunkRenderInfo, quadCount) == 36);
 
     GpuChunkRenderInfo info{};
-    CHECK(sizeof(info) == 48);
+    CHECK(sizeof(info) == 64);
     CHECK(offsetof(GpuChunkRenderInfo, boundingSphere) == 0);
     CHECK(offsetof(GpuChunkRenderInfo, worldBasePos) == 16);
     CHECK(offsetof(GpuChunkRenderInfo, gigabufferOffset) == 32);
     CHECK(offsetof(GpuChunkRenderInfo, quadCount) == 36);
-    CHECK(offsetof(GpuChunkRenderInfo, pad) == 40);
+    CHECK(offsetof(GpuChunkRenderInfo, transGigabufferOffset) == 40);
+    CHECK(offsetof(GpuChunkRenderInfo, transQuadCount) == 44);
+    CHECK(offsetof(GpuChunkRenderInfo, pad) == 48);
 }
 
 TEST_CASE("buildGpuInfo computes correct bounding sphere", "[renderer][chunk-upload]")

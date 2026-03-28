@@ -315,6 +315,26 @@ static uint16_t registerGlass(BlockRegistry& registry)
     return registry.getIdByName("base:glass");
 }
 
+// Helper: register a translucent FullCube block (e.g., water).
+static uint16_t registerWater(BlockRegistry& registry)
+{
+    BlockDefinition def;
+    def.stringId = "base:water";
+    def.isSolid = false;
+    def.isTransparent = true;
+    def.modelType = ModelType::FullCube;
+    def.renderType = RenderType::Translucent;
+    def.textureIndices[0] = 11;
+    def.textureIndices[1] = 11;
+    def.textureIndices[2] = 11;
+    def.textureIndices[3] = 11;
+    def.textureIndices[4] = 11;
+    def.textureIndices[5] = 11;
+    auto result = registry.registerBlock(std::move(def));
+    REQUIRE(result.has_value());
+    return registry.getIdByName("base:water");
+}
+
 TEST_CASE("Greedy meshing AO-aware merging", "[renderer][meshing][greedy][ao]")
 {
     BlockRegistry registry;
@@ -458,12 +478,10 @@ TEST_CASE("Greedy meshing transparent blocks", "[renderer][meshing][greedy][tran
 
     SECTION("stone-glass adjacency emits correct faces")
     {
-        // Stone at (8,8,8) + glass at (9,8,8). Stone is opaque, glass is transparent.
-        // Stone: 6 faces (opaque sees transparent neighbor as air-like, emits face toward glass).
-        // Glass: 5 faces (glass doesn't emit face toward opaque stone — same block type check
-        //        passes, but the neighbor is opaque so it's culled by !neighborOpaque check).
-        // Actually: glass emits toward stone because stone is opaque → !neighborOpaque is false,
-        // so glass does NOT emit toward stone. Glass gets 5 faces.
+        // Stone at (8,8,8) + glass at (9,8,8). Stone is opaque, glass is transparent (cutout).
+        // Stone: 6 faces (opaque sees transparent neighbor → emits PosX toward glass).
+        // Glass: 6 faces (transparent sees opaque neighbor → emits NegX toward stone).
+        // Both are cutout → all in mesh.quads. Total = 12.
         ChunkSection section;
         section.setBlock(8, 8, 8, stoneId);
         section.setBlock(9, 8, 8, glassId);
@@ -471,8 +489,113 @@ TEST_CASE("Greedy meshing transparent blocks", "[renderer][meshing][greedy][tran
         ChunkMesh naiveMesh = builder.buildNaive(section, NO_NEIGHBORS);
         ChunkMesh greedyMesh = builder.buildGreedy(section, NO_NEIGHBORS);
 
-        // Both should produce 11 quads (stone=6, glass=5).
+        // Both should produce 12 quads (stone=6, glass=6).
+        REQUIRE(naiveMesh.quadCount == 12);
         REQUIRE(naiveMesh.quadCount == greedyMesh.quadCount);
+    }
+}
+
+TEST_CASE("Greedy meshing translucent quad routing", "[renderer][meshing][greedy][translucent]")
+{
+    BlockRegistry registry;
+    uint16_t stoneId = registerStone(registry);
+    uint16_t glassId = registerGlass(registry); // Cutout → opaque quads
+    uint16_t waterId = registerWater(registry);  // Translucent → translucentQuads
+    MeshBuilder builder(registry);
+
+    SECTION("translucent block routes to translucentQuads (naive)")
+    {
+        ChunkSection section;
+        section.setBlock(8, 8, 8, waterId);
+
+        ChunkMesh mesh = builder.buildNaive(section, NO_NEIGHBORS);
+
+        // Water is translucent → all 6 faces go to translucentQuads, 0 to quads
+        REQUIRE(mesh.quadCount == 0);
+        REQUIRE(mesh.translucentQuadCount == 6);
+    }
+
+    SECTION("translucent block routes to translucentQuads (greedy)")
+    {
+        ChunkSection section;
+        section.setBlock(8, 8, 8, waterId);
+
+        ChunkMesh mesh = builder.buildGreedy(section, NO_NEIGHBORS);
+
+        REQUIRE(mesh.quadCount == 0);
+        REQUIRE(mesh.translucentQuadCount == 6);
+    }
+
+    SECTION("cutout block stays in opaque quads (naive)")
+    {
+        ChunkSection section;
+        section.setBlock(8, 8, 8, glassId);
+
+        ChunkMesh mesh = builder.buildNaive(section, NO_NEIGHBORS);
+
+        REQUIRE(mesh.quadCount == 6);
+        REQUIRE(mesh.translucentQuadCount == 0);
+    }
+
+    SECTION("cutout block stays in opaque quads (greedy)")
+    {
+        ChunkSection section;
+        section.setBlock(8, 8, 8, glassId);
+
+        ChunkMesh mesh = builder.buildGreedy(section, NO_NEIGHBORS);
+
+        REQUIRE(mesh.quadCount == 6);
+        REQUIRE(mesh.translucentQuadCount == 0);
+    }
+
+    SECTION("mixed opaque + translucent separates correctly (naive)")
+    {
+        ChunkSection section;
+        section.setBlock(7, 8, 8, stoneId);
+        section.setBlock(8, 8, 8, waterId);
+
+        ChunkMesh mesh = builder.buildNaive(section, NO_NEIGHBORS);
+
+        // Stone: 6 opaque faces (PosX toward water emitted — water is transparent)
+        // Water: 6 translucent faces (NegX toward stone emitted — transparent sees opaque)
+        REQUIRE(mesh.quadCount == 6);
+        REQUIRE(mesh.translucentQuadCount == 6);
+    }
+
+    SECTION("mixed opaque + translucent separates correctly (greedy)")
+    {
+        ChunkSection section;
+        section.setBlock(7, 8, 8, stoneId);
+        section.setBlock(8, 8, 8, waterId);
+
+        ChunkMesh mesh = builder.buildGreedy(section, NO_NEIGHBORS);
+
+        REQUIRE(mesh.quadCount == 6);
+        REQUIRE(mesh.translucentQuadCount == 6);
+    }
+
+    SECTION("translucent plane merges to 6 quads in translucentQuads")
+    {
+        ChunkSection section;
+        for (int z = 0; z < ChunkSection::SIZE; ++z)
+            for (int x = 0; x < ChunkSection::SIZE; ++x)
+                section.setBlock(x, 0, z, waterId);
+
+        ChunkMesh mesh = builder.buildGreedy(section, NO_NEIGHBORS);
+
+        REQUIRE(mesh.quadCount == 0);
+        REQUIRE(mesh.translucentQuadCount == 6);
+    }
+
+    SECTION("isEmpty() accounts for translucent quads")
+    {
+        ChunkMesh empty;
+        REQUIRE(empty.isEmpty());
+
+        ChunkMesh transOnly;
+        transOnly.translucentQuads.push_back(0);
+        transOnly.translucentQuadCount = 1;
+        REQUIRE_FALSE(transOnly.isEmpty());
     }
 }
 

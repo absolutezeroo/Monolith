@@ -34,6 +34,11 @@ void main()
     // Sample block texture from array using tiling UVs and texture layer
     vec4 texColor = texture(blockTextures, vec3(fragUV, float(fragTextureLayer)));
 
+    // Alpha test for cutout blocks (leaves, flowers, tall grass)
+    // Opaque blocks have texColor.a == 1.0 so they always pass.
+    if (texColor.a < 0.5)
+        discard;
+
     // RT0: albedo from texture + AO in alpha
     outAlbedoAO = vec4(texColor.rgb, fragAO);
 

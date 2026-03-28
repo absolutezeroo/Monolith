@@ -13,10 +13,10 @@ layout(push_constant) uniform CullPushConstants {
 struct ChunkRenderInfo {
     vec4 boundingSphere;       // xyz = center (world space), w = radius
     vec4 worldBasePos;         // xyz = section world origin, w = unused
-    uint gigabufferOffset;     // byte offset into gigabuffer (opaque)
-    uint quadCount;            // number of opaque quads (0 = inactive slot)
-    uint transGigabufferOffset;// translucent (unused by cull.comp)
-    uint transQuadCount;       // translucent (unused by cull.comp)
+    uint gigabufferOffset;     // opaque
+    uint quadCount;            // opaque
+    uint transGigabufferOffset;// translucent byte offset into gigabuffer
+    uint transQuadCount;       // translucent quad count
     uint _pad0, _pad1, _pad2, _pad3; // pad to 64 bytes
 };
 
@@ -51,7 +51,7 @@ bool isVisible(vec4 sphere)
     {
         float dist = dot(pc.frustumPlanes[i].xyz, center) + pc.frustumPlanes[i].w;
         if (dist < -radius)
-            return false; // entirely outside this plane
+            return false;
     }
     return true;
 }
@@ -64,20 +64,20 @@ void main()
 
     ChunkRenderInfo chunk = chunkInfo.infos[idx];
 
-    // Skip inactive slots (freed or empty sections)
-    if (chunk.quadCount == 0u)
+    // Skip slots with no translucent quads
+    if (chunk.transQuadCount == 0u)
         return;
 
     // Frustum cull
     if (!isVisible(chunk.boundingSphere))
         return;
 
-    // Visible — append indirect draw command
+    // Visible — append indirect draw command for translucent quads
     uint drawIdx = atomicAdd(counter.drawCount, 1u);
 
-    indirect.commands[drawIdx].indexCount    = chunk.quadCount * 6u;
+    indirect.commands[drawIdx].indexCount    = chunk.transQuadCount * 6u;
     indirect.commands[drawIdx].instanceCount = 1u;
     indirect.commands[drawIdx].firstIndex    = 0;
-    indirect.commands[drawIdx].vertexOffset  = int(chunk.gigabufferOffset) / 2;
-    indirect.commands[drawIdx].firstInstance = idx; // slot index → gl_InstanceIndex in vertex shader
+    indirect.commands[drawIdx].vertexOffset  = int(chunk.transGigabufferOffset) / 2;
+    indirect.commands[drawIdx].firstInstance = idx; // slot index → gl_InstanceIndex
 }

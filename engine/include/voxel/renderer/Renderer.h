@@ -224,6 +224,10 @@ class Renderer
     VkPipelineLayout m_computePipelineLayout = VK_NULL_HANDLE;
     VkPipeline m_cullPipeline = VK_NULL_HANDLE;
 
+    VkPipeline m_translucentPipeline = VK_NULL_HANDLE;
+    VkPipeline m_cullTranslucentPipeline = VK_NULL_HANDLE;
+    std::unique_ptr<IndirectDrawBuffer> m_transIndirectDrawBuffer;
+
     VkDescriptorSetLayout m_lightingDescriptorSetLayout = VK_NULL_HANDLE;
     VkDescriptorSet m_lightingDescriptorSet = VK_NULL_HANDLE;
     VkPipelineLayout m_lightingPipelineLayout = VK_NULL_HANDLE;
@@ -232,6 +236,7 @@ class Renderer
     std::unique_ptr<DescriptorAllocator> m_descriptorAllocator;
     VkDescriptorSetLayout m_chunkDescriptorSetLayout = VK_NULL_HANDLE;
     VkDescriptorSet m_chunkDescriptorSet = VK_NULL_HANDLE;
+    VkDescriptorSet m_transDescriptorSet = VK_NULL_HANDLE;
 
     std::unique_ptr<StagingBuffer> m_stagingBuffer;
     std::unique_ptr<Gigabuffer> m_gigabuffer;
@@ -254,6 +259,9 @@ class Renderer
     // Render stats from last renderChunks() call
     uint32_t m_lastDrawCount = 0;
     uint32_t m_lastQuadCount = 0;
+
+    // Cached VP matrix from renderChunksIndirect() for translucent pass
+    glm::mat4 m_lastViewProjection{1.0f};
 
     // Per-frame state (set by beginFrame, used by endFrame)
     game::Window* m_currentWindow = nullptr;

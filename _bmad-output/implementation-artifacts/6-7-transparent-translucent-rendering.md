@@ -490,6 +490,47 @@ transitionImage(cmd, depthImage,
     VK_IMAGE_ASPECT_DEPTH_BIT);
 ```
 
+---
+
+## Senior Developer Review
+
+### Implementation Summary
+
+All 14 tasks implemented successfully. The translucent rendering pipeline is fully integrated.
+
+### Files Modified
+- `engine/include/voxel/renderer/ChunkMesh.h` — Added `translucentQuads` + `translucentQuadCount`, updated `isEmpty()`
+- `engine/include/voxel/renderer/ChunkRenderInfo.h` — Extended `ChunkRenderInfo` and `GpuChunkRenderInfo` (48→64 bytes) with translucent fields
+- `engine/include/voxel/renderer/RendererConstants.h` — Updated `CHUNK_RENDER_INFO_BUFFER_SIZE` to 64 bytes/entry
+- `engine/include/voxel/renderer/ChunkUploadManager.h` — Added `getSlotIndex()` accessor, `<optional>` include
+- `engine/include/voxel/renderer/Renderer.h` — Added translucent pipeline, descriptor set, indirect buffer, cached VP matrix
+- `engine/src/renderer/MeshBuilder.cpp` — Naive: transparent-toward-opaque face emit + translucent routing. Greedy: split Pass 2 into Cutout (2a) + Translucent (2b) with `targetType` filter param
+- `engine/src/renderer/ChunkUploadManager.cpp` — Dual gigabuffer allocation (opaque + translucent), deferred free for both
+- `engine/src/renderer/Renderer.cpp` — Translucent graphics pipeline (alpha blend, no depth write, cull none), translucent cull compute pipeline, separate IndirectDrawBuffer + descriptor set, translucent render pass in endFrame()
+- `assets/shaders/gbuffer.frag` — Added alpha discard for cutout blocks
+- `assets/shaders/chunk.vert` — Updated ChunkRenderInfo struct to 64 bytes
+- `assets/shaders/cull.comp` — Updated ChunkRenderInfo struct to 64 bytes
+- `assets/scripts/base/blocks.json` — Changed glass renderType from cutout to translucent
+
+### Files Created
+- `assets/shaders/translucent.frag` — Forward fragment shader with alpha blending + simple lighting
+- `assets/shaders/cull_translucent.comp` — Compute culling shader for translucent quads
+
+### Tests Modified
+- `tests/renderer/TestChunkUpload.cpp` — Updated GpuChunkRenderInfo size/layout assertions (48→64)
+- `tests/renderer/TestMeshBuilder.cpp` — Updated stone-glass adjacency (11→12 quads), added translucent routing tests
+- `tests/renderer/TestGreedyMeshing.cpp` — Updated stone-glass adjacency, added 8 new translucent routing test sections
+
+### Architecture Decisions
+- **GPU-driven translucent culling**: Used a separate compute cull shader (`cull_translucent.comp`) with its own IndirectDrawBuffer and descriptor set, rather than CPU-driven sorting. This is simpler for V1 and avoids CPU-side frustum testing. Back-to-front sorting can be added later.
+- **Separate render pass**: The translucent pass uses a separate `vkCmdBeginRendering` with depth in `DEPTH_READ_ONLY_OPTIMAL` layout, after the lighting pass ends. ImGui renders in its own pass after translucent.
+- **Face culling change**: Transparent blocks now emit faces toward opaque neighbors (glass surface visible in front of stone). This is the correct visual behavior for alpha-blended surfaces.
+
+### Build & Test Results
+- Build: zero warnings (`/W4 /WX`)
+- Tests: 166 test cases, 489,063 assertions — all pass
+- Shaders: all 7 shaders compile successfully (gbuffer.frag, translucent.frag, chunk.vert, cull.comp, cull_translucent.comp, lighting.vert, lighting.frag)
+
 ### Descriptor Set — No Changes
 
 The translucent pipeline reuses the existing chunk descriptor set layout (bindings 0-4):

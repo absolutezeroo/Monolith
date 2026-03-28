@@ -263,13 +263,14 @@ void buildAOKeys(
     }
 }
 
-/// Build face masks for transparent FullCube blocks in one face direction.
+/// Build face masks for transparent FullCube blocks in one face direction, filtered by render type.
 /// A transparent face is visible when its neighbor is air or a different transparent block.
 void buildTransparentFaceMasks(
     uint8_t faceIdx,
     const std::array<uint16_t, PAD_VOLUME>& blockPad,
     const std::array<bool, OPACITY_PAD_VOLUME>& opacityPad,
     const world::BlockRegistry& registry,
+    world::RenderType targetType,
     uint16_t* outMasks)
 {
     for (int slice = 0; slice < S; ++slice)
@@ -288,14 +289,14 @@ void buildTransparentFaceMasks(
                 uint16_t blockId = blockPad[bpIdx];
                 if (blockId != world::BLOCK_AIR && !opacityPad[opIdx])
                 {
-                    // Current block is transparent — check it's FullCube.
+                    // Current block is transparent — check it's FullCube and matches target render type.
                     const world::BlockDefinition& def = registry.getBlockType(blockId);
-                    if (def.modelType == world::ModelType::FullCube)
+                    if (def.modelType == world::ModelType::FullCube && def.renderType == targetType)
                     {
-                        // Neighbor must be air or transparent (not opaque).
+                        // Emit face toward opaque, air, or different transparent block.
                         bool neighborOpaque = opacityPad[opIdx + st.neighborOffset];
                         uint16_t neighborId = blockPad[bpIdx + st.neighborOffset];
-                        if (!neighborOpaque && neighborId != blockId)
+                        if (neighborOpaque || neighborId != blockId)
                         {
                             bits |= static_cast<uint16_t>(1u << col);
                         }
@@ -521,6 +522,12 @@ ChunkMesh MeshBuilder::buildNaive(
                         {
                             shouldEmit = true;
                         }
+                        else if (blockDef.isTransparent)
+                        {
+                            // Transparent block facing opaque → emit face
+                            // (glass surface visible in front of opaque block)
+                            shouldEmit = true;
+                        }
                         else if (neighborDef.modelType != world::ModelType::FullCube)
                         {
                             // Non-cubic neighbor: check if it fully covers the opposite face.
@@ -549,7 +556,15 @@ ChunkMesh MeshBuilder::buildNaive(
                             flip,
                             blockDef.tintIndex,
                             blockDef.waving);
-                        mesh.quads.push_back(quad);
+
+                        if (blockDef.renderType == world::RenderType::Translucent)
+                        {
+                            mesh.translucentQuads.push_back(quad);
+                        }
+                        else
+                        {
+                            mesh.quads.push_back(quad);
+                        }
                     }
                 }
             }
@@ -557,6 +572,7 @@ ChunkMesh MeshBuilder::buildNaive(
     }
 
     mesh.quadCount = static_cast<uint32_t>(mesh.quads.size());
+    mesh.translucentQuadCount = static_cast<uint32_t>(mesh.translucentQuads.size());
 
     // Second pass: generate model vertices for non-cubic blocks.
     buildNonCubicPass(section, neighbors, mesh);
@@ -654,18 +670,31 @@ ChunkMesh MeshBuilder::buildGreedy(
         greedyMergeFace(faceIdx, masks, aoKeys, ws.blockPad, m_registry, mesh.quads);
     }
 
-    // Pass 2 — Transparent FullCube blocks: separate face masks, same AO-aware merge.
+    // Pass 2a — Cutout FullCube blocks: face masks filtered by RenderType::Cutout → opaque quads.
     for (uint8_t faceIdx = 0; faceIdx < BLOCK_FACE_COUNT; ++faceIdx)
     {
         uint16_t* masks = &ws.faceMasks[faceIdx * S * S];
         uint8_t* aoKeys = &ws.aoKeys[faceIdx * S * S * S];
 
-        buildTransparentFaceMasks(faceIdx, ws.blockPad, ws.opacityPad, m_registry, masks);
+        buildTransparentFaceMasks(faceIdx, ws.blockPad, ws.opacityPad, m_registry, world::RenderType::Cutout, masks);
         buildAOKeys(faceIdx, masks, ws.opacityPad, aoKeys);
         greedyMergeFace(faceIdx, masks, aoKeys, ws.blockPad, m_registry, mesh.quads);
     }
 
+    // Pass 2b — Translucent FullCube blocks: face masks filtered by RenderType::Translucent → translucent quads.
+    for (uint8_t faceIdx = 0; faceIdx < BLOCK_FACE_COUNT; ++faceIdx)
+    {
+        uint16_t* masks = &ws.faceMasks[faceIdx * S * S];
+        uint8_t* aoKeys = &ws.aoKeys[faceIdx * S * S * S];
+
+        buildTransparentFaceMasks(
+            faceIdx, ws.blockPad, ws.opacityPad, m_registry, world::RenderType::Translucent, masks);
+        buildAOKeys(faceIdx, masks, ws.opacityPad, aoKeys);
+        greedyMergeFace(faceIdx, masks, aoKeys, ws.blockPad, m_registry, mesh.translucentQuads);
+    }
+
     mesh.quadCount = static_cast<uint32_t>(mesh.quads.size());
+    mesh.translucentQuadCount = static_cast<uint32_t>(mesh.translucentQuads.size());
 
     // Non-cubic pass for greedy mesher too.
     buildNonCubicPass(section, neighbors, mesh);

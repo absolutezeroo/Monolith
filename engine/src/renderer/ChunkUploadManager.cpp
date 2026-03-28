@@ -32,13 +32,17 @@ void ChunkUploadManager::processUploads(world::ChunkManager& chunkManager, const
         SectionKey skey{entry.key.coord, entry.key.sectionY};
 
         // Empty mesh (no quads) — store None state, no allocation (AC9)
-        if (entry.mesh->quadCount == 0)
+        if (entry.mesh->isEmpty())
         {
             // If there was an existing Resident allocation, queue deferred free
             auto it = m_renderInfos.find(skey);
             if (it != m_renderInfos.end() && it->second.state == RenderState::Resident)
             {
                 queueDeferredFree(it->second.allocation);
+                if (it->second.transAllocation.size > 0)
+                {
+                    queueDeferredFree(it->second.transAllocation);
+                }
             }
 
             // Free GPU slot if this section had one (prevents slot leak on empty remesh)
@@ -63,6 +67,10 @@ void ChunkUploadManager::processUploads(world::ChunkManager& chunkManager, const
         if (it != m_renderInfos.end() && it->second.state == RenderState::Resident)
         {
             queueDeferredFree(it->second.allocation);
+            if (it->second.transAllocation.size > 0)
+            {
+                queueDeferredFree(it->second.transAllocation);
+            }
         }
 
         // Calculate distance to player for priority
@@ -107,48 +115,85 @@ void ChunkUploadManager::processUploads(world::ChunkManager& chunkManager, const
 
 bool ChunkUploadManager::uploadSingle(const SectionKey& key, const ChunkMesh& mesh)
 {
-    VkDeviceSize uploadSize = mesh.quadCount * sizeof(uint64_t);
-
-    // 1. Allocate in gigabuffer
-    auto allocResult = m_gigabuffer.allocate(uploadSize);
-    if (!allocResult.has_value())
-    {
-        VX_LOG_WARN(
-            "Gigabuffer full — cannot upload section ({},{}) y={}",
-            key.chunkCoord.x,
-            key.chunkCoord.y,
-            key.sectionY);
-        // Store None state to prevent re-upload attempts
-        m_renderInfos[key] = ChunkRenderInfo{
-            .allocation = {},
-            .quadCount = 0,
-            .worldBasePos = glm::ivec3{0},
-            .state = RenderState::None,
-        };
-        // Remove from pending — don't retry (gigabuffer full)
-        return true; // "consumed" the upload — caller should erase
-    }
-
-    // 2. Stage the upload — guard against silent rate-limit success (Pitfall #1)
+    // Rate-limit check before any allocations
     if (m_stagingBuffer.pendingTransferCount() >= MAX_UPLOADS_PER_FRAME)
     {
-        m_gigabuffer.free(*allocResult);
         return false; // Staging budget exhausted — retry next frame
     }
 
-    auto uploadResult =
-        m_stagingBuffer.uploadToGigabuffer(mesh.quads.data(), mesh.quadCount * sizeof(uint64_t), allocResult->offset);
-    if (!uploadResult.has_value())
+    // 1. Upload opaque quads (if any)
+    GigabufferAllocation opaqueAlloc{};
+    uint32_t opaqueCount = 0;
+    if (mesh.quadCount > 0)
     {
-        // Staging ring full — free the gigabuffer allocation (never written)
-        m_gigabuffer.free(*allocResult);
-        return false; // Retry next frame
+        VkDeviceSize uploadSize = mesh.quadCount * sizeof(uint64_t);
+        auto allocResult = m_gigabuffer.allocate(uploadSize);
+        if (!allocResult.has_value())
+        {
+            VX_LOG_WARN(
+                "Gigabuffer full — cannot upload section ({},{}) y={}",
+                key.chunkCoord.x,
+                key.chunkCoord.y,
+                key.sectionY);
+            m_renderInfos[key] = ChunkRenderInfo{
+                .allocation = {},
+                .quadCount = 0,
+                .transAllocation = {},
+                .transQuadCount = 0,
+                .worldBasePos = glm::ivec3{0},
+                .state = RenderState::None,
+            };
+            return true; // consumed
+        }
+
+        auto uploadResult = m_stagingBuffer.uploadToGigabuffer(
+            mesh.quads.data(), uploadSize, allocResult->offset);
+        if (!uploadResult.has_value())
+        {
+            m_gigabuffer.free(*allocResult);
+            return false; // Retry next frame
+        }
+        opaqueAlloc = *allocResult;
+        opaqueCount = mesh.quadCount;
+    }
+
+    // 2. Upload translucent quads (if any)
+    GigabufferAllocation transAlloc{};
+    uint32_t transCount = 0;
+    if (mesh.translucentQuadCount > 0)
+    {
+        VkDeviceSize transSize = mesh.translucentQuadCount * sizeof(uint64_t);
+        auto transAllocResult = m_gigabuffer.allocate(transSize);
+        if (!transAllocResult.has_value())
+        {
+            VX_LOG_WARN(
+                "Gigabuffer full for translucent — section ({},{}) y={} opaque only",
+                key.chunkCoord.x,
+                key.chunkCoord.y,
+                key.sectionY);
+        }
+        else
+        {
+            auto transUpload = m_stagingBuffer.uploadToGigabuffer(
+                mesh.translucentQuads.data(), transSize, transAllocResult->offset);
+            if (!transUpload.has_value())
+            {
+                m_gigabuffer.free(*transAllocResult);
+            }
+            else
+            {
+                transAlloc = *transAllocResult;
+                transCount = mesh.translucentQuadCount;
+            }
+        }
     }
 
     // 3. Store render info
     ChunkRenderInfo renderInfo{
-        .allocation = *allocResult,
-        .quadCount = mesh.quadCount,
+        .allocation = opaqueAlloc,
+        .quadCount = opaqueCount,
+        .transAllocation = transAlloc,
+        .transQuadCount = transCount,
         .worldBasePos = glm::ivec3{
             key.chunkCoord.x * world::ChunkSection::SIZE,
             key.sectionY * world::ChunkSection::SIZE,
@@ -158,7 +203,7 @@ bool ChunkUploadManager::uploadSingle(const SectionKey& key, const ChunkMesh& me
     };
     m_renderInfos[key] = renderInfo;
 
-    // 4. Update ChunkRenderInfoBuffer GPU slot
+    // 4. Update ChunkRenderInfoBuffer GPU slot (cull.comp works on quadCount for opaque, transQuadCount for translucent)
     auto slotIt = m_slotMap.find(key);
     if (slotIt != m_slotMap.end())
     {
@@ -216,6 +261,10 @@ void ChunkUploadManager::onChunkUnloaded(glm::ivec2 coord)
         if (it != m_renderInfos.end() && it->second.state == RenderState::Resident)
         {
             queueDeferredFree(it->second.allocation);
+            if (it->second.transAllocation.size > 0)
+            {
+                queueDeferredFree(it->second.transAllocation);
+            }
         }
         m_renderInfos.erase(skey);
 
