@@ -1,6 +1,6 @@
 # Story 6.4: Compute Culling Shader (cull.comp)
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -24,19 +24,19 @@ so that only visible chunks are rendered with zero CPU overhead via `vkCmdDrawIn
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: Enable `drawIndirectCount` Vulkan feature** (AC: #10)
-  - [ ] In `VulkanContext.cpp`, add `features12.drawIndirectCount = VK_TRUE` to the `VkPhysicalDeviceVulkan12Features` struct (line ~118, after `descriptorIndexing`)
-  - [ ] Verify device creation still succeeds (all GTX 1660+ GPUs support this)
+- [x] **Task 1: Enable `drawIndirectCount` Vulkan feature** (AC: #10)
+  - [x] In `VulkanContext.cpp`, add `features12.drawIndirectCount = VK_TRUE` to the `VkPhysicalDeviceVulkan12Features` struct (line ~118, after `descriptorIndexing`)
+  - [x] Verify device creation still succeeds (all GTX 1660+ GPUs support this)
 
-- [ ] **Task 2: Add `ChunkRenderInfoBuffer::getHighWaterMark()` accessor** (AC: #1, #2)
-  - [ ] Add `uint32_t m_highWaterMark = 0` member to `ChunkRenderInfoBuffer`
-  - [ ] In `allocateSlot()`: update `m_highWaterMark = std::max(m_highWaterMark, slotIndex + 1)`
-  - [ ] Add `[[nodiscard]] uint32_t getHighWaterMark() const` accessor
-  - [ ] This tells the compute shader dispatch how many slots to iterate (avoids dispatching for all 32768 when only 200 are used)
+- [x] **Task 2: Add `ChunkRenderInfoBuffer::getHighWaterMark()` accessor** (AC: #1, #2)
+  - [x] Add `uint32_t m_highWaterMark = 0` member to `ChunkRenderInfoBuffer`
+  - [x] In `allocateSlot()`: update `m_highWaterMark = std::max(m_highWaterMark, slotIndex + 1)`
+  - [x] Add `[[nodiscard]] uint32_t getHighWaterMark() const` accessor
+  - [x] This tells the compute shader dispatch how many slots to iterate (avoids dispatching for all 32768 when only 200 are used)
 
-- [ ] **Task 3: Write `cull.comp` compute shader** (AC: #1, #2, #3, #4, #5)
-  - [ ] Create `assets/shaders/cull.comp` (GLSL 450, `local_size_x = 64`)
-  - [ ] Define push constants (128 bytes max):
+- [x] **Task 3: Write `cull.comp` compute shader** (AC: #1, #2, #3, #4, #5)
+  - [x] Create `assets/shaders/cull.comp` (GLSL 450, `local_size_x = 64`)
+  - [x] Define push constants (128 bytes max):
     ```glsl
     layout(push_constant) uniform CullPushConstants {
         vec4 frustumPlanes[6]; // 96 bytes (6 × 16)
@@ -44,12 +44,12 @@ so that only visible chunks are rendered with zero CPU overhead via `vkCmdDrawIn
         uint _pad[3];          // 12 bytes padding
     } pc;                      // 112 bytes total
     ```
-  - [ ] Bind SSBOs from shared descriptor set:
+  - [x] Bind SSBOs from shared descriptor set:
     - Binding 1 (read): `ChunkRenderInfo[]` — bounding sphere, world pos, gigabuffer offset, quad count
     - Binding 2 (write): `VkDrawIndexedIndirectCommand[]` — indirect command buffer
     - Binding 3 (read/write): `uint drawCount` — atomic counter
-  - [ ] Frustum culling: sphere-vs-6-planes test. Sphere is outside frustum if `dot(plane.xyz, center) + plane.w < -radius` for ANY plane
-  - [ ] If visible: `uint drawIdx = atomicAdd(drawCount, 1)` then write command at `drawIdx`:
+  - [x] Frustum culling: sphere-vs-6-planes test. Sphere is outside frustum if `dot(plane.xyz, center) + plane.w < -radius` for ANY plane
+  - [x] If visible: `uint drawIdx = atomicAdd(drawCount, 1)` then write command at `drawIdx`:
     ```glsl
     commands[drawIdx].indexCount    = chunk.quadCount * 6;
     commands[drawIdx].instanceCount = 1;
@@ -57,10 +57,10 @@ so that only visible chunks are rendered with zero CPU overhead via `vkCmdDrawIn
     commands[drawIdx].vertexOffset  = int(chunk.gigabufferOffset) / 2;
     commands[drawIdx].firstInstance = gl_GlobalInvocationID.x; // = slot index
     ```
-  - [ ] Compile to SPIR-V alongside existing shaders
+  - [x] Compile to SPIR-V alongside existing shaders
 
-- [ ] **Task 4: Update `chunk.vert` to read chunkWorldPos from SSBO** (AC: #9)
-  - [ ] Add `ChunkRenderInfo` SSBO at binding 1:
+- [x] **Task 4: Update `chunk.vert` to read chunkWorldPos from SSBO** (AC: #9)
+  - [x] Add `ChunkRenderInfo` SSBO at binding 1:
     ```glsl
     struct ChunkRenderInfo {
         vec4 boundingSphere;
@@ -74,18 +74,18 @@ so that only visible chunks are rendered with zero CPU overhead via `vkCmdDrawIn
         ChunkRenderInfo infos[];
     } chunkInfo;
     ```
-  - [ ] Replace `vec3 chunkWorldPos = vec3(pc.chunkWorldPosX, pc.chunkWorldPosY, pc.chunkWorldPosZ);` with `vec3 chunkWorldPos = chunkInfo.infos[gl_InstanceIndex].worldBasePos.xyz;`
-  - [ ] Update push constants to remove chunkWorldPos fields:
+  - [x] Replace `vec3 chunkWorldPos = vec3(pc.chunkWorldPosX, pc.chunkWorldPosY, pc.chunkWorldPosZ);` with `vec3 chunkWorldPos = chunkInfo.infos[gl_InstanceIndex].worldBasePos.xyz;`
+  - [x] Update push constants to remove chunkWorldPos fields:
     ```glsl
     layout(push_constant) uniform PushConstants {
         mat4 viewProjection;  // 64 bytes
         float time;           // 4 bytes
     } pc;
     ```
-  - [ ] All other vertex shader logic (quad unpacking, corner reconstruction, AO, waving) remains identical
+  - [x] All other vertex shader logic (quad unpacking, corner reconstruction, AO, waving) remains identical
 
-- [ ] **Task 5: Update `ChunkPushConstants` C++ struct** (AC: #9)
-  - [ ] In `Renderer.h`, change `ChunkPushConstants` to:
+- [x] **Task 5: Update `ChunkPushConstants` C++ struct** (AC: #9)
+  - [x] In `Renderer.h`, change `ChunkPushConstants` to:
     ```cpp
     struct ChunkPushConstants
     {
@@ -95,11 +95,11 @@ so that only visible chunks are rendered with zero CPU overhead via `vkCmdDrawIn
     };
     static_assert(sizeof(ChunkPushConstants) == 80);
     ```
-  - [ ] Alternatively, reduce to 68 bytes if padding isn't needed — but keeping 80 avoids changing pipeline layout size. Preference: keep at 80 bytes for simplicity (backward-safe).
-  - [ ] Remove `chunkWorldPos` field — it's now read from SSBO
+  - [x] Alternatively, reduce to 68 bytes if padding isn't needed — but keeping 80 avoids changing pipeline layout size. Preference: keep at 80 bytes for simplicity (backward-safe).
+  - [x] Remove `chunkWorldPos` field — it's now read from SSBO
 
-- [ ] **Task 6: Create compute pipeline in Renderer** (AC: #7)
-  - [ ] Add `CullPushConstants` struct (matches GLSL):
+- [x] **Task 6: Create compute pipeline in Renderer** (AC: #7)
+  - [x] Add `CullPushConstants` struct (matches GLSL):
     ```cpp
     struct CullPushConstants
     {
@@ -109,22 +109,22 @@ so that only visible chunks are rendered with zero CPU overhead via `vkCmdDrawIn
     };
     static_assert(sizeof(CullPushConstants) == 112);
     ```
-  - [ ] Add members to `Renderer`:
+  - [x] Add members to `Renderer`:
     - `VkPipelineLayout m_computePipelineLayout = VK_NULL_HANDLE`
     - `VkPipeline m_cullPipeline = VK_NULL_HANDLE`
-  - [ ] In `init()`, after graphics pipeline creation:
+  - [x] In `init()`, after graphics pipeline creation:
     - Create compute pipeline layout using **same** `m_chunkDescriptorSetLayout` but with COMPUTE_BIT push constant range (112 bytes)
     - Load `cull.comp.spv`, create compute pipeline via `VkComputePipelineCreateInfo`
-  - [ ] In `shutdown()`, destroy `m_cullPipeline` and `m_computePipelineLayout` alongside existing pipeline resources
+  - [x] In `shutdown()`, destroy `m_cullPipeline` and `m_computePipelineLayout` alongside existing pipeline resources
 
-- [ ] **Task 7: Add `IndirectDrawBuffer` and `ChunkRenderInfoBuffer` to Renderer** (AC: #8)
-  - [ ] Add `std::unique_ptr<IndirectDrawBuffer> m_indirectDrawBuffer` and `std::unique_ptr<ChunkRenderInfoBuffer> m_chunkRenderInfoBuffer` members (if not already added by Story 6.3)
-  - [ ] Add accessors: `getIndirectDrawBuffer()`, `getMutableChunkRenderInfoBuffer()`
-  - [ ] These may already exist from Story 6.3 — if so, just verify they're available
+- [x] **Task 7: Add `IndirectDrawBuffer` and `ChunkRenderInfoBuffer` to Renderer** (AC: #8)
+  - [x] Add `std::unique_ptr<IndirectDrawBuffer> m_indirectDrawBuffer` and `std::unique_ptr<ChunkRenderInfoBuffer> m_chunkRenderInfoBuffer` members (if not already added by Story 6.3)
+  - [x] Add accessors: `getIndirectDrawBuffer()`, `getMutableChunkRenderInfoBuffer()`
+  - [x] These may already exist from Story 6.3 — if so, just verify they're available
 
-- [ ] **Task 8: Implement `renderChunksIndirect()`** (AC: #6, #8, #11)
-  - [ ] New method signature: `void renderChunksIndirect(const glm::mat4& viewProjection, const std::array<glm::vec4, 6>& frustumPlanes)`
-  - [ ] Implementation sequence:
+- [x] **Task 8: Implement `renderChunksIndirect()`** (AC: #6, #8, #11)
+  - [x] New method signature: `void renderChunksIndirect(const glm::mat4& viewProjection, const std::array<glm::vec4, 6>& frustumPlanes)`
+  - [x] Implementation sequence:
     1. **Reset draw count** — `m_indirectDrawBuffer->recordCountReset(cmd)`
     2. **Barrier**: TRANSFER_DST → COMPUTE_SHADER (fill → compute read/write)
     3. **Bind compute pipeline** — `vkCmdBindPipeline(cmd, COMPUTE, m_cullPipeline)`
@@ -137,10 +137,10 @@ so that only visible chunks are rendered with zero CPU overhead via `vkCmdDrawIn
     10. **Bind quad index buffer**
     11. **Push graphics constants** — VP matrix + time (no chunkWorldPos)
     12. **Indirect draw** — `vkCmdDrawIndexedIndirectCount(cmd, commandBuffer, 0, countBuffer, 0, MAX_RENDERABLE_SECTIONS, sizeof(VkDrawIndexedIndirectCommand))`
-  - [ ] Update `m_lastDrawCount` and `m_lastQuadCount` — read back from GPU is expensive; for debug overlay use `getHighWaterMark()` as upper bound or defer readback. Simplest V1: display "indirect" in overlay, skip exact count.
+  - [x] Update `m_lastDrawCount` and `m_lastQuadCount` — read back from GPU is expensive; for debug overlay use `getHighWaterMark()` as upper bound or defer readback. Simplest V1: display "indirect" in overlay, skip exact count.
 
-- [ ] **Task 9: Wire `renderChunksIndirect()` into GameApp** (AC: #8, #11)
-  - [ ] In `GameApp::render()`, replace:
+- [x] **Task 9: Wire `renderChunksIndirect()` into GameApp** (AC: #8, #11)
+  - [x] In `GameApp::render()`, replace:
     ```cpp
     m_renderer.renderChunks(m_uploadManager->getAllRenderInfos(), vp);
     ```
@@ -149,14 +149,14 @@ so that only visible chunks are rendered with zero CPU overhead via `vkCmdDrawIn
     auto frustumPlanes = m_camera.extractFrustumPlanes();
     m_renderer.renderChunksIndirect(vp, frustumPlanes);
     ```
-  - [ ] Remove the `renderChunks()` call entirely (keep method for potential fallback, mark deprecated)
-  - [ ] Update debug overlay: change "Draw calls" stat to show indirect mode info
+  - [x] Remove the `renderChunks()` call entirely (keep method for potential fallback, mark deprecated)
+  - [x] Update debug overlay: change "Draw calls" stat to show indirect mode info
 
-- [ ] **Task 10: Compile shaders and validate** (AC: #11)
-  - [ ] Compile `cull.comp` to `cull.comp.spv` (add to shader compilation script/CMake if exists)
-  - [ ] Compile updated `chunk.vert` to `chunk.vert.spv`
-  - [ ] Build with `/W4 /WX` — zero warnings
-  - [ ] Run with Vulkan validation layers — zero errors
+- [x] **Task 10: Compile shaders and validate** (AC: #11)
+  - [x] Compile `cull.comp` to `cull.comp.spv` (add to shader compilation script/CMake if exists)
+  - [x] Compile updated `chunk.vert` to `chunk.vert.spv`
+  - [x] Build with `/W4 /WX` — zero warnings
+  - [x] Run with Vulkan validation layers — zero errors
   - [ ] Visual validation: chunks render correctly, no popping when turning camera, culled chunks disappear at frustum edges
 
 ## Dev Notes

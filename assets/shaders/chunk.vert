@@ -6,15 +6,27 @@ layout(std430, set = 0, binding = 0) readonly buffer Gigabuffer {
     uint data[];
 } gigabuffer;
 
+// ── ChunkRenderInfo SSBO (binding 1) ────────────────────────────────────────
+// Per-chunk metadata uploaded by CPU, indexed by gl_InstanceIndex (= firstInstance from compute cull).
+struct ChunkRenderInfo {
+    vec4 boundingSphere;   // xyz = center, w = radius
+    vec4 worldBasePos;     // xyz = section world origin, w = unused
+    uint gigabufferOffset;
+    uint quadCount;
+    uint _pad0;
+    uint _pad1;
+};
+layout(std430, set = 0, binding = 1) readonly buffer ChunkInfoSSBO {
+    ChunkRenderInfo infos[];
+} chunkInfo;
+
 // ── Push constants ──────────────────────────────────────────────────────────
-// vec3 after float would pad to 16-byte alignment in std430 (92 bytes total).
-// Use 3 separate floats to match the C++ struct layout (80 bytes exact).
 layout(push_constant) uniform PushConstants {
     mat4 viewProjection;    // 64 bytes (offset 0)
     float time;             // 4 bytes  (offset 64)
-    float chunkWorldPosX;   // 4 bytes  (offset 68)
-    float chunkWorldPosY;   // 4 bytes  (offset 72)
-    float chunkWorldPosZ;   // 4 bytes  (offset 76)
+    float _pad0;            // 4 bytes  (offset 68)
+    float _pad1;            // 4 bytes  (offset 72)
+    float _pad2;            // 4 bytes  (offset 76)
 } pc;
 
 // ── Outputs to fragment shader ──────────────────────────────────────────────
@@ -186,7 +198,7 @@ void main()
     fragUV = uvs[cornerIndex];
 
     // ── World position ──────────────────────────────────────────────────────
-    vec3 chunkWorldPos = vec3(pc.chunkWorldPosX, pc.chunkWorldPosY, pc.chunkWorldPosZ);
+    vec3 chunkWorldPos = chunkInfo.infos[gl_InstanceIndex].worldBasePos.xyz;
     vec3 worldPos = chunkWorldPos + localPos;
 
     // ── Waving vertex animation ─────────────────────────────────────────────

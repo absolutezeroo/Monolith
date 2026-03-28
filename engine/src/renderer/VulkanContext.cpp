@@ -117,6 +117,7 @@ core::Result<std::unique_ptr<VulkanContext>> VulkanContext::create(game::Window&
     features12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
     features12.bufferDeviceAddress = VK_TRUE;
     features12.descriptorIndexing = VK_TRUE;
+    features12.drawIndirectCount = VK_TRUE;
 
     VkPhysicalDeviceVulkan11Features features11{};
     features11.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;

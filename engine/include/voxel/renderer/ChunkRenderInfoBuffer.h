@@ -53,6 +53,10 @@ class ChunkRenderInfoBuffer
     /// Returns the number of active (allocated) slots.
     [[nodiscard]] uint32_t getActiveCount() const { return m_maxSections - static_cast<uint32_t>(m_freeSlots.size()); }
 
+    /// Returns the high water mark (one past the highest allocated slot index).
+    /// Used by compute shader dispatch to know how many slots to iterate.
+    [[nodiscard]] uint32_t getHighWaterMark() const { return m_highWaterMark; }
+
     [[nodiscard]] VkBuffer getBuffer() const { return m_buffer; }
     [[nodiscard]] VkDeviceSize getBufferSize() const
     {
@@ -68,6 +72,7 @@ class ChunkRenderInfoBuffer
 
     uint8_t* m_mappedData = nullptr;
     uint32_t m_maxSections = 0;
+    uint32_t m_highWaterMark = 0;
     std::vector<uint32_t> m_freeSlots;
 };
 

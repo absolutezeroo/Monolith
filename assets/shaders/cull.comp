@@ -1,0 +1,82 @@
+#version 450
+
+layout(local_size_x = 64) in;
+
+// ── Push constants ──────────────────────────────────────────────────────────
+layout(push_constant) uniform CullPushConstants {
+    vec4 frustumPlanes[6]; // 96 bytes (6 × 16)
+    uint totalSections;    // 4 bytes
+    uint _pad[3];          // 12 bytes padding → 112 bytes total
+} pc;
+
+// ── ChunkRenderInfo SSBO (binding 1, read-only) ────────────────────────────
+struct ChunkRenderInfo {
+    vec4 boundingSphere;   // xyz = center (world space), w = radius
+    vec4 worldBasePos;     // xyz = section world origin, w = unused
+    uint gigabufferOffset; // byte offset into gigabuffer
+    uint quadCount;        // number of quads (0 = inactive slot)
+    uint _pad0;
+    uint _pad1;
+};
+
+layout(std430, set = 0, binding = 1) readonly buffer ChunkInfoSSBO {
+    ChunkRenderInfo infos[];
+} chunkInfo;
+
+// ── Indirect command buffer (binding 2, write-only) ─────────────────────────
+struct VkDrawIndexedIndirectCommand {
+    uint indexCount;
+    uint instanceCount;
+    int  firstIndex;
+    int  vertexOffset;
+    uint firstInstance;
+};
+
+layout(std430, set = 0, binding = 2) writeonly buffer IndirectCommandSSBO {
+    VkDrawIndexedIndirectCommand commands[];
+} indirect;
+
+// ── Draw count (binding 3, read/write — atomic counter) ─────────────────────
+layout(std430, set = 0, binding = 3) buffer DrawCountSSBO {
+    uint drawCount;
+} counter;
+
+// ── Frustum culling: sphere vs 6 planes ─────────────────────────────────────
+bool isVisible(vec4 sphere)
+{
+    vec3 center = sphere.xyz;
+    float radius = sphere.w;
+    for (int i = 0; i < 6; ++i)
+    {
+        float dist = dot(pc.frustumPlanes[i].xyz, center) + pc.frustumPlanes[i].w;
+        if (dist < -radius)
+            return false; // entirely outside this plane
+    }
+    return true;
+}
+
+void main()
+{
+    uint idx = gl_GlobalInvocationID.x;
+    if (idx >= pc.totalSections)
+        return;
+
+    ChunkRenderInfo chunk = chunkInfo.infos[idx];
+
+    // Skip inactive slots (freed or empty sections)
+    if (chunk.quadCount == 0u)
+        return;
+
+    // Frustum cull
+    if (!isVisible(chunk.boundingSphere))
+        return;
+
+    // Visible — append indirect draw command
+    uint drawIdx = atomicAdd(counter.drawCount, 1u);
+
+    indirect.commands[drawIdx].indexCount    = chunk.quadCount * 6u;
+    indirect.commands[drawIdx].instanceCount = 1u;
+    indirect.commands[drawIdx].firstIndex    = 0;
+    indirect.commands[drawIdx].vertexOffset  = int(chunk.gigabufferOffset) / 2;
+    indirect.commands[drawIdx].firstInstance = idx; // slot index → gl_InstanceIndex in vertex shader
+}

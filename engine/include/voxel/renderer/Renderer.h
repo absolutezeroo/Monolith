@@ -33,14 +33,24 @@ class QuadIndexBuffer;
 class StagingBuffer;
 class VulkanContext;
 
-/// Push constants for chunk rendering: VP matrix + animation time + chunk world position.
+/// Push constants for chunk rendering: VP matrix + animation time.
+/// chunkWorldPos is now read from the ChunkRenderInfo SSBO via gl_InstanceIndex.
 struct ChunkPushConstants
 {
     glm::mat4 viewProjection; // 64 bytes
     float time;               // 4 bytes
-    glm::vec3 chunkWorldPos;  // 12 bytes
+    float pad[3];             // 12 bytes padding to 80 bytes
 };
 static_assert(sizeof(ChunkPushConstants) == 80);
+
+/// Push constants for the compute culling shader (cull.comp).
+struct CullPushConstants
+{
+    glm::vec4 frustumPlanes[6]; // 96 bytes
+    uint32_t totalSections;     // 4 bytes
+    uint32_t pad[3];            // 12 bytes
+};
+static_assert(sizeof(CullPushConstants) == 112);
 
 /**
  * @brief Per-frame synchronization and command recording resources.
@@ -114,8 +124,21 @@ class Renderer
      *
      * @param renderInfos The map of section keys to GPU render metadata.
      * @param viewProjection Combined view-projection matrix from the camera.
+     * @deprecated Use renderChunksIndirect() for GPU-driven rendering.
      */
     void renderChunks(const ChunkRenderInfoMap& renderInfos, const glm::mat4& viewProjection);
+
+    /**
+     * @brief GPU-driven chunk rendering via compute frustum culling and indirect draw.
+     *
+     * Resets the draw count, dispatches the compute culling shader, issues pipeline
+     * barriers, then calls vkCmdDrawIndexedIndirectCount. Must be called between
+     * beginFrame/endFrame.
+     *
+     * @param viewProjection Combined view-projection matrix from the camera.
+     * @param frustumPlanes The 6 frustum planes for culling (Gribb-Hartmann extraction).
+     */
+    void renderChunksIndirect(const glm::mat4& viewProjection, const std::array<glm::vec4, 6>& frustumPlanes);
 
     /// Returns the number of draw calls issued in the last renderChunks() call.
     [[nodiscard]] uint32_t getLastDrawCount() const { return m_lastDrawCount; }
@@ -171,6 +194,7 @@ class Renderer
     core::Result<void> createFrameResources();
     core::Result<VkPipeline> buildPipeline(const PipelineConfig& config);
     core::Result<VkShaderModule> loadShaderModule(const std::string& path);
+    void beginRenderPass();
 
     void recreateRenderFinishedSemaphores();
 
@@ -189,6 +213,9 @@ class Renderer
     VkPipeline m_pipeline = VK_NULL_HANDLE;
     VkPipeline m_wireframePipeline = VK_NULL_HANDLE;
 
+    VkPipelineLayout m_computePipelineLayout = VK_NULL_HANDLE;
+    VkPipeline m_cullPipeline = VK_NULL_HANDLE;
+
     std::unique_ptr<DescriptorAllocator> m_descriptorAllocator;
     VkDescriptorSetLayout m_chunkDescriptorSetLayout = VK_NULL_HANDLE;
     VkDescriptorSet m_chunkDescriptorSet = VK_NULL_HANDLE;
@@ -206,6 +233,7 @@ class Renderer
 
     bool m_isInitialized = false;
     bool m_needsSwapchainRecreate = false;
+    bool m_renderPassActive = false;
     std::string m_screenshotPath;
 
     // Render stats from last renderChunks() call
@@ -216,6 +244,7 @@ class Renderer
     game::Window* m_currentWindow = nullptr;
     uint32_t m_currentImageIndex = 0;
     bool m_frameActive = false;
+    bool m_useWireframe = false;
 };
 
 } // namespace voxel::renderer

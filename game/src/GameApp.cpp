@@ -333,8 +333,7 @@ void GameApp::buildDebugOverlay()
                 m_uploadManager->pendingUploadCount(),
                 m_uploadManager->deferredFreeCount());
         }
-        ImGui::Text(
-            "Draw Calls: %u  Quads: %u", m_renderer.getLastDrawCount(), m_renderer.getLastQuadCount());
+        ImGui::Text("Draw: indirect  Sections: %u", m_renderer.getLastDrawCount());
         ImGui::Text("Seed: %lld", static_cast<long long>(m_config.getSeed()));
 
         ImGui::Separator();
@@ -483,11 +482,11 @@ void GameApp::render(double /*alpha*/)
             m_uploadManager->processDeferredFrees();
         }
 
-        // Render chunk sections between beginFrame/endFrame (after pipeline bind)
-        if (m_uploadManager)
+        // Render chunk sections via GPU-driven compute culling + indirect draw
         {
             glm::mat4 vp = m_camera.getProjectionMatrix() * m_camera.getViewMatrix();
-            m_renderer.renderChunks(m_uploadManager->getAllRenderInfos(), vp);
+            auto frustumPlanes = m_camera.extractFrustumPlanes();
+            m_renderer.renderChunksIndirect(vp, frustumPlanes);
         }
 
         buildDebugOverlay();

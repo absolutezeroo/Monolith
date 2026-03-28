@@ -156,6 +156,61 @@ core::Result<void> Renderer::init(const std::string& shaderDir, game::Window& wi
         m_wireframePipeline = wireResult.value();
     }
 
+    // Create compute pipeline layout — same descriptor set layout, but with compute push constants
+    VkPushConstantRange computePushRange{};
+    computePushRange.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    computePushRange.offset = 0;
+    computePushRange.size = sizeof(CullPushConstants);
+
+    VkPipelineLayoutCreateInfo computeLayoutInfo{};
+    computeLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    computeLayoutInfo.setLayoutCount = 1;
+    computeLayoutInfo.pSetLayouts = &m_chunkDescriptorSetLayout;
+    computeLayoutInfo.pushConstantRangeCount = 1;
+    computeLayoutInfo.pPushConstantRanges = &computePushRange;
+
+    VkResult computeLayoutResult =
+        vkCreatePipelineLayout(device, &computeLayoutInfo, nullptr, &m_computePipelineLayout);
+    if (computeLayoutResult != VK_SUCCESS)
+    {
+        VX_LOG_ERROR("Failed to create compute pipeline layout: {}", static_cast<int>(computeLayoutResult));
+        return std::unexpected(core::EngineError::vulkan(
+            static_cast<int32_t>(computeLayoutResult), "Failed to create compute pipeline layout"));
+    }
+
+    // Load cull.comp shader and create compute pipeline
+    std::string cullPath = shaderDir + "/cull.comp.spv";
+    auto cullShaderResult = loadShaderModule(cullPath);
+    if (!cullShaderResult.has_value())
+    {
+        return std::unexpected(cullShaderResult.error());
+    }
+    VkShaderModule cullShader = cullShaderResult.value();
+
+    VkPipelineShaderStageCreateInfo computeStageInfo{};
+    computeStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    computeStageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+    computeStageInfo.module = cullShader;
+    computeStageInfo.pName = "main";
+
+    VkComputePipelineCreateInfo computePipelineInfo{};
+    computePipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+    computePipelineInfo.stage = computeStageInfo;
+    computePipelineInfo.layout = m_computePipelineLayout;
+
+    VkResult cullPipelineResult =
+        vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computePipelineInfo, nullptr, &m_cullPipeline);
+    vkDestroyShaderModule(device, cullShader, nullptr);
+
+    if (cullPipelineResult != VK_SUCCESS)
+    {
+        VX_LOG_ERROR("Failed to create compute culling pipeline: {}", static_cast<int>(cullPipelineResult));
+        return std::unexpected(core::EngineError::vulkan(
+            static_cast<int32_t>(cullPipelineResult), "Failed to create compute culling pipeline"));
+    }
+
+    VX_LOG_INFO("Compute culling pipeline created");
+
     // Allocate chunk descriptor set and write gigabuffer to binding 0
     auto descriptorSetResult = m_descriptorAllocator->allocate(m_chunkDescriptorSetLayout);
     if (!descriptorSetResult.has_value())
@@ -726,6 +781,29 @@ bool Renderer::beginFrame(game::Window& window, const DebugOverlayState& overlay
     transitionImage(
         cmd, m_swapchainResources.depthImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
+    // Render pass is NOT started here — deferred until renderChunksIndirect()/renderChunks()
+    // so that compute dispatch can happen before the render pass.
+    m_useWireframe = overlay.wireframeMode && m_wireframePipeline != VK_NULL_HANDLE;
+    m_renderPassActive = false;
+
+    // Begin ImGui frame — caller will build UI between beginFrame/endFrame
+    m_imguiBackend->beginFrame();
+
+    m_currentWindow = &window;
+    m_frameActive = true;
+    return true;
+}
+
+void Renderer::beginRenderPass()
+{
+    if (m_renderPassActive)
+    {
+        return;
+    }
+    m_renderPassActive = true;
+
+    auto& frame = m_frames[m_frameIndex];
+    VkCommandBuffer cmd = frame.commandBuffer;
     VkExtent2D extent = m_vulkanContext.getSwapchainExtent();
 
     VkRenderingAttachmentInfo colorAttachment{};
@@ -769,16 +847,7 @@ bool Renderer::beginFrame(game::Window& window, const DebugOverlayState& overlay
     scissor.extent = extent;
     vkCmdSetScissor(cmd, 0, 1, &scissor);
 
-    // Select fill or wireframe pipeline — drawing is now caller-driven via renderChunks()
-    bool useWireframe = overlay.wireframeMode && m_wireframePipeline != VK_NULL_HANDLE;
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, useWireframe ? m_wireframePipeline : m_pipeline);
-
-    // Begin ImGui frame — caller will build UI between beginFrame/endFrame
-    m_imguiBackend->beginFrame();
-
-    m_currentWindow = &window;
-    m_frameActive = true;
-    return true;
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_useWireframe ? m_wireframePipeline : m_pipeline);
 }
 
 void Renderer::renderChunks(const ChunkRenderInfoMap& renderInfos, const glm::mat4& viewProjection)
@@ -787,6 +856,8 @@ void Renderer::renderChunks(const ChunkRenderInfoMap& renderInfos, const glm::ma
     {
         return;
     }
+
+    beginRenderPass();
 
     auto& frame = m_frames[m_frameIndex];
     VkCommandBuffer cmd = frame.commandBuffer;
@@ -813,7 +884,6 @@ void Renderer::renderChunks(const ChunkRenderInfoMap& renderInfos, const glm::ma
         ChunkPushConstants pc{};
         pc.viewProjection = viewProjection;
         pc.time = currentTime;
-        pc.chunkWorldPos = glm::vec3(info.worldBasePos);
 
         vkCmdPushConstants(
             cmd,
@@ -849,6 +919,124 @@ void Renderer::renderChunks(const ChunkRenderInfoMap& renderInfos, const glm::ma
     }
 }
 
+void Renderer::renderChunksIndirect(
+    const glm::mat4& viewProjection,
+    const std::array<glm::vec4, 6>& frustumPlanes)
+{
+    if (!m_frameActive)
+    {
+        return;
+    }
+
+    auto& frame = m_frames[m_frameIndex];
+    VkCommandBuffer cmd = frame.commandBuffer;
+
+    uint32_t totalSections = m_chunkRenderInfoBuffer->getHighWaterMark();
+    if (totalSections == 0)
+    {
+        m_lastDrawCount = 0;
+        m_lastQuadCount = 0;
+        beginRenderPass(); // ensure render pass is active for subsequent ImGui rendering
+        return;
+    }
+
+    // 1. Reset draw count to 0 via vkCmdFillBuffer
+    m_indirectDrawBuffer->recordCountReset(cmd);
+
+    // 2. Barrier: TRANSFER_DST → COMPUTE_SHADER (fill completes before compute reads/writes)
+    VkMemoryBarrier2 fillToComputeBarrier{};
+    fillToComputeBarrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2;
+    fillToComputeBarrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+    fillToComputeBarrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+    fillToComputeBarrier.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+    fillToComputeBarrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT;
+
+    VkDependencyInfo fillDep{};
+    fillDep.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+    fillDep.memoryBarrierCount = 1;
+    fillDep.pMemoryBarriers = &fillToComputeBarrier;
+    vkCmdPipelineBarrier2(cmd, &fillDep);
+
+    // 3. Bind compute pipeline and descriptor set
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_cullPipeline);
+    vkCmdBindDescriptorSets(
+        cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_computePipelineLayout, 0, 1, &m_chunkDescriptorSet, 0, nullptr);
+
+    // 4. Push compute constants: frustum planes + totalSections
+    CullPushConstants cullPC{};
+    for (int i = 0; i < 6; ++i)
+    {
+        cullPC.frustumPlanes[i] = frustumPlanes[static_cast<size_t>(i)];
+    }
+    cullPC.totalSections = totalSections;
+
+    vkCmdPushConstants(
+        cmd,
+        m_computePipelineLayout,
+        VK_SHADER_STAGE_COMPUTE_BIT,
+        0,
+        sizeof(CullPushConstants),
+        &cullPC);
+
+    // 5. Dispatch compute shader: ceil(totalSections / 64)
+    uint32_t groupCount = (totalSections + 63) / 64;
+    vkCmdDispatch(cmd, groupCount, 1, 1);
+
+    // 6. Barrier: COMPUTE → DRAW_INDIRECT + VERTEX_SHADER
+    VkMemoryBarrier2 computeToDrawBarrier{};
+    computeToDrawBarrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2;
+    computeToDrawBarrier.srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+    computeToDrawBarrier.srcAccessMask = VK_ACCESS_2_SHADER_WRITE_BIT;
+    computeToDrawBarrier.dstStageMask =
+        VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT | VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT;
+    computeToDrawBarrier.dstAccessMask =
+        VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT | VK_ACCESS_2_SHADER_READ_BIT;
+
+    VkDependencyInfo drawDep{};
+    drawDep.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+    drawDep.memoryBarrierCount = 1;
+    drawDep.pMemoryBarriers = &computeToDrawBarrier;
+    vkCmdPipelineBarrier2(cmd, &drawDep);
+
+    // 7. Begin render pass (deferred from beginFrame to allow compute dispatch first)
+    beginRenderPass();
+
+    // 8. Bind descriptor set for graphics
+    vkCmdBindDescriptorSets(
+        cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout, 0, 1, &m_chunkDescriptorSet, 0, nullptr);
+
+    // 9. Bind shared quad index buffer
+    m_quadIndexBuffer->bind(cmd);
+
+    // 10. Push graphics constants: VP + time (no chunkWorldPos)
+    float currentTime = static_cast<float>(glfwGetTime());
+    ChunkPushConstants pc{};
+    pc.viewProjection = viewProjection;
+    pc.time = currentTime;
+
+    vkCmdPushConstants(
+        cmd,
+        m_pipelineLayout,
+        VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+        0,
+        sizeof(ChunkPushConstants),
+        &pc);
+
+    // 11. Indirect draw: vkCmdDrawIndexedIndirectCount
+    vkCmdDrawIndexedIndirectCount(
+        cmd,
+        m_indirectDrawBuffer->getCommandBuffer(), // buffer with VkDrawIndexedIndirectCommand[]
+        0,                                         // offset into command buffer
+        m_indirectDrawBuffer->getCountBuffer(),    // buffer with uint32_t draw count
+        0,                                         // offset into count buffer
+        MAX_RENDERABLE_SECTIONS,                   // maxDrawCount (GPU clamps to this)
+        sizeof(VkDrawIndexedIndirectCommand));     // stride
+
+    // V1: display highWaterMark as approximate stats — no GPU readback
+    m_lastDrawCount = totalSections; // upper bound (actual may be less due to culling)
+    m_lastQuadCount = 0;            // unknown without readback
+}
+
 void Renderer::endFrame()
 {
     if (!m_frameActive)
@@ -860,10 +1048,14 @@ void Renderer::endFrame()
     auto& frame = m_frames[m_frameIndex];
     VkCommandBuffer cmd = frame.commandBuffer;
 
+    // Ensure render pass is active for ImGui (may not be if renderChunksIndirect wasn't called)
+    beginRenderPass();
+
     // Finalize ImGui and render
     m_imguiBackend->render(cmd);
 
     vkCmdEndRendering(cmd);
+    m_renderPassActive = false;
 
     VkImage swapchainImage = m_vulkanContext.getSwapchainImages()[m_currentImageIndex];
     transitionImage(cmd, swapchainImage, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
@@ -992,6 +1184,12 @@ void Renderer::shutdown()
         m_pipeline = VK_NULL_HANDLE;
     }
 
+    if (m_cullPipeline != VK_NULL_HANDLE)
+    {
+        vkDestroyPipeline(device, m_cullPipeline, nullptr);
+        m_cullPipeline = VK_NULL_HANDLE;
+    }
+
     // Destroy descriptor infrastructure (pools first, then layout, then pipeline layout)
     m_chunkDescriptorSet = VK_NULL_HANDLE; // owned by pool, destroyed with it
     m_descriptorAllocator.reset();
@@ -1000,6 +1198,12 @@ void Renderer::shutdown()
     {
         vkDestroyDescriptorSetLayout(device, m_chunkDescriptorSetLayout, nullptr);
         m_chunkDescriptorSetLayout = VK_NULL_HANDLE;
+    }
+
+    if (m_computePipelineLayout != VK_NULL_HANDLE)
+    {
+        vkDestroyPipelineLayout(device, m_computePipelineLayout, nullptr);
+        m_computePipelineLayout = VK_NULL_HANDLE;
     }
 
     if (m_pipelineLayout != VK_NULL_HANDLE)

@@ -3,6 +3,7 @@
 #include "voxel/core/Log.h"
 #include "voxel/renderer/VulkanContext.h"
 
+#include <algorithm>
 #include <cstring>
 
 namespace voxel::renderer
@@ -67,6 +68,7 @@ core::Result<uint32_t> ChunkRenderInfoBuffer::allocateSlot()
 
     uint32_t slot = m_freeSlots.back();
     m_freeSlots.pop_back();
+    m_highWaterMark = std::max(m_highWaterMark, slot + 1);
     return slot;
 }
 
