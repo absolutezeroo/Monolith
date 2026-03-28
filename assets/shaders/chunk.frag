@@ -13,9 +13,24 @@ layout(location = 0) out vec4 outColor;
 
 void main()
 {
-    // DEBUG: color based on world position fractional (repeats every 16 blocks)
-    // If geometry is correct, you'll see a colorful rainbow pattern across terrain.
-    // If all quads overlap, you'll see a single solid color per section.
-    vec3 debugColor = fract(fragWorldPos / 16.0);
-    outColor = vec4(debugColor, 1.0);
+    // Face-normal-based coloring (textures come in Story 6.5)
+    vec3 color;
+
+    if (fragNormal.y > 0.5)       // PosY (top) → green
+    {
+        color = vec3(0.3, 0.8, 0.2);
+    }
+    else if (fragNormal.y < -0.5) // NegY (bottom) → brown
+    {
+        color = vec3(0.5, 0.3, 0.1);
+    }
+    else                           // Sides → gray
+    {
+        color = vec3(0.6, 0.6, 0.6);
+    }
+
+    // Apply ambient occlusion darkening
+    color *= fragAO;
+
+    outColor = vec4(color, 1.0);
 }

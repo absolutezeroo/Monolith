@@ -5,7 +5,7 @@
 project: VoxelForge
 methodology: BMAD v6 + Game Dev Studio
 created: 2026-03-24
-last_updated: 2026-03-28  # Story 6.1 → done (code review passed)
+last_updated: 2026-03-28  # Story 6.3 → ready-for-dev (context created)
 
 # Status values: backlog | ready | in-progress | review | done | blocked
 
@@ -215,7 +215,7 @@ epics:
         assigned_to: dev-agent
       - id: "6.3"
         title: "Indirect Draw Buffer + ChunkRenderInfo SSBO"
-        status: backlog
+        status: ready-for-dev
         assigned_to: null
       - id: "6.4"
         title: "Compute Culling Shader (cull.comp)"

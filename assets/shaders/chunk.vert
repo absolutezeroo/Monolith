@@ -124,12 +124,16 @@ void main()
     }
 
     // ── Quad diagonal flip ──────────────────────────────────────────────────
-    // When flip == 1, swap corners 1 and 3 to change the triangle diagonal
-    // from (1,3) to (0,2) for AO-correct interpolation.
+    // When flip == 1, rotate corners by one position to change the triangle
+    // diagonal from c0-c2 to c1-c3 for AO-correct interpolation.
+    // A swap of c1↔c3 would reverse winding and cause back-face culling;
+    // a rotation [c0,c1,c2,c3] → [c1,c2,c3,c0] preserves winding order.
     if (flip == 1u)
     {
-        vec3 temp = c1;
-        c1 = c3;
+        vec3 temp = c0;
+        c0 = c1;
+        c1 = c2;
+        c2 = c3;
         c3 = temp;
     }
 
@@ -142,11 +146,13 @@ void main()
         float(ao3) / 3.0
     );
 
-    // When flipped, AO corners 1 and 3 swap to match the position swap
+    // When flipped, rotate AO values to match the corner rotation
     if (flip == 1u)
     {
-        float temp = aoValues[1];
-        aoValues[1] = aoValues[3];
+        float temp = aoValues[0];
+        aoValues[0] = aoValues[1];
+        aoValues[1] = aoValues[2];
+        aoValues[2] = aoValues[3];
         aoValues[3] = temp;
     }
 
@@ -158,10 +164,13 @@ void main()
         vec2(width, 0.0)
     );
 
+    // When flipped, rotate UVs to match the corner rotation
     if (flip == 1u)
     {
-        vec2 temp = uvs[1];
-        uvs[1] = uvs[3];
+        vec2 temp = uvs[0];
+        uvs[0] = uvs[1];
+        uvs[1] = uvs[2];
+        uvs[2] = uvs[3];
         uvs[3] = temp;
     }
 

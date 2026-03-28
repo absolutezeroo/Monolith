@@ -262,12 +262,8 @@ void GameApp::tick(double dt)
     // Async meshing: poll results and dispatch dirty sections
     m_chunkManager.update(m_camera.getPosition());
 
-    // Upload completed meshes to gigabuffer via staging buffer
-    if (m_uploadManager)
-    {
-        m_uploadManager->processUploads(m_chunkManager, m_camera.getPosition());
-        m_uploadManager->processDeferredFrees();
-    }
+    // NOTE: mesh uploads moved to render() — must happen AFTER beginFrame()
+    // calls StagingBuffer::beginFrame() which resets the pending transfer list.
 
     // Clear edge flags and update hold timers at end of tick.
     // Edge flags were set by pollEvents callbacks, read above, and now cleared
@@ -475,6 +471,16 @@ void GameApp::render(double /*alpha*/)
 
     if (m_renderer.beginFrame(m_window, m_overlayState))
     {
+        // Upload completed meshes to gigabuffer via staging buffer.
+        // MUST happen after beginFrame() (which resets staging state) and before
+        // renderChunks() (which draws from gigabuffer). endFrame() flushes the
+        // staged transfers before submitting the graphics command buffer.
+        if (m_uploadManager)
+        {
+            m_uploadManager->processUploads(m_chunkManager, m_camera.getPosition());
+            m_uploadManager->processDeferredFrees();
+        }
+
         // Render chunk sections between beginFrame/endFrame (after pipeline bind)
         if (m_uploadManager)
         {

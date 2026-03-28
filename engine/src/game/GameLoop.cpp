@@ -65,7 +65,7 @@ void GameLoop::run()
         m_fpsTimer += frameTime;
         if (m_fpsTimer >= 1.0)
         {
-            VX_LOG_INFO("FPS: {}", m_frameCount);
+            // VX_LOG_INFO("FPS: {}", m_frameCount);
             m_frameCount = 0;
             m_fpsTimer -= 1.0;
         }

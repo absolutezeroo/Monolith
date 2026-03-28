@@ -292,7 +292,7 @@ core::Result<void> StagingBuffer::flushTransfers(VkBuffer gigabuffer)
     m_hasActiveTransfer = true;
     m_fenceSubmitted[m_currentFrameIndex] = true;
 
-    VX_LOG_DEBUG("Flushed {} transfers ({} bytes) via transfer queue", m_pendingTransfers.size(), m_usedBytes);
+    // VX_LOG_DEBUG("Flushed {} transfers ({} bytes) via transfer queue", m_pendingTransfers.size(), m_usedBytes);
 
     m_pendingTransfers.clear();
 
@@ -304,14 +304,16 @@ void StagingBuffer::beginFrame(uint32_t frameIndex)
     VkDevice device = m_context->getDevice();
     m_currentFrameIndex = frameIndex;
 
-    // Only wait on fence if a transfer was actually submitted for this frame slot.
-    // Skipping avoids deadlock when no uploads occur (fence would be unsignaled).
+    // Wait for any in-flight transfer from the previous use of this frame slot.
     if (m_fenceSubmitted[frameIndex])
     {
         vkWaitForFences(device, 1, &m_transferFences[frameIndex], VK_TRUE, UINT64_MAX);
-        vkResetFences(device, 1, &m_transferFences[frameIndex]);
         m_fenceSubmitted[frameIndex] = false;
     }
+
+    // Always reset so the fence is unsignaled before the next flushTransfers() submit.
+    // Handles the initial case where fences are created VK_FENCE_CREATE_SIGNALED_BIT.
+    vkResetFences(device, 1, &m_transferFences[frameIndex]);
 
     // Reset write offset to this frame's ring-buffer region
     m_writeOffset = static_cast<VkDeviceSize>(frameIndex) * m_frameRegionSize;
