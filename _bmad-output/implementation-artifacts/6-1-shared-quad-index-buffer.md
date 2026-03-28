@@ -1,6 +1,6 @@
 # Story 6.1: Shared Quad Index Buffer
 
-Status: review
+Status: done
 
 ## Story
 
@@ -326,6 +326,7 @@ Claude Opus 4.6
 |------|--------|
 | 2026-03-27 | Story created by create-story workflow |
 | 2026-03-27 | Implemented all tasks: QuadIndexBuffer class, Renderer integration, tests — all ACs satisfied |
+| 2026-03-28 | Code review: added missing vkAllocateCommandBuffers error check, fixed log MB integer truncation |
 
 ### File List
 - `engine/include/voxel/renderer/RendererConstants.h` (MODIFIED — added MAX_QUADS, QUAD_INDEX_BUFFER_SIZE)

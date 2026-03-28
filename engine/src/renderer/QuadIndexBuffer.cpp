@@ -102,7 +102,18 @@ core::Result<std::unique_ptr<QuadIndexBuffer>> QuadIndexBuffer::create(VulkanCon
     cmdAI.commandPool = tempPool;
     cmdAI.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     cmdAI.commandBufferCount = 1;
-    vkAllocateCommandBuffers(device, &cmdAI, &cmd);
+    result = vkAllocateCommandBuffers(device, &cmdAI, &cmd);
+    if (result != VK_SUCCESS)
+    {
+        VX_LOG_ERROR("QuadIndexBuffer: command buffer allocation failed: {}", static_cast<int>(result));
+        vkDestroyCommandPool(device, tempPool, nullptr);
+        vmaDestroyBuffer(qib->m_allocator, stagingBuffer, stagingAlloc);
+        vmaDestroyBuffer(qib->m_allocator, qib->m_buffer, qib->m_allocation);
+        qib->m_buffer = VK_NULL_HANDLE;
+        qib->m_allocation = VK_NULL_HANDLE;
+        return std::unexpected(
+            core::EngineError::vulkan(static_cast<int32_t>(result), "QuadIndexBuffer: command buffer alloc failed"));
+    }
 
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -147,8 +158,8 @@ core::Result<std::unique_ptr<QuadIndexBuffer>> QuadIndexBuffer::create(VulkanCon
     vmaDestroyBuffer(qib->m_allocator, stagingBuffer, stagingAlloc);
 
     VX_LOG_INFO(
-        "QuadIndexBuffer created: {} MB, {} quads, {} indices",
-        dataSize / (1024 * 1024),
+        "QuadIndexBuffer created: {:.1f} MB, {} quads, {} indices",
+        static_cast<double>(dataSize) / (1024.0 * 1024.0),
         MAX_QUADS,
         MAX_QUADS * 6);
 
