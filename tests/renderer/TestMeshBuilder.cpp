@@ -21,6 +21,12 @@ static uint16_t registerStone(BlockRegistry& registry)
     def.stringId = "base:stone";
     def.isSolid = true;
     def.isTransparent = false;
+    def.textureIndices[0] = 1;
+    def.textureIndices[1] = 1;
+    def.textureIndices[2] = 1;
+    def.textureIndices[3] = 1;
+    def.textureIndices[4] = 1;
+    def.textureIndices[5] = 1;
     auto result = registry.registerBlock(std::move(def));
     REQUIRE(result.has_value());
     return registry.getIdByName("base:stone");
@@ -33,6 +39,12 @@ static uint16_t registerGlass(BlockRegistry& registry)
     def.stringId = "base:glass";
     def.isSolid = true;
     def.isTransparent = true;
+    def.textureIndices[0] = 10;
+    def.textureIndices[1] = 10;
+    def.textureIndices[2] = 10;
+    def.textureIndices[3] = 10;
+    def.textureIndices[4] = 10;
+    def.textureIndices[5] = 10;
     auto result = registry.registerBlock(std::move(def));
     REQUIRE(result.has_value());
     return registry.getIdByName("base:glass");
@@ -94,7 +106,7 @@ TEST_CASE("MeshBuilder naive face culling", "[renderer][meshing]")
             REQUIRE(unpackX(quad) == 8);
             REQUIRE(unpackY(quad) == 8);
             REQUIRE(unpackZ(quad) == 8);
-            REQUIRE(unpackBlockStateId(quad) == stoneId);
+            REQUIRE(unpackBlockStateId(quad) == 1); // stone texture index
             REQUIRE(unpackWidth(quad) == 1);
             REQUIRE(unpackHeight(quad) == 1);
             auto ao = unpackAO(quad);
@@ -171,7 +183,7 @@ TEST_CASE("MeshBuilder naive face culling", "[renderer][meshing]")
             if (unpackX(quad) == 7 && unpackFace(quad) == BlockFace::PosX)
             {
                 foundStonePosX = true;
-                REQUIRE(unpackBlockStateId(quad) == stoneId);
+                REQUIRE(unpackBlockStateId(quad) == 1); // stone texture index
             }
             if (unpackX(quad) == 8 && unpackFace(quad) == BlockFace::NegX)
             {

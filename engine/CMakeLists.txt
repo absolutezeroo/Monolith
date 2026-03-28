@@ -17,6 +17,7 @@ add_library(VoxelEngine STATIC
         src/renderer/ImGuiBackend.cpp
         src/renderer/ImGuiImpl.cpp
         src/renderer/ImGuiImplGlfw.cpp
+        src/renderer/StbImageImpl.cpp
         src/renderer/StbImageWriteImpl.cpp
         src/world/ChunkSection.cpp
         src/world/ChunkColumn.cpp
@@ -32,6 +33,7 @@ add_library(VoxelEngine STATIC
         src/renderer/QuadIndexBuffer.cpp
         src/renderer/IndirectDrawBuffer.cpp
         src/renderer/ChunkRenderInfoBuffer.cpp
+        src/renderer/TextureArray.cpp
         src/renderer/ChunkUploadManager.cpp
         src/renderer/MeshBuilder.cpp
         src/renderer/ModelMesher.cpp
@@ -166,13 +168,15 @@ else ()
             APPEND_STRING PROPERTY COMPILE_FLAGS " -w")
 endif ()
 
-# StbImageWriteImpl.cpp — single-header implementation; skip PCH and suppress warnings.
-set_source_files_properties(src/renderer/StbImageWriteImpl.cpp
+# StbImage*.cpp — single-header implementations; skip PCH and suppress warnings.
+set_source_files_properties(
+        src/renderer/StbImageImpl.cpp
+        src/renderer/StbImageWriteImpl.cpp
         PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 if (MSVC)
-    set_property(SOURCE src/renderer/StbImageWriteImpl.cpp
+    set_property(SOURCE src/renderer/StbImageImpl.cpp src/renderer/StbImageWriteImpl.cpp
             APPEND_STRING PROPERTY COMPILE_FLAGS " /w")
 else ()
-    set_property(SOURCE src/renderer/StbImageWriteImpl.cpp
+    set_property(SOURCE src/renderer/StbImageImpl.cpp src/renderer/StbImageWriteImpl.cpp
             APPEND_STRING PROPERTY COMPILE_FLAGS " -w")
 endif ()

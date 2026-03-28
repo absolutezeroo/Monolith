@@ -5,32 +5,22 @@ layout(location = 0) in vec3 fragWorldPos;
 layout(location = 1) in vec3 fragNormal;
 layout(location = 2) in vec2 fragUV;
 layout(location = 3) in float fragAO;
-layout(location = 4) flat in uint fragBlockStateId;
+layout(location = 4) flat in uint fragTextureLayer;
 layout(location = 5) flat in uint fragTintIndex;
+
+// ── Block texture array (binding 4) ────────────────────────────────────────
+layout(set = 0, binding = 4) uniform sampler2DArray blockTextures;
 
 // ── Output ──────────────────────────────────────────────────────────────────
 layout(location = 0) out vec4 outColor;
 
 void main()
 {
-    // Face-normal-based coloring (textures come in Story 6.5)
-    vec3 color;
-
-    if (fragNormal.y > 0.5)       // PosY (top) → green
-    {
-        color = vec3(0.3, 0.8, 0.2);
-    }
-    else if (fragNormal.y < -0.5) // NegY (bottom) → brown
-    {
-        color = vec3(0.5, 0.3, 0.1);
-    }
-    else                           // Sides → gray
-    {
-        color = vec3(0.6, 0.6, 0.6);
-    }
+    // Sample block texture from array using tiling UVs and texture layer
+    vec4 texColor = texture(blockTextures, vec3(fragUV, float(fragTextureLayer)));
 
     // Apply ambient occlusion darkening
-    color *= fragAO;
+    vec3 color = texColor.rgb * fragAO;
 
-    outColor = vec4(color, 1.0);
+    outColor = vec4(color, texColor.a);
 }

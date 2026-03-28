@@ -143,7 +143,7 @@ voxel::core::Result<void> GameApp::init(const std::string& shaderDir, std::optio
     // Swapchain recreation is handled by VK_ERROR_OUT_OF_DATE_KHR in Renderer::draw().
     glfwSetFramebufferSizeCallback(m_window.getHandle(), nullptr);
 
-    auto result = m_renderer.init(shaderDir, m_window);
+    auto result = m_renderer.init(shaderDir, VX_ASSETS_DIR, m_window);
     if (!result.has_value())
     {
         return result;

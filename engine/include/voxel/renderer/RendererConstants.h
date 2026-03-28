@@ -32,4 +32,13 @@ inline constexpr VkDeviceSize INDIRECT_COMMAND_BUFFER_SIZE =
 inline constexpr VkDeviceSize CHUNK_RENDER_INFO_BUFFER_SIZE =
     static_cast<VkDeviceSize>(MAX_RENDERABLE_SECTIONS) * 48;
 
+/// Pixel dimensions of each block texture (square).
+inline constexpr uint32_t BLOCK_TEXTURE_SIZE = 16;
+
+/// Number of mip levels for block textures: log2(16) + 1 = 5.
+inline constexpr uint32_t BLOCK_TEXTURE_MIP_LEVELS = 5;
+
+/// Maximum number of layers in the block texture array.
+inline constexpr uint32_t MAX_BLOCK_TEXTURES = 256;
+
 } // namespace voxel::renderer

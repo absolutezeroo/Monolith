@@ -34,7 +34,7 @@ layout(location = 0) out vec3 fragWorldPos;
 layout(location = 1) out vec3 fragNormal;
 layout(location = 2) out vec2 fragUV;
 layout(location = 3) out float fragAO;
-layout(location = 4) flat out uint fragBlockStateId;
+layout(location = 4) flat out uint fragTextureLayer;
 layout(location = 5) flat out uint fragTintIndex;
 
 // ── Face normals ────────────────────────────────────────────────────────────
@@ -79,7 +79,7 @@ void main()
     uint tintIndex  = bitfieldExtract(hi, 27, 3);
     uint wavingType = bitfieldExtract(hi, 30, 2);
 
-    uint blockStateId = bsLow | (bsHigh << 2u);
+    uint textureLayer = bsLow | (bsHigh << 2u);
 
     float x = float(posX);
     float y = float(posY);
@@ -225,7 +225,7 @@ void main()
     // ── Output ──────────────────────────────────────────────────────────────
     fragWorldPos = worldPos;
     fragNormal = FACE_NORMALS[face];
-    fragBlockStateId = blockStateId;
+    fragTextureLayer = textureLayer;
     fragTintIndex = tintIndex;
 
     gl_Position = pc.viewProjection * vec4(worldPos, 1.0);

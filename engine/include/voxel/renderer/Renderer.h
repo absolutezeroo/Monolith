@@ -30,6 +30,7 @@ class ImGuiBackend;
 class IndirectDrawBuffer;
 class QuadIndexBuffer;
 class StagingBuffer;
+class TextureArray;
 class VulkanContext;
 
 /// Push constants for chunk rendering: VP matrix + animation time.
@@ -94,7 +95,7 @@ class Renderer
      * @param window GLFW window for ImGui initialization.
      * @return Success or EngineError on failure.
      */
-    core::Result<void> init(const std::string& shaderDir, game::Window& window);
+    core::Result<void> init(const std::string& shaderDir, const std::string& assetsDir, game::Window& window);
 
     /**
      * @brief Begins a frame: acquires swapchain image, starts command recording, draws scene.
@@ -156,6 +157,7 @@ class Renderer
     [[nodiscard]] DescriptorAllocator& getDescriptorAllocator() { return *m_descriptorAllocator; }
     [[nodiscard]] VkPipelineLayout getPipelineLayout() const { return m_pipelineLayout; }
     [[nodiscard]] const QuadIndexBuffer* getQuadIndexBuffer() const { return m_quadIndexBuffer.get(); }
+    [[nodiscard]] const TextureArray* getTextureArray() const { return m_textureArray.get(); }
 
   private:
     /// Extent-dependent resources that must be recreated on swapchain resize.
@@ -212,6 +214,7 @@ class Renderer
     std::unique_ptr<QuadIndexBuffer> m_quadIndexBuffer;
     std::unique_ptr<IndirectDrawBuffer> m_indirectDrawBuffer;
     std::unique_ptr<ChunkRenderInfoBuffer> m_chunkRenderInfoBuffer;
+    std::unique_ptr<TextureArray> m_textureArray;
     std::unique_ptr<ImGuiBackend> m_imguiBackend;
 
     SwapchainResources m_swapchainResources{};

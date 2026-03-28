@@ -19,7 +19,8 @@ static uint16_t registerBlock(
     const std::string& id,
     uint8_t tintIndex = 0,
     uint8_t waving = 0,
-    bool transparent = false)
+    bool transparent = false,
+    uint16_t textureIdx = 0)
 {
     BlockDefinition def;
     def.stringId = id;
@@ -27,6 +28,8 @@ static uint16_t registerBlock(
     def.isTransparent = transparent;
     def.tintIndex = tintIndex;
     def.waving = waving;
+    for (int i = 0; i < 6; ++i)
+        def.textureIndices[i] = textureIdx;
     auto result = registry.registerBlock(std::move(def));
     REQUIRE(result.has_value());
     return registry.getIdByName(id);
@@ -126,8 +129,8 @@ TEST_CASE("Tint and waving quad packing roundtrip", "[renderer][meshing][tint]")
 TEST_CASE("Meshing integration with tint and waving", "[renderer][meshing][tint]")
 {
     BlockRegistry registry;
-    uint16_t stoneId = registerBlock(registry, "base:stone", 0, 0);
-    uint16_t grassId = registerBlock(registry, "base:grass_block", 1, 2);
+    uint16_t stoneId = registerBlock(registry, "base:stone", 0, 0, false, 1);
+    uint16_t grassId = registerBlock(registry, "base:grass_block", 1, 2, false, 3);
     registerBlock(registry, "base:oak_leaves", 2, 1, true);
     MeshBuilder builder(registry);
 
@@ -171,13 +174,13 @@ TEST_CASE("Meshing integration with tint and waving", "[renderer][meshing][tint]
 
         for (const uint64_t quad : mesh.quads)
         {
-            uint16_t blockId = unpackBlockStateId(quad);
-            if (blockId == stoneId)
+            uint16_t texLayer = unpackBlockStateId(quad);
+            if (texLayer == 1) // stone texture index
             {
                 REQUIRE(unpackTintIndex(quad) == 0);
                 REQUIRE(unpackWavingType(quad) == 0);
             }
-            else if (blockId == grassId)
+            else if (texLayer == 3) // grass texture index
             {
                 REQUIRE(unpackTintIndex(quad) == 1);
                 REQUIRE(unpackWavingType(quad) == 2);
@@ -200,7 +203,7 @@ TEST_CASE("Meshing integration with tint and waving", "[renderer][meshing][tint]
             REQUIRE(unpackX(quad) == 8);
             REQUIRE(unpackY(quad) == 8);
             REQUIRE(unpackZ(quad) == 8);
-            REQUIRE(unpackBlockStateId(quad) == stoneId);
+            REQUIRE(unpackBlockStateId(quad) == 1); // stone texture index
             REQUIRE(unpackWidth(quad) == 1);
             REQUIRE(unpackHeight(quad) == 1);
             auto ao = unpackAO(quad);
@@ -217,8 +220,8 @@ TEST_CASE("Meshing integration with tint and waving", "[renderer][meshing][tint]
 TEST_CASE("Greedy mesher propagates tint and waving", "[renderer][meshing][tint]")
 {
     BlockRegistry registry;
-    uint16_t stoneId = registerBlock(registry, "base:stone", 0, 0);
-    uint16_t grassId = registerBlock(registry, "base:grass_block", 1, 2);
+    uint16_t stoneId = registerBlock(registry, "base:stone", 0, 0, false, 1);
+    uint16_t grassId = registerBlock(registry, "base:grass_block", 1, 2, false, 3);
     MeshBuilder builder(registry);
 
     SECTION("grass block quads carry tintIndex=1, wavingType=2 via greedy")
@@ -261,13 +264,13 @@ TEST_CASE("Greedy mesher propagates tint and waving", "[renderer][meshing][tint]
 
         for (const uint64_t quad : mesh.quads)
         {
-            uint16_t blockId = unpackBlockStateId(quad);
-            if (blockId == stoneId)
+            uint16_t texLayer = unpackBlockStateId(quad);
+            if (texLayer == 1) // stone texture index
             {
                 REQUIRE(unpackTintIndex(quad) == 0);
                 REQUIRE(unpackWavingType(quad) == 0);
             }
-            else if (blockId == grassId)
+            else if (texLayer == 3) // grass texture index
             {
                 REQUIRE(unpackTintIndex(quad) == 1);
                 REQUIRE(unpackWavingType(quad) == 2);

@@ -1,6 +1,6 @@
 # Story 6.5: Texture Array Loading
 
-Status: ready-for-dev
+Status: in-progress
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -26,18 +26,18 @@ so that all block textures are available in a single bind and the fragment shade
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: Create stb_image implementation translation unit** (AC: #1)
-  - [ ] Create `engine/src/renderer/StbImageImpl.cpp`:
+- [x] **Task 1: Create stb_image implementation translation unit** (AC: #1)
+  - [x] Create `engine/src/renderer/StbImageImpl.cpp`:
     ```cpp
     #define STB_IMAGE_IMPLEMENTATION
     #include <stb_image.h>
     ```
-  - [ ] Follow existing pattern from `engine/src/renderer/StbImageWriteImpl.cpp`
-  - [ ] Verify `stb` is already in `vcpkg.json` (it is — provides both stb_image.h and stb_image_write.h)
+  - [x] Follow existing pattern from `engine/src/renderer/StbImageWriteImpl.cpp`
+  - [x] Verify `stb` is already in `vcpkg.json` (it is — provides both stb_image.h and stb_image_write.h)
 
-- [ ] **Task 2: Create placeholder textures** (AC: #10)
-  - [ ] Create directory `assets/textures/blocks/`
-  - [ ] Create `assets/textures/blocks/textures.json` manifest listing all textures in index order:
+- [x] **Task 2: Create placeholder textures** (AC: #10)
+  - [x] Create directory `assets/textures/blocks/`
+  - [x] Create `assets/textures/blocks/textures.json` manifest listing all textures in index order:
     ```json
     [
       "fallback",
@@ -78,19 +78,19 @@ so that all block textures are available in a single bind and the fragment shade
       "diamond_ore"
     ]
     ```
-  - [ ] Generate 16x16 RGBA placeholder PNGs programmatically (small helper using stb_image_write, or committed as binary). Each texture should be a distinct solid color so blocks are visually distinguishable. Index 0 = magenta/black checkerboard (missing-texture marker).
-  - [ ] Texture filenames match manifest entries with `.png` extension (e.g., `stone.png`, `dirt.png`)
+  - [x] Generate 16x16 RGBA placeholder PNGs programmatically (small helper using stb_image_write, or committed as binary). Each texture should be a distinct solid color so blocks are visually distinguishable. Index 0 = magenta/black checkerboard (missing-texture marker).
+  - [x] Texture filenames match manifest entries with `.png` extension (e.g., `stone.png`, `dirt.png`)
 
-- [ ] **Task 3: Add constants to RendererConstants.h** (AC: #1, #2)
-  - [ ] `BLOCK_TEXTURE_SIZE = 16` — pixel dimensions per texture
-  - [ ] `BLOCK_TEXTURE_MIP_LEVELS = 5` — log2(16) + 1 = 5
-  - [ ] `MAX_BLOCK_TEXTURES = 256` — max layers in texture array
+- [x] **Task 3: Add constants to RendererConstants.h** (AC: #1, #2)
+  - [x] `BLOCK_TEXTURE_SIZE = 16` — pixel dimensions per texture
+  - [x] `BLOCK_TEXTURE_MIP_LEVELS = 5` — log2(16) + 1 = 5
+  - [x] `MAX_BLOCK_TEXTURES = 256` — max layers in texture array
 
-- [ ] **Task 4: Create TextureArray class** (AC: #1, #2, #3, #4)
-  - [ ] New files: `engine/include/voxel/renderer/TextureArray.h` / `engine/src/renderer/TextureArray.cpp`
-  - [ ] Follow RAII factory pattern from `QuadIndexBuffer` / `Gigabuffer`: private ctor, `static create()`, deleted copy/move
-  - [ ] Factory signature: `static Result<unique_ptr<TextureArray>> create(VulkanContext& ctx, const std::string& textureDir)`
-  - [ ] Members:
+- [x] **Task 4: Create TextureArray class** (AC: #1, #2, #3, #4)
+  - [x] New files: `engine/include/voxel/renderer/TextureArray.h` / `engine/src/renderer/TextureArray.cpp`
+  - [x] Follow RAII factory pattern from `QuadIndexBuffer` / `Gigabuffer`: private ctor, `static create()`, deleted copy/move
+  - [x] Factory signature: `static Result<unique_ptr<TextureArray>> create(VulkanContext& ctx, const std::string& textureDir)`
+  - [x] Members:
     - `VkImage m_image = VK_NULL_HANDLE`
     - `VmaAllocation m_allocation = VK_NULL_HANDLE`
     - `VkImageView m_imageView = VK_NULL_HANDLE`
@@ -99,7 +99,7 @@ so that all block textures are available in a single bind and the fragment shade
     - `VkDevice m_device` (for RAII cleanup)
     - `uint32_t m_layerCount = 0`
     - `std::unordered_map<std::string, uint16_t> m_nameToLayer`
-  - [ ] `create()` implementation:
+  - [x] `create()` implementation:
     1. Load `textures.json` manifest from `textureDir` to get ordered list of texture names
     2. For each name, load `textureDir/<name>.png` via `stbi_load()` (force 4 channels = RGBA)
     3. Validate all textures are `BLOCK_TEXTURE_SIZE x BLOCK_TEXTURE_SIZE` — error if not
@@ -138,15 +138,15 @@ so that all block textures are available in a single bind and the fragment shade
         - `maxLod = float(BLOCK_TEXTURE_MIP_LEVELS - 1)`
         - `anisotropyEnable = VK_FALSE` (can enable later)
     12. Populate `m_nameToLayer` map from manifest order
-  - [ ] Accessors: `getImageView()`, `getSampler()`, `getLayerIndex(name) -> uint16_t`, `getLayerCount()`
-  - [ ] RAII destructor: destroy sampler, image view, image (via vmaDestroyImage)
+  - [x] Accessors: `getImageView()`, `getSampler()`, `getLayerIndex(name) -> uint16_t`, `getLayerCount()`
+  - [x] RAII destructor: destroy sampler, image view, image (via vmaDestroyImage)
 
-- [ ] **Task 5: Update descriptor layout and write texture binding** (AC: #6)
-  - [ ] In `Renderer::init()`, extend the `DescriptorLayoutBuilder` chain to add:
+- [x] **Task 5: Update descriptor layout and write texture binding** (AC: #6)
+  - [x] In `Renderer::init()`, extend the `DescriptorLayoutBuilder` chain to add:
     ```cpp
     .addBinding(4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
     ```
-  - [ ] After texture array creation, write descriptor binding 4:
+  - [x] After texture array creation, write descriptor binding 4:
     ```cpp
     VkDescriptorImageInfo textureInfo{};
     textureInfo.sampler = m_textureArray->getSampler();
@@ -161,36 +161,36 @@ so that all block textures are available in a single bind and the fragment shade
     textureWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     textureWrite.pImageInfo = &textureInfo;
     ```
-  - [ ] DescriptorAllocator pool already includes `COMBINED_IMAGE_SAMPLER` — no changes needed (verified in `DescriptorAllocator.cpp:166`)
+  - [x] DescriptorAllocator pool already includes `COMBINED_IMAGE_SAMPLER` — no changes needed (verified in `DescriptorAllocator.cpp:166`)
 
-- [ ] **Task 6: Wire TextureArray into Renderer** (AC: #6, #11)
-  - [ ] Add member: `std::unique_ptr<TextureArray> m_textureArray`
-  - [ ] In `init()`, create TextureArray after Gigabuffer, before descriptor layout build
-  - [ ] Pass texture directory path (derive from shaderDir or add as parameter)
-  - [ ] Add accessor: `const TextureArray* getTextureArray() const`
-  - [ ] In `shutdown()`, destroy TextureArray in correct order: ImGuiBackend -> StagingBuffer -> TextureArray -> QuadIndexBuffer -> Gigabuffer -> DescriptorAllocator -> pipelines
+- [x] **Task 6: Wire TextureArray into Renderer** (AC: #6, #11)
+  - [x] Add member: `std::unique_ptr<TextureArray> m_textureArray`
+  - [x] In `init()`, create TextureArray after Gigabuffer, before descriptor layout build
+  - [x] Pass texture directory path (derive from shaderDir or add as parameter)
+  - [x] Add accessor: `const TextureArray* getTextureArray() const`
+  - [x] In `shutdown()`, destroy TextureArray in correct order: ImGuiBackend -> StagingBuffer -> TextureArray -> QuadIndexBuffer -> Gigabuffer -> DescriptorAllocator -> pipelines
 
-- [ ] **Task 7: Update MeshBuilder to pack per-face texture index** (AC: #7)
-  - [ ] Find where the mesher packs the 16-bit `blockStateId` field into quad data
-  - [ ] The current packing: bits 30-31 of lo word + bits 0-13 of hi word = 16-bit blockStateId
-  - [ ] Change to pack `blockDef.textureIndices[faceIndex]` instead of the raw block numeric ID
-  - [ ] `faceIndex` is 0-5 corresponding to +X,-X,+Y,-Y,+Z,-Z (same as `BlockFace` enum order)
-  - [ ] Ensure the mesher has access to BlockRegistry to look up BlockDefinition for each block
-  - [ ] Greedy meshing merge check: adjacent quads should only merge if they share the same texture index for that face (this should naturally work since same-type blocks have same per-face texture)
+- [x] **Task 7: Update MeshBuilder to pack per-face texture index** (AC: #7)
+  - [x] Find where the mesher packs the 16-bit `blockStateId` field into quad data
+  - [x] The current packing: bits 30-31 of lo word + bits 0-13 of hi word = 16-bit blockStateId
+  - [x] Change to pack `blockDef.textureIndices[faceIndex]` instead of the raw block numeric ID
+  - [x] `faceIndex` is 0-5 corresponding to +X,-X,+Y,-Y,+Z,-Z (same as `BlockFace` enum order)
+  - [x] Ensure the mesher has access to BlockRegistry to look up BlockDefinition for each block
+  - [x] Greedy meshing merge check: adjacent quads should only merge if they share the same texture index for that face (this should naturally work since same-type blocks have same per-face texture)
 
-- [ ] **Task 8: Update chunk.vert** (AC: #8)
-  - [ ] Rename output: `fragBlockStateId` -> `fragTextureLayer` (location 4)
-  - [ ] The unpacking logic stays the same — `blockStateId = bsLow | (bsHigh << 2u)` — but now represents a texture layer index
-  - [ ] Rename internal variable: `blockStateId` -> `textureLayer`
-  - [ ] Output: `fragTextureLayer = textureLayer;`
+- [x] **Task 8: Update chunk.vert** (AC: #8)
+  - [x] Rename output: `fragBlockStateId` -> `fragTextureLayer` (location 4)
+  - [x] The unpacking logic stays the same — `blockStateId = bsLow | (bsHigh << 2u)` — but now represents a texture layer index
+  - [x] Rename internal variable: `blockStateId` -> `textureLayer`
+  - [x] Output: `fragTextureLayer = textureLayer;`
 
-- [ ] **Task 9: Update chunk.frag** (AC: #9, #11)
-  - [ ] Add texture array binding:
+- [x] **Task 9: Update chunk.frag** (AC: #9, #11)
+  - [x] Add texture array binding:
     ```glsl
     layout(set = 0, binding = 4) uniform sampler2DArray blockTextures;
     ```
-  - [ ] Rename input: `fragBlockStateId` -> `fragTextureLayer` (location 4)
-  - [ ] Replace face-normal placeholder coloring with texture sampling:
+  - [x] Rename input: `fragBlockStateId` -> `fragTextureLayer` (location 4)
+  - [x] Replace face-normal placeholder coloring with texture sampling:
     ```glsl
     void main()
     {
@@ -203,14 +203,14 @@ so that all block textures are available in a single bind and the fragment shade
         outColor = vec4(color, texColor.a);
     }
     ```
-  - [ ] Remove the face-normal coloring block and its `// textures come in Story 6.5` comment
+  - [x] Remove the face-normal coloring block and its `// textures come in Story 6.5` comment
 
-- [ ] **Task 10: Compile shaders and validate** (AC: #11)
-  - [ ] Recompile `chunk.vert` -> `chunk.vert.spv`
-  - [ ] Recompile `chunk.frag` -> `chunk.frag.spv`
-  - [ ] Build with `/W4 /WX` — zero warnings
-  - [ ] Run with Vulkan validation layers — zero errors
-  - [ ] Visual validation: blocks render with correct textures, grass has green top / dirt bottom / textured sides, logs have bark sides / cut ends
+- [x] **Task 10: Compile shaders and validate** (AC: #11)
+  - [x] Recompile `chunk.vert` -> `chunk.vert.spv`
+  - [x] Recompile `chunk.frag` -> `chunk.frag.spv`
+  - [x] Build with `/W4 /WX` — zero warnings
+  - [x] Run with Vulkan validation layers — zero errors
+  - [x] Visual validation: blocks render with correct textures, grass has green top / dirt bottom / textured sides, logs have bark sides / cut ends
 
 ## Dev Notes
 

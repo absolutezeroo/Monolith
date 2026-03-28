@@ -10,6 +10,7 @@
 #include "voxel/renderer/IndirectDrawBuffer.h"
 #include "voxel/renderer/QuadIndexBuffer.h"
 #include "voxel/renderer/StagingBuffer.h"
+#include "voxel/renderer/TextureArray.h"
 #include "voxel/renderer/VulkanContext.h"
 
 #include <GLFW/glfw3.h>
@@ -28,7 +29,7 @@ Renderer::~Renderer()
     shutdown();
 }
 
-core::Result<void> Renderer::init(const std::string& shaderDir, game::Window& window)
+core::Result<void> Renderer::init(const std::string& shaderDir, const std::string& assetsDir, game::Window& window)
 {
     auto frameResult = createFrameResources();
     if (!frameResult.has_value())
@@ -76,6 +77,15 @@ core::Result<void> Renderer::init(const std::string& shaderDir, game::Window& wi
     }
     m_chunkRenderInfoBuffer = std::move(chunkInfoResult.value());
 
+    // Create texture array for block textures
+    std::string textureDir = assetsDir + "/textures/blocks";
+    auto textureResult = TextureArray::create(m_vulkanContext, textureDir);
+    if (!textureResult.has_value())
+    {
+        return std::unexpected(textureResult.error());
+    }
+    m_textureArray = std::move(textureResult.value());
+
     VkDevice device = m_vulkanContext.getDevice();
 
     // Create descriptor allocator
@@ -86,6 +96,7 @@ core::Result<void> Renderer::init(const std::string& shaderDir, game::Window& wi
     //   binding 1 = SSBO (ChunkRenderInfo, vertex + compute stage)
     //   binding 2 = SSBO (indirect command buffer, compute stage)
     //   binding 3 = SSBO (indirect draw count buffer, compute stage)
+    //   binding 4 = COMBINED_IMAGE_SAMPLER (block texture array, fragment stage)
     DescriptorLayoutBuilder layoutBuilder;
     auto chunkLayoutResult =
         layoutBuilder.addBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT)
@@ -93,6 +104,7 @@ core::Result<void> Renderer::init(const std::string& shaderDir, game::Window& wi
                 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_COMPUTE_BIT)
             .addBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
             .addBinding(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
+            .addBinding(4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
             .build(device);
     if (!chunkLayoutResult.has_value())
     {
@@ -219,7 +231,7 @@ core::Result<void> Renderer::init(const std::string& shaderDir, game::Window& wi
     }
     m_chunkDescriptorSet = descriptorSetResult.value();
 
-    // Write all 4 bindings in a batch
+    // Write all 5 bindings in a batch
     VkDescriptorBufferInfo gigabufferInfo{};
     gigabufferInfo.buffer = m_gigabuffer->getBuffer();
     gigabufferInfo.offset = 0;
@@ -240,7 +252,12 @@ core::Result<void> Renderer::init(const std::string& shaderDir, game::Window& wi
     indirectCountInfo.offset = 0;
     indirectCountInfo.range = VK_WHOLE_SIZE;
 
-    std::array<VkWriteDescriptorSet, 4> descriptorWrites{};
+    VkDescriptorImageInfo textureInfo{};
+    textureInfo.sampler = m_textureArray->getSampler();
+    textureInfo.imageView = m_textureArray->getImageView();
+    textureInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+    std::array<VkWriteDescriptorSet, 5> descriptorWrites{};
 
     // Binding 0: gigabuffer SSBO
     descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -273,6 +290,14 @@ core::Result<void> Renderer::init(const std::string& shaderDir, game::Window& wi
     descriptorWrites[3].descriptorCount = 1;
     descriptorWrites[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     descriptorWrites[3].pBufferInfo = &indirectCountInfo;
+
+    // Binding 4: block texture array
+    descriptorWrites[4].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[4].dstSet = m_chunkDescriptorSet;
+    descriptorWrites[4].dstBinding = 4;
+    descriptorWrites[4].descriptorCount = 1;
+    descriptorWrites[4].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    descriptorWrites[4].pImageInfo = &textureInfo;
 
     vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
 
@@ -1092,6 +1117,7 @@ void Renderer::shutdown()
     m_imguiBackend.reset();
 
     m_stagingBuffer.reset();
+    m_textureArray.reset();
 
     // Destroy indirect/ChunkRenderInfo buffers before DescriptorAllocator (they are referenced by descriptors)
     m_indirectDrawBuffer.reset();
