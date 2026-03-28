@@ -19,8 +19,10 @@ void main()
     // Sample block texture from array using tiling UVs and texture layer
     vec4 texColor = texture(blockTextures, vec3(fragUV, float(fragTextureLayer)));
 
-    // Apply ambient occlusion darkening
-    vec3 color = texColor.rgb * fragAO;
+    // Soften ambient occlusion: remap [0..1] → [0.4..1.0] so darkest corner
+    // is 40% brightness instead of black. Reduces harsh diagonal AO artifacts.
+    float ao = mix(0.4, 1.0, fragAO);
+    vec3 color = texColor.rgb * ao;
 
     outColor = vec4(color, texColor.a);
 }
