@@ -1,7 +1,6 @@
 #pragma once
 
 #include "voxel/core/Result.h"
-#include "voxel/renderer/ChunkRenderInfo.h"
 #include "voxel/renderer/Gigabuffer.h"
 #include "voxel/renderer/RendererConstants.h"
 
@@ -115,18 +114,6 @@ class Renderer
 
     /// Waits for GPU idle and destroys all owned resources.
     void shutdown();
-
-    /**
-     * @brief Renders all resident chunk sections from the render info map.
-     *
-     * Binds the chunk descriptor set and quad index buffer, then issues one
-     * vkCmdDrawIndexed per resident section. Must be called between beginFrame/endFrame.
-     *
-     * @param renderInfos The map of section keys to GPU render metadata.
-     * @param viewProjection Combined view-projection matrix from the camera.
-     * @deprecated Use renderChunksIndirect() for GPU-driven rendering.
-     */
-    void renderChunks(const ChunkRenderInfoMap& renderInfos, const glm::mat4& viewProjection);
 
     /**
      * @brief GPU-driven chunk rendering via compute frustum culling and indirect draw.

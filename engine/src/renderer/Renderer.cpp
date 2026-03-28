@@ -100,7 +100,7 @@ core::Result<void> Renderer::init(const std::string& shaderDir, game::Window& wi
     }
     m_chunkDescriptorSetLayout = chunkLayoutResult.value();
 
-    // Define push constant range for VP matrix + time + chunkWorldPos
+    // Define push constant range for VP matrix + time
     VkPushConstantRange pushRange{};
     pushRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
     pushRange.offset = 0;
@@ -848,75 +848,6 @@ void Renderer::beginRenderPass()
     vkCmdSetScissor(cmd, 0, 1, &scissor);
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_useWireframe ? m_wireframePipeline : m_pipeline);
-}
-
-void Renderer::renderChunks(const ChunkRenderInfoMap& renderInfos, const glm::mat4& viewProjection)
-{
-    if (!m_frameActive)
-    {
-        return;
-    }
-
-    beginRenderPass();
-
-    auto& frame = m_frames[m_frameIndex];
-    VkCommandBuffer cmd = frame.commandBuffer;
-
-    // Bind descriptor set 0 (gigabuffer SSBO at binding 0)
-    vkCmdBindDescriptorSets(
-        cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout, 0, 1, &m_chunkDescriptorSet, 0, nullptr);
-
-    // Bind shared quad index buffer
-    m_quadIndexBuffer->bind(cmd);
-
-    float currentTime = static_cast<float>(glfwGetTime());
-
-    uint32_t drawCount = 0;
-    uint32_t totalQuads = 0;
-
-    for (const auto& [key, info] : renderInfos)
-    {
-        if (info.state != RenderState::Resident || info.quadCount == 0)
-        {
-            continue;
-        }
-
-        ChunkPushConstants pc{};
-        pc.viewProjection = viewProjection;
-        pc.time = currentTime;
-
-        vkCmdPushConstants(
-            cmd,
-            m_pipelineLayout,
-            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-            0,
-            sizeof(ChunkPushConstants),
-            &pc);
-
-        // vertexOffset = allocation.offset / 2
-        // (each quad = 8 bytes, 4 vertices → offset/8*4 = offset/2)
-        int32_t vertexOffset = static_cast<int32_t>(info.allocation.offset / 2);
-
-        vkCmdDrawIndexed(
-            cmd,
-            info.quadCount * 6, // index count (6 indices per quad)
-            1,                  // instance count
-            0,                  // first index
-            vertexOffset,       // vertex offset
-            0);                 // first instance
-
-        ++drawCount;
-        totalQuads += info.quadCount;
-    }
-
-    m_lastDrawCount = drawCount;
-    m_lastQuadCount = totalQuads;
-
-    if (drawCount > 0 && m_lastDrawCount == 0)
-    {
-        VX_LOG_INFO(
-            "renderChunks: first draw — {} entries, {} draws, {} quads", renderInfos.size(), drawCount, totalQuads);
-    }
 }
 
 void Renderer::renderChunksIndirect(
