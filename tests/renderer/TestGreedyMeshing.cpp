@@ -104,7 +104,7 @@ TEST_CASE("Greedy meshing correctness", "[renderer][meshing][greedy]")
         REQUIRE(mesh.quadCount == 6);
         for (const uint64_t quad : mesh.quads)
         {
-            REQUIRE(unpackBlockStateId(quad) == 1); // stone texture index
+            REQUIRE(unpackTextureIndex(quad) == 1); // stone texture index
             REQUIRE(unpackWidth(quad) == 1);
             REQUIRE(unpackHeight(quad) == 1);
         }
@@ -288,7 +288,7 @@ TEST_CASE("Greedy meshing correctness", "[renderer][meshing][greedy]")
         REQUIRE(unpackX(quad) == 3);
         REQUIRE(unpackY(quad) == 5);
         REQUIRE(unpackZ(quad) == 7);
-        REQUIRE(unpackBlockStateId(quad) == stoneId);
+        REQUIRE(unpackTextureIndex(quad) == stoneId);
         REQUIRE(unpackFace(quad) == BlockFace::PosY);
         REQUIRE(unpackWidth(quad) == 16);
         REQUIRE(unpackHeight(quad) == 16);

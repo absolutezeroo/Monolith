@@ -1,6 +1,6 @@
 # Story 6.5: Texture Array Loading
 
-Status: in-progress
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -346,6 +346,7 @@ Ensure the merge key check in the binary greedy mesher compares the per-face tex
 ```
 engine/include/voxel/renderer/
   TextureArray.h                    (NEW)
+  ChunkMesh.h                       (MODIFY — rename blockStateId → textureIndex in packQuad/unpack API)
   RendererConstants.h               (MODIFY — add texture constants)
   Renderer.h                        (MODIFY — add TextureArray member + accessor)
 engine/src/renderer/
@@ -353,12 +354,18 @@ engine/src/renderer/
   StbImageImpl.cpp                  (NEW — stb_image implementation unit)
   Renderer.cpp                      (MODIFY — create TextureArray, write descriptor, shutdown order)
   MeshBuilder.cpp                   (MODIFY — pack per-face texture index instead of block ID)
+engine/CMakeLists.txt               (MODIFY — add StbImageImpl.cpp + TextureArray.cpp sources)
+game/src/GameApp.cpp                (MODIFY — pass assetsDir to Renderer::init)
 assets/shaders/
   chunk.vert                        (MODIFY — rename blockStateId → textureLayer)
   chunk.frag                        (MODIFY — add sampler2DArray, sample texture, remove placeholder)
 assets/textures/blocks/
   textures.json                     (NEW — manifest)
   *.png                             (NEW — 36 placeholder textures)
+tests/renderer/
+  TestMeshBuilder.cpp               (MODIFY — update for textureIndex rename)
+  TestGreedyMeshing.cpp             (MODIFY — update for textureIndex rename)
+  TestTintWaving.cpp                (MODIFY — update for textureIndex rename)
 ```
 
 ### Previous Story Intelligence
@@ -412,9 +419,22 @@ Suggested commit: `feat(renderer): add texture array loading for block textures`
 ## Dev Agent Record
 
 ### Agent Model Used
+Claude Opus 4.6 (implementation) + Claude Opus 4.6 (code review)
 
 ### Debug Log References
+- Commit `7e87f06`: Initial implementation of TextureArray, shader updates, descriptor binding
+- Commit `91e1f12`: AO curve adjustment, texture improvements
 
 ### Completion Notes List
+- All 11 ACs verified and implemented
+- All 10 tasks completed and verified against code
+- Code review found 4 MEDIUM + 3 LOW issues, all MEDIUM issues fixed
 
 ### Change Log
+- `7e87f06` feat(renderer): add TextureArray support for block textures and integrate into Renderer
+- `91e1f12` feat(renderer): adjust ambient occlusion curve and update block textures
+- Code review fixes:
+  - Renamed `packQuad` parameter `blockStateId` → `textureIndex` and `unpackBlockStateId()` → `unpackTextureIndex()` (ChunkMesh.h + 3 test files)
+  - Added `vkAllocateCommandBuffers` return value check in TextureArray.cpp
+  - Removed `bug.png` debug screenshot from repository
+  - Updated story File List to include all changed files

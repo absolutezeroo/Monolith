@@ -30,7 +30,7 @@ static constexpr uint8_t BLOCK_FACE_COUNT = 6;
 ///   [12:17] Z position (0-63)
 ///   [18:23] Width - 1  (0-63)
 ///   [24:29] Height - 1 (0-63)
-///   [30:45] Block state ID (0-65535)
+///   [30:45] Texture layer index (0-65535)
 ///   [46:48] Face direction (0-5)
 ///   [49:50] AO corner 0 (0-3)
 ///   [51:52] AO corner 1 (0-3)
@@ -47,7 +47,7 @@ inline constexpr uint64_t packQuad(
     uint8_t x,
     uint8_t y,
     uint8_t z,
-    uint16_t blockStateId,
+    uint16_t textureIndex,
     BlockFace face,
     uint8_t width = 1,
     uint8_t height = 1,
@@ -65,7 +65,7 @@ inline constexpr uint64_t packQuad(
     q |= static_cast<uint64_t>(z & 0x3F) << 12;
     q |= static_cast<uint64_t>((width - 1) & 0x3F) << 18;
     q |= static_cast<uint64_t>((height - 1) & 0x3F) << 24;
-    q |= static_cast<uint64_t>(blockStateId & 0xFFFF) << 30;
+    q |= static_cast<uint64_t>(textureIndex & 0xFFFF) << 30;
     q |= static_cast<uint64_t>(static_cast<uint8_t>(face) & 0x7) << 46;
     q |= static_cast<uint64_t>(ao0 & 0x3) << 49;
     q |= static_cast<uint64_t>(ao1 & 0x3) << 51;
@@ -92,8 +92,8 @@ inline constexpr uint8_t unpackWidth(uint64_t quad) { return static_cast<uint8_t
 /// Unpack height (stored as height-1, so add 1).
 inline constexpr uint8_t unpackHeight(uint64_t quad) { return static_cast<uint8_t>(((quad >> 24) & 0x3F) + 1); }
 
-/// Unpack block state ID.
-inline constexpr uint16_t unpackBlockStateId(uint64_t quad) { return static_cast<uint16_t>((quad >> 30) & 0xFFFF); }
+/// Unpack texture layer index.
+inline constexpr uint16_t unpackTextureIndex(uint64_t quad) { return static_cast<uint16_t>((quad >> 30) & 0xFFFF); }
 
 /// Unpack face direction.
 inline constexpr BlockFace unpackFace(uint64_t quad)

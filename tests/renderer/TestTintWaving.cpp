@@ -71,7 +71,7 @@ TEST_CASE("Tint and waving quad packing roundtrip", "[renderer][meshing][tint]")
         uint8_t x = 15;
         uint8_t y = 7;
         uint8_t z = 31;
-        uint16_t blockStateId = 500;
+        uint16_t textureIndex = 500;
         BlockFace face = BlockFace::PosZ;
         uint8_t w = 10;
         uint8_t h = 20;
@@ -83,12 +83,12 @@ TEST_CASE("Tint and waving quad packing roundtrip", "[renderer][meshing][tint]")
         uint8_t tintIndex = 5;
         uint8_t wavingType = 2;
 
-        uint64_t quad = packQuad(x, y, z, blockStateId, face, w, h, ao0, ao1, ao2, ao3, flip, tintIndex, wavingType);
+        uint64_t quad = packQuad(x, y, z, textureIndex, face, w, h, ao0, ao1, ao2, ao3, flip, tintIndex, wavingType);
 
         REQUIRE(unpackX(quad) == x);
         REQUIRE(unpackY(quad) == y);
         REQUIRE(unpackZ(quad) == (z & 0x3F));
-        REQUIRE(unpackBlockStateId(quad) == blockStateId);
+        REQUIRE(unpackTextureIndex(quad) == textureIndex);
         REQUIRE(unpackFace(quad) == face);
         REQUIRE(unpackWidth(quad) == w);
         REQUIRE(unpackHeight(quad) == h);
@@ -117,7 +117,7 @@ TEST_CASE("Tint and waving quad packing roundtrip", "[renderer][meshing][tint]")
         static_assert(unpackTintIndex(quad) == 6, "constexpr tintIndex roundtrip");
         static_assert(unpackWavingType(quad) == 3, "constexpr wavingType roundtrip");
         static_assert(unpackX(quad) == 1, "constexpr X unaffected");
-        static_assert(unpackBlockStateId(quad) == 42, "constexpr blockStateId unaffected");
+        static_assert(unpackTextureIndex(quad) == 42, "constexpr textureIndex unaffected");
 
         REQUIRE(unpackTintIndex(quad) == 6);
         REQUIRE(unpackWavingType(quad) == 3);
@@ -174,7 +174,7 @@ TEST_CASE("Meshing integration with tint and waving", "[renderer][meshing][tint]
 
         for (const uint64_t quad : mesh.quads)
         {
-            uint16_t texLayer = unpackBlockStateId(quad);
+            uint16_t texLayer = unpackTextureIndex(quad);
             if (texLayer == 1) // stone texture index
             {
                 REQUIRE(unpackTintIndex(quad) == 0);
@@ -203,7 +203,7 @@ TEST_CASE("Meshing integration with tint and waving", "[renderer][meshing][tint]
             REQUIRE(unpackX(quad) == 8);
             REQUIRE(unpackY(quad) == 8);
             REQUIRE(unpackZ(quad) == 8);
-            REQUIRE(unpackBlockStateId(quad) == 1); // stone texture index
+            REQUIRE(unpackTextureIndex(quad) == 1); // stone texture index
             REQUIRE(unpackWidth(quad) == 1);
             REQUIRE(unpackHeight(quad) == 1);
             auto ao = unpackAO(quad);
@@ -264,7 +264,7 @@ TEST_CASE("Greedy mesher propagates tint and waving", "[renderer][meshing][tint]
 
         for (const uint64_t quad : mesh.quads)
         {
-            uint16_t texLayer = unpackBlockStateId(quad);
+            uint16_t texLayer = unpackTextureIndex(quad);
             if (texLayer == 1) // stone texture index
             {
                 REQUIRE(unpackTintIndex(quad) == 0);

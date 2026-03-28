@@ -170,11 +170,16 @@ void main()
     }
 
     // ── UV coordinates per corner ───────────────────────────────────────────
+    // For PosY, corner winding maps V to Z-axis (width) and U to X-axis (height),
+    // so swap UV dimensions to match physical extents.
+    float uvW = (face == 2u) ? height : width;
+    float uvH = (face == 2u) ? width  : height;
+
     vec2 uvs[4] = vec2[4](
         vec2(0.0, 0.0),
-        vec2(0.0, height),
-        vec2(width, height),
-        vec2(width, 0.0)
+        vec2(0.0, uvH),
+        vec2(uvW,  uvH),
+        vec2(uvW,  0.0)
     );
 
     // When flipped, rotate UVs to match the corner rotation

@@ -106,7 +106,7 @@ TEST_CASE("MeshBuilder naive face culling", "[renderer][meshing]")
             REQUIRE(unpackX(quad) == 8);
             REQUIRE(unpackY(quad) == 8);
             REQUIRE(unpackZ(quad) == 8);
-            REQUIRE(unpackBlockStateId(quad) == 1); // stone texture index
+            REQUIRE(unpackTextureIndex(quad) == 1); // stone texture index
             REQUIRE(unpackWidth(quad) == 1);
             REQUIRE(unpackHeight(quad) == 1);
             auto ao = unpackAO(quad);
@@ -183,7 +183,7 @@ TEST_CASE("MeshBuilder naive face culling", "[renderer][meshing]")
             if (unpackX(quad) == 7 && unpackFace(quad) == BlockFace::PosX)
             {
                 foundStonePosX = true;
-                REQUIRE(unpackBlockStateId(quad) == 1); // stone texture index
+                REQUIRE(unpackTextureIndex(quad) == 1); // stone texture index
             }
             if (unpackX(quad) == 8 && unpackFace(quad) == BlockFace::NegX)
             {
@@ -200,7 +200,7 @@ TEST_CASE("MeshBuilder naive face culling", "[renderer][meshing]")
         uint8_t x = 15;
         uint8_t y = 7;
         uint8_t z = 31;
-        uint16_t blockStateId = 500;
+        uint16_t textureIndex = 500;
         BlockFace face = BlockFace::PosZ;
         uint8_t w = 10;
         uint8_t h = 20;
@@ -209,12 +209,12 @@ TEST_CASE("MeshBuilder naive face culling", "[renderer][meshing]")
         uint8_t ao2 = 1;
         uint8_t ao3 = 0;
 
-        uint64_t quad = packQuad(x, y, z, blockStateId, face, w, h, ao0, ao1, ao2, ao3, true);
+        uint64_t quad = packQuad(x, y, z, textureIndex, face, w, h, ao0, ao1, ao2, ao3, true);
 
         REQUIRE(unpackX(quad) == x);
         REQUIRE(unpackY(quad) == y);
         REQUIRE(unpackZ(quad) == (z & 0x3F)); // z is masked to 6 bits
-        REQUIRE(unpackBlockStateId(quad) == blockStateId);
+        REQUIRE(unpackTextureIndex(quad) == textureIndex);
         REQUIRE(unpackFace(quad) == face);
         REQUIRE(unpackWidth(quad) == w);
         REQUIRE(unpackHeight(quad) == h);

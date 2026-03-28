@@ -219,7 +219,15 @@ core::Result<std::unique_ptr<TextureArray>> TextureArray::create(
     cmdAI.commandPool = tempPool;
     cmdAI.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     cmdAI.commandBufferCount = 1;
-    vkAllocateCommandBuffers(device, &cmdAI, &cmd);
+    result = vkAllocateCommandBuffers(device, &cmdAI, &cmd);
+    if (result != VK_SUCCESS)
+    {
+        VX_LOG_ERROR("TextureArray: command buffer allocation failed: {}", static_cast<int>(result));
+        vkDestroyCommandPool(device, tempPool, nullptr);
+        vmaDestroyBuffer(allocator, stagingBuffer, stagingAlloc);
+        return std::unexpected(
+            core::EngineError::vulkan(static_cast<int32_t>(result), "TextureArray: command buffer allocation failed"));
+    }
 
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
