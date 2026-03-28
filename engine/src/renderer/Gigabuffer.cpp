@@ -19,6 +19,16 @@ core::Result<std::unique_ptr<Gigabuffer>> Gigabuffer::create(VulkanContext& cont
     bufferCI.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT |
                      VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
 
+    // When a dedicated transfer queue exists, allow both queue families to access
+    // the buffer without explicit ownership transfer barriers.
+    uint32_t queueFamilies[] = {context.getGraphicsQueueFamily(), context.getTransferQueueFamily()};
+    if (context.hasDedicatedTransferQueue())
+    {
+        bufferCI.sharingMode = VK_SHARING_MODE_CONCURRENT;
+        bufferCI.queueFamilyIndexCount = 2;
+        bufferCI.pQueueFamilyIndices = queueFamilies;
+    }
+
     VmaAllocationCreateInfo allocCI{};
     allocCI.usage = VMA_MEMORY_USAGE_AUTO;
     allocCI.flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;

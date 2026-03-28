@@ -1,6 +1,6 @@
 # Story 6.3: Indirect Draw Buffer + ChunkRenderInfo SSBO
 
-Status: review
+Status: done
 
 ## Story
 
@@ -319,3 +319,7 @@ Claude Opus 4.6
 ### Change Log
 
 - 2026-03-28: Story 6.3 implementation complete — IndirectDrawBuffer, ChunkRenderInfoBuffer, 4-binding descriptor layout, ChunkUploadManager slot management integration. All 164 tests pass.
+- 2026-03-28: Code review fixes applied:
+  - **HIGH fix**: Added GPU slot cleanup (freeSlot + m_slotMap erase) to the empty mesh path in ChunkUploadManager::processUploads() — prevented slot leak when sections transition to quadCount=0.
+  - **MEDIUM fix**: Replaced hardcoded magic number `20` with `sizeof(VkDrawIndexedIndirectCommand)` in IndirectDrawBuffer.h, IndirectDrawBuffer.cpp, and RendererConstants.h.
+  - All 164 tests pass, clean build with /W4 /WX.

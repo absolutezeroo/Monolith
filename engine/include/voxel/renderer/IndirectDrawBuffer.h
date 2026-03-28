@@ -51,7 +51,7 @@ class IndirectDrawBuffer
     [[nodiscard]] uint32_t getMaxCommands() const { return m_maxCommands; }
     [[nodiscard]] VkDeviceSize getCommandBufferSize() const
     {
-        return static_cast<VkDeviceSize>(m_maxCommands) * 20; // sizeof(VkDrawIndexedIndirectCommand)
+        return static_cast<VkDeviceSize>(m_maxCommands) * sizeof(VkDrawIndexedIndirectCommand);
     }
 
   private:

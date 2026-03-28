@@ -40,6 +40,15 @@ void ChunkUploadManager::processUploads(world::ChunkManager& chunkManager, const
             {
                 queueDeferredFree(it->second.allocation);
             }
+
+            // Free GPU slot if this section had one (prevents slot leak on empty remesh)
+            auto slotIt = m_slotMap.find(skey);
+            if (slotIt != m_slotMap.end())
+            {
+                m_chunkRenderInfoBuffer.freeSlot(slotIt->second);
+                m_slotMap.erase(slotIt);
+            }
+
             m_renderInfos[skey] = ChunkRenderInfo{
                 .allocation = {},
                 .quadCount = 0,

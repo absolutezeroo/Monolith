@@ -74,8 +74,9 @@ void main()
     float z = float(posZ);
 
     // ── Corner reconstruction per face ──────────────────────────────────────
-    // 4 corners in CCW winding from outside face (after Y-flip in projection).
-    // Index buffer pattern {0,1,2, 2,3,0} with VK_FRONT_FACE_COUNTER_CLOCKWISE.
+    // 4 corners in CCW winding from outside face (world space).
+    // Y-flip in projection reverses winding: world CCW → framebuffer CW.
+    // Index buffer pattern {0,1,2, 2,3,0} with VK_FRONT_FACE_CLOCKWISE.
     vec3 c0, c1, c2, c3;
 
     if (face == 0u) // PosX (+X)

@@ -17,8 +17,7 @@ core::Result<std::unique_ptr<IndirectDrawBuffer>> IndirectDrawBuffer::create(
     constexpr VkBufferUsageFlags usageFlags =
         VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
-    // Command array buffer: maxCommands * sizeof(VkDrawIndexedIndirectCommand) = maxCommands * 20 bytes
-    VkDeviceSize commandSize = static_cast<VkDeviceSize>(maxCommands) * 20;
+    VkDeviceSize commandSize = static_cast<VkDeviceSize>(maxCommands) * sizeof(VkDrawIndexedIndirectCommand);
 
     VkBufferCreateInfo commandCI{};
     commandCI.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
