@@ -11,9 +11,9 @@
 #include "voxel/renderer/VulkanContext.h"
 
 #include <GLFW/glfw3.h>
-#include <stb_image_write.h>
 
 #include <fstream>
+#include <stb_image_write.h>
 #include <vector>
 
 namespace voxel::renderer
@@ -67,8 +67,7 @@ core::Result<void> Renderer::init(const std::string& shaderDir, game::Window& wi
     //   binding 0 = SSBO (gigabuffer, vertex stage)
     //   binding 1 = SSBO (ChunkRenderInfo per-draw data, vertex stage)
     DescriptorLayoutBuilder layoutBuilder;
-    auto chunkLayoutResult = layoutBuilder
-                                 .addBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT)
+    auto chunkLayoutResult = layoutBuilder.addBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT)
                                  .addBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT)
                                  .build(device);
     if (!chunkLayoutResult.has_value())
@@ -337,8 +336,8 @@ core::Result<void> Renderer::createSwapchainResources()
     depthViewInfo.subresourceRange.baseArrayLayer = 0;
     depthViewInfo.subresourceRange.layerCount = 1;
 
-    result = vkCreateImageView(
-        m_vulkanContext.getDevice(), &depthViewInfo, nullptr, &m_swapchainResources.depthImageView);
+    result =
+        vkCreateImageView(m_vulkanContext.getDevice(), &depthViewInfo, nullptr, &m_swapchainResources.depthImageView);
     if (result != VK_SUCCESS)
     {
         VX_LOG_ERROR("Failed to create depth image view: {}", static_cast<int>(result));
@@ -462,7 +461,7 @@ core::Result<VkPipeline> Renderer::buildPipeline(const PipelineConfig& config)
     raster.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
     raster.polygonMode = config.polygonMode;
     raster.cullMode = VK_CULL_MODE_NONE; // TODO: restore to VK_CULL_MODE_BACK_BIT after winding is verified
-    raster.frontFace = VK_FRONT_FACE_CLOCKWISE;
+    raster.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     raster.lineWidth = 1.0f;
 
     VkPipelineMultisampleStateCreateInfo msaa{};
@@ -661,10 +660,7 @@ bool Renderer::beginFrame(game::Window& window, const DebugOverlayState& overlay
 
     // Transition depth image to depth attachment layout
     transitionImage(
-        cmd,
-        m_swapchainResources.depthImage,
-        VK_IMAGE_LAYOUT_UNDEFINED,
-        VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+        cmd, m_swapchainResources.depthImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
     VkExtent2D extent = m_vulkanContext.getSwapchainExtent();
 
@@ -733,14 +729,7 @@ void Renderer::renderChunks(const ChunkRenderInfoMap& renderInfos, const glm::ma
 
     // Bind descriptor set 0 (gigabuffer SSBO at binding 0)
     vkCmdBindDescriptorSets(
-        cmd,
-        VK_PIPELINE_BIND_POINT_GRAPHICS,
-        m_pipelineLayout,
-        0,
-        1,
-        &m_chunkDescriptorSet,
-        0,
-        nullptr);
+        cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout, 0, 1, &m_chunkDescriptorSet, 0, nullptr);
 
     // Bind shared quad index buffer
     m_quadIndexBuffer->bind(cmd);
@@ -776,11 +765,11 @@ void Renderer::renderChunks(const ChunkRenderInfoMap& renderInfos, const glm::ma
 
         vkCmdDrawIndexed(
             cmd,
-            info.quadCount * 6,  // index count (6 indices per quad)
-            1,                    // instance count
-            0,                    // first index
-            vertexOffset,         // vertex offset
-            0);                   // first instance
+            info.quadCount * 6, // index count (6 indices per quad)
+            1,                  // instance count
+            0,                  // first index
+            vertexOffset,       // vertex offset
+            0);                 // first instance
 
         ++drawCount;
         totalQuads += info.quadCount;
@@ -789,24 +778,10 @@ void Renderer::renderChunks(const ChunkRenderInfoMap& renderInfos, const glm::ma
     m_lastDrawCount = drawCount;
     m_lastQuadCount = totalQuads;
 
-    static uint32_t logCounter = 0;
-    static bool firstDraw = true;
-    if (firstDraw && drawCount > 0)
+    if (drawCount > 0 && m_lastDrawCount == 0)
     {
         VX_LOG_INFO(
-            "renderChunks: FIRST DRAW — {} entries, {} draws, {} quads",
-            renderInfos.size(),
-            drawCount,
-            totalQuads);
-        firstDraw = false;
-    }
-    if (logCounter++ % 60 == 0)
-    {
-        VX_LOG_INFO(
-            "renderChunks: {} total entries, {} draws, {} quads",
-            renderInfos.size(),
-            drawCount,
-            totalQuads);
+            "renderChunks: first draw — {} entries, {} draws, {} quads", renderInfos.size(), drawCount, totalQuads);
     }
 }
 
@@ -1097,12 +1072,10 @@ void Renderer::captureScreenshot(VkImage swapchainImage, VkExtent2D extent)
     blitRegion.sType = VK_STRUCTURE_TYPE_IMAGE_BLIT_2;
     blitRegion.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
     blitRegion.srcOffsets[0] = {0, 0, 0};
-    blitRegion.srcOffsets[1] = {
-        static_cast<int32_t>(extent.width), static_cast<int32_t>(extent.height), 1};
+    blitRegion.srcOffsets[1] = {static_cast<int32_t>(extent.width), static_cast<int32_t>(extent.height), 1};
     blitRegion.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
     blitRegion.dstOffsets[0] = {0, 0, 0};
-    blitRegion.dstOffsets[1] = {
-        static_cast<int32_t>(extent.width), static_cast<int32_t>(extent.height), 1};
+    blitRegion.dstOffsets[1] = {static_cast<int32_t>(extent.width), static_cast<int32_t>(extent.height), 1};
 
     VkBlitImageInfo2 blitInfo{};
     blitInfo.sType = VK_STRUCTURE_TYPE_BLIT_IMAGE_INFO_2;

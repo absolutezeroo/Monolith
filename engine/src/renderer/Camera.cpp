@@ -79,7 +79,9 @@ glm::mat4 Camera::getViewMatrix() const
 
 glm::mat4 Camera::getProjectionMatrix() const
 {
-    return glm::perspective(glm::radians(m_fov), m_aspectRatio, m_nearPlane, m_farPlane);
+    glm::mat4 proj = glm::perspective(glm::radians(m_fov), m_aspectRatio, m_nearPlane, m_farPlane);
+    proj[1][1] *= -1.0f;
+    return proj;
 }
 
 std::array<glm::vec4, 6> Camera::extractFrustumPlanes() const

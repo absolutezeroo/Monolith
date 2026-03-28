@@ -413,10 +413,22 @@ de3f666 finalize Story 5.7: resolve code review issues for GPU mesh upload
 ### Debug Log References
 
 ### Completion Notes List
+- ChunkManager chunk streaming (`streamChunks()`, `setRenderDistance()`) was added out-of-scope to enable rendering; not part of story ACs.
 
 ### Change Log
 | Date | Change |
 |------|--------|
 | 2026-03-27 | Story created by create-story workflow |
+| 2026-03-28 | Code review: fixed backface culling (was VK_CULL_MODE_NONE with TODO), replaced static debug vars with member-based first-draw detection, updated outdated docstring, populated File List |
 
 ### File List
+| File | Action | Description |
+|------|--------|-------------|
+| `assets/shaders/chunk.vert` | CREATE | Vertex pulling shader — SSBO read, bit unpack, corner reconstruction, waving, AO |
+| `assets/shaders/chunk.frag` | CREATE | Placeholder fragment shader — face-normal coloring with AO darkening |
+| `engine/include/voxel/renderer/Renderer.h` | MODIFY | ChunkPushConstants (chunkWorldPos replaces padding), renderChunks(), draw stat accessors |
+| `engine/src/renderer/Renderer.cpp` | MODIFY | Shader paths → chunk.*, renderChunks() impl, backface culling, remove test triangle draw |
+| `engine/src/renderer/VulkanContext.cpp` | MODIFY | Enable shaderDrawParameters via VkPhysicalDeviceVulkan11Features |
+| `engine/include/voxel/world/ChunkManager.h` | MODIFY | (Out-of-scope) Add streamChunks(), setRenderDistance(), MAX_LOADS_PER_FRAME |
+| `engine/src/world/ChunkManager.cpp` | MODIFY | (Out-of-scope) Implement streamChunks() for player-relative chunk loading/unloading |
+| `game/src/GameApp.cpp` | MODIFY | Call renderChunks() in render loop, show draw stats in debug overlay |

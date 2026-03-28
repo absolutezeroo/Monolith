@@ -74,8 +74,8 @@ void main()
     float z = float(posZ);
 
     // ── Corner reconstruction per face ──────────────────────────────────────
-    // 4 corners in clockwise winding (in Vulkan NDC after Y-flip by projection).
-    // Index buffer pattern {0,1,2, 2,3,0} with VK_FRONT_FACE_CLOCKWISE.
+    // 4 corners in CCW winding from outside face (after Y-flip in projection).
+    // Index buffer pattern {0,1,2, 2,3,0} with VK_FRONT_FACE_COUNTER_CLOCKWISE.
     vec3 c0, c1, c2, c3;
 
     if (face == 0u) // PosX (+X)
@@ -94,17 +94,19 @@ void main()
     }
     else if (face == 2u) // PosY (+Y, up)
     {
-        c0 = vec3(x,         y + 1.0, z);
-        c1 = vec3(x,         y + 1.0, z + height);
-        c2 = vec3(x + width, y + 1.0, z + height);
-        c3 = vec3(x + width, y + 1.0, z);
+        // Mesher: width = Z extent, height = X extent for Y-axis faces.
+        c0 = vec3(x,          y + 1.0, z);
+        c1 = vec3(x,          y + 1.0, z + width);
+        c2 = vec3(x + height, y + 1.0, z + width);
+        c3 = vec3(x + height, y + 1.0, z);
     }
     else if (face == 3u) // NegY (-Y, down)
     {
-        c0 = vec3(x + width, y, z);
-        c1 = vec3(x + width, y, z + height);
-        c2 = vec3(x,         y, z + height);
-        c3 = vec3(x,         y, z);
+        // Mesher: width = Z extent, height = X extent for Y-axis faces.
+        c0 = vec3(x,          y, z);
+        c1 = vec3(x + height, y, z);
+        c2 = vec3(x + height, y, z + width);
+        c3 = vec3(x,          y, z + width);
     }
     else if (face == 4u) // PosZ (+Z)
     {

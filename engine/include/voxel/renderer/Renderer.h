@@ -62,7 +62,7 @@ struct DebugOverlayState
 };
 
 /**
- * @brief Manages the Vulkan rendering pipeline for a test triangle.
+ * @brief Manages the Vulkan rendering pipeline for chunk rendering.
  *
  * Uses Vulkan 1.3 dynamic rendering (no VkRenderPass/VkFramebuffer),
  * synchronization2 for barriers and submission, and double-buffered frames.
