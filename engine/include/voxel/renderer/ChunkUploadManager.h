@@ -8,6 +8,7 @@
 #include <glm/vec3.hpp>
 
 #include <cstdint>
+#include <unordered_map>
 #include <vector>
 
 namespace voxel::world
@@ -18,6 +19,7 @@ class ChunkManager;
 namespace voxel::renderer
 {
 
+class ChunkRenderInfoBuffer;
 class Gigabuffer;
 class StagingBuffer;
 
@@ -25,14 +27,15 @@ class StagingBuffer;
  * @brief Orchestrates CPU→GPU mesh upload via Gigabuffer + StagingBuffer.
  *
  * Polls ChunkManager for new meshes, allocates gigabuffer space, stages uploads,
- * and manages deferred frees for safe remesh/unload. All operations are main-thread only.
+ * and manages deferred frees for safe remesh/unload. Also maintains GPU slot
+ * allocations in ChunkRenderInfoBuffer for compute culling. All operations are main-thread only.
  */
 class ChunkUploadManager
 {
   public:
     static constexpr uint32_t MAX_UPLOADS_PER_FRAME = 8;
 
-    ChunkUploadManager(Gigabuffer& gigabuffer, StagingBuffer& stagingBuffer);
+    ChunkUploadManager(Gigabuffer& gigabuffer, StagingBuffer& stagingBuffer, ChunkRenderInfoBuffer& chunkRenderInfo);
 
     /// Poll ChunkManager for new meshes, allocate gigabuffer space, stage uploads.
     /// Call once per frame from the main thread.
@@ -72,10 +75,14 @@ class ChunkUploadManager
 
     Gigabuffer& m_gigabuffer;
     StagingBuffer& m_stagingBuffer;
+    ChunkRenderInfoBuffer& m_chunkRenderInfoBuffer;
 
     ChunkRenderInfoMap m_renderInfos;
     std::vector<PendingUpload> m_pendingUploads;
     std::vector<DeferredFree> m_deferredFrees;
+
+    /// Maps SectionKey → GPU slot index in ChunkRenderInfoBuffer.
+    std::unordered_map<SectionKey, uint32_t, SectionKeyHash> m_slotMap;
 };
 
 } // namespace voxel::renderer

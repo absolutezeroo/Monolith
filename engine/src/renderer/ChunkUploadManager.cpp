@@ -1,6 +1,7 @@
 #include "voxel/renderer/ChunkUploadManager.h"
 
 #include "voxel/core/Log.h"
+#include "voxel/renderer/ChunkRenderInfoBuffer.h"
 #include "voxel/renderer/Gigabuffer.h"
 #include "voxel/renderer/StagingBuffer.h"
 #include "voxel/world/ChunkColumn.h"
@@ -12,8 +13,11 @@
 namespace voxel::renderer
 {
 
-ChunkUploadManager::ChunkUploadManager(Gigabuffer& gigabuffer, StagingBuffer& stagingBuffer)
-    : m_gigabuffer(gigabuffer), m_stagingBuffer(stagingBuffer)
+ChunkUploadManager::ChunkUploadManager(
+    Gigabuffer& gigabuffer,
+    StagingBuffer& stagingBuffer,
+    ChunkRenderInfoBuffer& chunkRenderInfo)
+    : m_gigabuffer(gigabuffer), m_stagingBuffer(stagingBuffer), m_chunkRenderInfoBuffer(chunkRenderInfo)
 {
 }
 
@@ -133,7 +137,7 @@ bool ChunkUploadManager::uploadSingle(const SectionKey& key, const ChunkMesh& me
     }
 
     // 3. Store render info
-    m_renderInfos[key] = ChunkRenderInfo{
+    ChunkRenderInfo renderInfo{
         .allocation = *allocResult,
         .quadCount = mesh.quadCount,
         .worldBasePos = glm::ivec3{
@@ -143,6 +147,33 @@ bool ChunkUploadManager::uploadSingle(const SectionKey& key, const ChunkMesh& me
         },
         .state = RenderState::Resident,
     };
+    m_renderInfos[key] = renderInfo;
+
+    // 4. Update ChunkRenderInfoBuffer GPU slot
+    auto slotIt = m_slotMap.find(key);
+    if (slotIt != m_slotMap.end())
+    {
+        // Remesh: reuse existing slot, just update data
+        m_chunkRenderInfoBuffer.update(slotIt->second, buildGpuInfo(renderInfo));
+    }
+    else
+    {
+        // New section: allocate a slot
+        auto slotResult = m_chunkRenderInfoBuffer.allocateSlot();
+        if (slotResult.has_value())
+        {
+            m_slotMap[key] = *slotResult;
+            m_chunkRenderInfoBuffer.update(*slotResult, buildGpuInfo(renderInfo));
+        }
+        else
+        {
+            VX_LOG_WARN(
+                "ChunkRenderInfoBuffer full — section ({},{}) y={} has no GPU slot",
+                key.chunkCoord.x,
+                key.chunkCoord.y,
+                key.sectionY);
+        }
+    }
 
     return true;
 }
@@ -178,6 +209,14 @@ void ChunkUploadManager::onChunkUnloaded(glm::ivec2 coord)
             queueDeferredFree(it->second.allocation);
         }
         m_renderInfos.erase(skey);
+
+        // Free GPU slot in ChunkRenderInfoBuffer
+        auto slotIt = m_slotMap.find(skey);
+        if (slotIt != m_slotMap.end())
+        {
+            m_chunkRenderInfoBuffer.freeSlot(slotIt->second);
+            m_slotMap.erase(slotIt);
+        }
     }
 
     // Remove any pending uploads for this chunk

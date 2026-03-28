@@ -4,8 +4,10 @@
 #include "voxel/core/Log.h"
 #include "voxel/game/Window.h"
 #include "voxel/renderer/Camera.h"
+#include "voxel/renderer/ChunkRenderInfoBuffer.h"
 #include "voxel/renderer/DescriptorAllocator.h"
 #include "voxel/renderer/ImGuiBackend.h"
+#include "voxel/renderer/IndirectDrawBuffer.h"
 #include "voxel/renderer/QuadIndexBuffer.h"
 #include "voxel/renderer/StagingBuffer.h"
 #include "voxel/renderer/VulkanContext.h"
@@ -58,6 +60,22 @@ core::Result<void> Renderer::init(const std::string& shaderDir, game::Window& wi
     }
     m_quadIndexBuffer = std::move(indexResult.value());
 
+    // Create indirect draw buffer for GPU-driven rendering (Story 6.3)
+    auto indirectResult = IndirectDrawBuffer::create(m_vulkanContext, MAX_RENDERABLE_SECTIONS);
+    if (!indirectResult.has_value())
+    {
+        return std::unexpected(indirectResult.error());
+    }
+    m_indirectDrawBuffer = std::move(indirectResult.value());
+
+    // Create ChunkRenderInfo SSBO for per-chunk metadata (Story 6.3)
+    auto chunkInfoResult = ChunkRenderInfoBuffer::create(m_vulkanContext, MAX_RENDERABLE_SECTIONS);
+    if (!chunkInfoResult.has_value())
+    {
+        return std::unexpected(chunkInfoResult.error());
+    }
+    m_chunkRenderInfoBuffer = std::move(chunkInfoResult.value());
+
     VkDevice device = m_vulkanContext.getDevice();
 
     // Create descriptor allocator
@@ -65,11 +83,17 @@ core::Result<void> Renderer::init(const std::string& shaderDir, game::Window& wi
 
     // Build chunk descriptor set layout:
     //   binding 0 = SSBO (gigabuffer, vertex stage)
-    //   binding 1 = SSBO (ChunkRenderInfo per-draw data, vertex stage)
+    //   binding 1 = SSBO (ChunkRenderInfo, vertex + compute stage)
+    //   binding 2 = SSBO (indirect command buffer, compute stage)
+    //   binding 3 = SSBO (indirect draw count buffer, compute stage)
     DescriptorLayoutBuilder layoutBuilder;
-    auto chunkLayoutResult = layoutBuilder.addBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT)
-                                 .addBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT)
-                                 .build(device);
+    auto chunkLayoutResult =
+        layoutBuilder.addBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT)
+            .addBinding(
+                1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_COMPUTE_BIT)
+            .addBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
+            .addBinding(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
+            .build(device);
     if (!chunkLayoutResult.has_value())
     {
         return std::unexpected(chunkLayoutResult.error());
@@ -140,22 +164,62 @@ core::Result<void> Renderer::init(const std::string& shaderDir, game::Window& wi
     }
     m_chunkDescriptorSet = descriptorSetResult.value();
 
-    // Write binding 0: gigabuffer SSBO
+    // Write all 4 bindings in a batch
     VkDescriptorBufferInfo gigabufferInfo{};
     gigabufferInfo.buffer = m_gigabuffer->getBuffer();
     gigabufferInfo.offset = 0;
     gigabufferInfo.range = VK_WHOLE_SIZE;
 
-    VkWriteDescriptorSet descriptorWrite{};
-    descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    descriptorWrite.dstSet = m_chunkDescriptorSet;
-    descriptorWrite.dstBinding = 0;
-    descriptorWrite.descriptorCount = 1;
-    descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    descriptorWrite.pBufferInfo = &gigabufferInfo;
+    VkDescriptorBufferInfo chunkRenderInfoInfo{};
+    chunkRenderInfoInfo.buffer = m_chunkRenderInfoBuffer->getBuffer();
+    chunkRenderInfoInfo.offset = 0;
+    chunkRenderInfoInfo.range = VK_WHOLE_SIZE;
 
-    vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
-    // Binding 1 left unwritten — ChunkRenderInfo SSBO created in Story 6.3
+    VkDescriptorBufferInfo indirectCommandInfo{};
+    indirectCommandInfo.buffer = m_indirectDrawBuffer->getCommandBuffer();
+    indirectCommandInfo.offset = 0;
+    indirectCommandInfo.range = VK_WHOLE_SIZE;
+
+    VkDescriptorBufferInfo indirectCountInfo{};
+    indirectCountInfo.buffer = m_indirectDrawBuffer->getCountBuffer();
+    indirectCountInfo.offset = 0;
+    indirectCountInfo.range = VK_WHOLE_SIZE;
+
+    std::array<VkWriteDescriptorSet, 4> descriptorWrites{};
+
+    // Binding 0: gigabuffer SSBO
+    descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[0].dstSet = m_chunkDescriptorSet;
+    descriptorWrites[0].dstBinding = 0;
+    descriptorWrites[0].descriptorCount = 1;
+    descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    descriptorWrites[0].pBufferInfo = &gigabufferInfo;
+
+    // Binding 1: ChunkRenderInfo SSBO
+    descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[1].dstSet = m_chunkDescriptorSet;
+    descriptorWrites[1].dstBinding = 1;
+    descriptorWrites[1].descriptorCount = 1;
+    descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    descriptorWrites[1].pBufferInfo = &chunkRenderInfoInfo;
+
+    // Binding 2: indirect command buffer
+    descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[2].dstSet = m_chunkDescriptorSet;
+    descriptorWrites[2].dstBinding = 2;
+    descriptorWrites[2].descriptorCount = 1;
+    descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    descriptorWrites[2].pBufferInfo = &indirectCommandInfo;
+
+    // Binding 3: indirect draw count buffer
+    descriptorWrites[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[3].dstSet = m_chunkDescriptorSet;
+    descriptorWrites[3].dstBinding = 3;
+    descriptorWrites[3].descriptorCount = 1;
+    descriptorWrites[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    descriptorWrites[3].pBufferInfo = &indirectCountInfo;
+
+    vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
 
     // Create depth buffer and other extent-dependent resources
     auto swapResResult = createSwapchainResources();
@@ -905,6 +969,10 @@ void Renderer::shutdown()
     m_imguiBackend.reset();
 
     m_stagingBuffer.reset();
+
+    // Destroy indirect/ChunkRenderInfo buffers before DescriptorAllocator (they are referenced by descriptors)
+    m_indirectDrawBuffer.reset();
+    m_chunkRenderInfoBuffer.reset();
 
     m_quadIndexBuffer.reset();
 

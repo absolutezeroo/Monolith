@@ -1,10 +1,13 @@
 #pragma once
 
 #include "voxel/renderer/Gigabuffer.h"
+#include "voxel/renderer/RendererConstants.h"
 
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
+#include <glm/vec4.hpp>
 
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <unordered_map>
@@ -28,6 +31,34 @@ struct ChunkRenderInfo
     glm::ivec3 worldBasePos{0};       // Section world origin (chunkX*16, sectionY*16, chunkZ*16)
     RenderState state = RenderState::None;
 };
+
+/// GPU-side per-chunk metadata for compute culling and vertex shader lookups.
+/// Layout matches GLSL std430 exactly — see cull.comp / chunk.vert.
+struct GpuChunkRenderInfo
+{
+    glm::vec4 boundingSphere;   // xyz = center (world space), w = radius
+    glm::vec4 worldBasePos;     // xyz = section world origin, w = unused
+    uint32_t gigabufferOffset;  // byte offset into gigabuffer
+    uint32_t quadCount;         // number of quads
+    uint32_t pad[2];            // explicit padding to 48 bytes
+};
+static_assert(sizeof(GpuChunkRenderInfo) == 48, "GpuChunkRenderInfo must be 48 bytes for std430 layout");
+static_assert(offsetof(GpuChunkRenderInfo, quadCount) == 36, "quadCount must be at offset 36");
+
+/// Builds a GpuChunkRenderInfo from the CPU-side ChunkRenderInfo.
+/// Computes bounding sphere center (section midpoint) and radius.
+inline GpuChunkRenderInfo buildGpuInfo(const ChunkRenderInfo& info)
+{
+    const auto pos = glm::vec3(info.worldBasePos);
+    const auto center = pos + glm::vec3(8.0f);
+    return GpuChunkRenderInfo{
+        .boundingSphere = glm::vec4(center, SECTION_BOUNDING_RADIUS),
+        .worldBasePos = glm::vec4(pos, 0.0f),
+        .gigabufferOffset = static_cast<uint32_t>(info.allocation.offset),
+        .quadCount = info.quadCount,
+        .pad = {0, 0},
+    };
+}
 
 /// Key for identifying a chunk section in the render info map.
 struct SectionKey

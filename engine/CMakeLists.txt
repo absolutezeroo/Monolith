@@ -30,6 +30,8 @@ add_library(VoxelEngine STATIC
         src/world/SplineCurve.cpp
         src/world/StructureGenerator.cpp
         src/renderer/QuadIndexBuffer.cpp
+        src/renderer/IndirectDrawBuffer.cpp
+        src/renderer/ChunkRenderInfoBuffer.cpp
         src/renderer/ChunkUploadManager.cpp
         src/renderer/MeshBuilder.cpp
         src/renderer/ModelMesher.cpp

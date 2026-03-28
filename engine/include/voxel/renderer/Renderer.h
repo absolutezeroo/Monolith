@@ -25,8 +25,10 @@ namespace voxel::renderer
 {
 
 class Camera;
+class ChunkRenderInfoBuffer;
 class DescriptorAllocator;
 class ImGuiBackend;
+class IndirectDrawBuffer;
 class QuadIndexBuffer;
 class StagingBuffer;
 class VulkanContext;
@@ -133,6 +135,12 @@ class Renderer
     /// Requests a screenshot to be captured after the next present. Saved as PNG to the given path.
     void requestScreenshot(const std::string& outputPath);
 
+    /// Returns mutable IndirectDrawBuffer. Renderer retains ownership.
+    [[nodiscard]] IndirectDrawBuffer* getIndirectDrawBuffer() { return m_indirectDrawBuffer.get(); }
+
+    /// Returns mutable ChunkRenderInfoBuffer for slot management. Renderer retains ownership.
+    [[nodiscard]] ChunkRenderInfoBuffer* getMutableChunkRenderInfoBuffer() { return m_chunkRenderInfoBuffer.get(); }
+
     [[nodiscard]] VkDescriptorSetLayout getChunkDescriptorSetLayout() const { return m_chunkDescriptorSetLayout; }
     [[nodiscard]] VkDescriptorSet getChunkDescriptorSet() const { return m_chunkDescriptorSet; }
     [[nodiscard]] DescriptorAllocator& getDescriptorAllocator() { return *m_descriptorAllocator; }
@@ -188,6 +196,8 @@ class Renderer
     std::unique_ptr<StagingBuffer> m_stagingBuffer;
     std::unique_ptr<Gigabuffer> m_gigabuffer;
     std::unique_ptr<QuadIndexBuffer> m_quadIndexBuffer;
+    std::unique_ptr<IndirectDrawBuffer> m_indirectDrawBuffer;
+    std::unique_ptr<ChunkRenderInfoBuffer> m_chunkRenderInfoBuffer;
     std::unique_ptr<ImGuiBackend> m_imguiBackend;
 
     SwapchainResources m_swapchainResources{};

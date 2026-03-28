@@ -3,9 +3,11 @@
 #include "voxel/renderer/Gigabuffer.h"
 #include "voxel/renderer/RendererConstants.h"
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <cstddef>
 #include <vector>
 
 using namespace voxel::renderer;
@@ -341,6 +343,68 @@ TEST_CASE("Remesh — old allocation deferred-freed, new allocation at different
 
     vmaVirtualFree(vblock, alloc2);
     vmaDestroyVirtualBlock(vblock);
+}
+
+// =============================================================================
+// GpuChunkRenderInfo tests (CPU-only, struct layout + buildGpuInfo)
+// =============================================================================
+
+TEST_CASE("GpuChunkRenderInfo has correct size and layout", "[renderer][chunk-upload]")
+{
+    static_assert(sizeof(GpuChunkRenderInfo) == 48);
+    static_assert(offsetof(GpuChunkRenderInfo, quadCount) == 36);
+
+    GpuChunkRenderInfo info{};
+    CHECK(sizeof(info) == 48);
+    CHECK(offsetof(GpuChunkRenderInfo, boundingSphere) == 0);
+    CHECK(offsetof(GpuChunkRenderInfo, worldBasePos) == 16);
+    CHECK(offsetof(GpuChunkRenderInfo, gigabufferOffset) == 32);
+    CHECK(offsetof(GpuChunkRenderInfo, quadCount) == 36);
+    CHECK(offsetof(GpuChunkRenderInfo, pad) == 40);
+}
+
+TEST_CASE("buildGpuInfo computes correct bounding sphere", "[renderer][chunk-upload]")
+{
+    ChunkRenderInfo cpuInfo{};
+    cpuInfo.allocation.offset = 1024;
+    cpuInfo.quadCount = 256;
+    cpuInfo.worldBasePos = glm::ivec3{32, 64, -16};
+    cpuInfo.state = RenderState::Resident;
+
+    GpuChunkRenderInfo gpuInfo = buildGpuInfo(cpuInfo);
+
+    // Center = worldBasePos + 8 in each axis
+    CHECK(gpuInfo.boundingSphere.x == 40.0f);
+    CHECK(gpuInfo.boundingSphere.y == 72.0f);
+    CHECK(gpuInfo.boundingSphere.z == -8.0f);
+    CHECK(gpuInfo.boundingSphere.w == Catch::Approx(SECTION_BOUNDING_RADIUS).margin(0.001f));
+
+    CHECK(gpuInfo.worldBasePos.x == 32.0f);
+    CHECK(gpuInfo.worldBasePos.y == 64.0f);
+    CHECK(gpuInfo.worldBasePos.z == -16.0f);
+    CHECK(gpuInfo.worldBasePos.w == 0.0f);
+
+    CHECK(gpuInfo.gigabufferOffset == 1024);
+    CHECK(gpuInfo.quadCount == 256);
+    CHECK(gpuInfo.pad[0] == 0);
+    CHECK(gpuInfo.pad[1] == 0);
+}
+
+TEST_CASE("buildGpuInfo handles origin section", "[renderer][chunk-upload]")
+{
+    ChunkRenderInfo cpuInfo{};
+    cpuInfo.allocation.offset = 0;
+    cpuInfo.quadCount = 1;
+    cpuInfo.worldBasePos = glm::ivec3{0, 0, 0};
+    cpuInfo.state = RenderState::Resident;
+
+    GpuChunkRenderInfo gpuInfo = buildGpuInfo(cpuInfo);
+
+    CHECK(gpuInfo.boundingSphere.x == 8.0f);
+    CHECK(gpuInfo.boundingSphere.y == 8.0f);
+    CHECK(gpuInfo.boundingSphere.z == 8.0f);
+    CHECK(gpuInfo.gigabufferOffset == 0);
+    CHECK(gpuInfo.quadCount == 1);
 }
 
 TEST_CASE("Unload removes all sections and queues deferred frees", "[renderer][chunk-upload]")

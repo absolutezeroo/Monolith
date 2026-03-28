@@ -149,9 +149,11 @@ voxel::core::Result<void> GameApp::init(const std::string& shaderDir, std::optio
         return result;
     }
 
-    // Create mesh upload manager — uses Renderer's Gigabuffer and StagingBuffer
+    // Create mesh upload manager — uses Renderer's Gigabuffer, StagingBuffer, and ChunkRenderInfoBuffer
     m_uploadManager = std::make_unique<voxel::renderer::ChunkUploadManager>(
-        *m_renderer.getMutableGigabuffer(), *m_renderer.getMutableStagingBuffer());
+        *m_renderer.getMutableGigabuffer(),
+        *m_renderer.getMutableStagingBuffer(),
+        *m_renderer.getMutableChunkRenderInfoBuffer());
 
     // Start with cursor captured for FPS camera
     m_input->setCursorCaptured(true);
