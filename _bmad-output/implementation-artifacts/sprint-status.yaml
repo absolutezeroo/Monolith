@@ -203,7 +203,7 @@ epics:
     stories:
       - id: "6.0"
         title: "Vulkan Descriptor Infrastructure"
-        status: review
+        status: done
         assigned_to: dev-agent
       - id: "6.1"
         title: "Shared Quad Index Buffer"

@@ -75,7 +75,7 @@ core::Result<GigabufferAllocation> Gigabuffer::allocate(VkDeviceSize size, VkDev
         return std::unexpected(core::EngineError{core::ErrorCode::OutOfMemory, "Gigabuffer: allocation failed"});
     }
 
-    VX_LOG_DEBUG("Gigabuffer: allocated {} bytes at offset {}, total used: {}", size, offset, usedBytes());
+    // VX_LOG_DEBUG("Gigabuffer: allocated {} bytes at offset {}, total used: {}", size, offset, usedBytes());
 
     return GigabufferAllocation{offset, size, allocation};
 }

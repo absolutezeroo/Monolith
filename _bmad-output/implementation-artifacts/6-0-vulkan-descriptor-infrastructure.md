@@ -1,6 +1,6 @@
 # Story 6.0: Vulkan Descriptor Infrastructure
 
-Status: review
+Status: done
 
 ## Story
 
@@ -509,6 +509,7 @@ Claude Opus 4.6
 ### Change Log
 
 - 2026-03-27: Implemented Story 6.0 — Vulkan descriptor infrastructure for GPU-driven rendering (all 8 tasks)
+- 2026-03-28: Code review passed — 1 LOW finding (unused PipelineConfig fields), no fixes needed
 
 ### File List
 

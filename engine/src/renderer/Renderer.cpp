@@ -460,8 +460,8 @@ core::Result<VkPipeline> Renderer::buildPipeline(const PipelineConfig& config)
     VkPipelineRasterizationStateCreateInfo raster{};
     raster.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
     raster.polygonMode = config.polygonMode;
-    raster.cullMode = VK_CULL_MODE_NONE; // TODO: restore to VK_CULL_MODE_BACK_BIT after winding is verified
-    raster.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    raster.cullMode = VK_CULL_MODE_BACK_BIT;
+    raster.frontFace = VK_FRONT_FACE_CLOCKWISE; // Y-flip in projection reverses winding: world CCW → framebuffer CW
     raster.lineWidth = 1.0f;
 
     VkPipelineMultisampleStateCreateInfo msaa{};
