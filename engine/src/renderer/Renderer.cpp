@@ -147,8 +147,6 @@ core::Result<void> Renderer::init(const std::string& shaderDir, const std::strin
     fillConfig.fragShaderPath = gbufferFragPath;
     fillConfig.colorAttachmentFormats = {GBUFFER_RT0_FORMAT, GBUFFER_RT1_FORMAT};
     fillConfig.depthAttachmentFormat = GBUFFER_DEPTH_FORMAT;
-    fillConfig.descriptorSetLayouts = {m_chunkDescriptorSetLayout};
-    fillConfig.pushConstantRanges = {pushRange};
 
     auto fillResult = buildPipeline(fillConfig);
     if (!fillResult.has_value())
@@ -913,7 +911,10 @@ bool Renderer::beginFrame(game::Window& window, const DebugOverlayState& overlay
         auto resResult = createSwapchainResources();
         if (!resResult.has_value())
         {
-            VX_LOG_ERROR("Failed to recreate depth resources after swapchain resize");
+            VX_LOG_ERROR("Failed to recreate depth resources after swapchain resize — renderer disabled");
+            m_isInitialized = false;
+            m_needsSwapchainRecreate = false;
+            return false;
         }
 
         // Recreate G-Buffer at new swapchain extent
@@ -921,13 +922,13 @@ bool Renderer::beginFrame(game::Window& window, const DebugOverlayState& overlay
         auto gbufResult = GBuffer::create(m_vulkanContext, m_vulkanContext.getSwapchainExtent());
         if (!gbufResult.has_value())
         {
-            VX_LOG_ERROR("Failed to recreate G-Buffer after swapchain resize");
+            VX_LOG_ERROR("Failed to recreate G-Buffer after swapchain resize — renderer disabled");
+            m_isInitialized = false;
+            m_needsSwapchainRecreate = false;
+            return false;
         }
-        else
-        {
-            m_gbuffer = std::move(gbufResult.value());
-            writeLightingDescriptors();
-        }
+        m_gbuffer = std::move(gbufResult.value());
+        writeLightingDescriptors();
 
         m_needsSwapchainRecreate = false;
         return false; // skip this frame

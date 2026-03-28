@@ -189,8 +189,6 @@ class Renderer
         std::string fragShaderPath;
         std::vector<VkFormat> colorAttachmentFormats;
         VkFormat depthAttachmentFormat = VK_FORMAT_D32_SFLOAT;
-        std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
-        std::vector<VkPushConstantRange> pushConstantRanges;
         VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
     };
 
