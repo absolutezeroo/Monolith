@@ -6,6 +6,7 @@
 #include "voxel/renderer/Camera.h"
 #include "voxel/renderer/ChunkRenderInfoBuffer.h"
 #include "voxel/renderer/DescriptorAllocator.h"
+#include "voxel/renderer/GBuffer.h"
 #include "voxel/renderer/ImGuiBackend.h"
 #include "voxel/renderer/IndirectDrawBuffer.h"
 #include "voxel/renderer/QuadIndexBuffer.h"
@@ -135,15 +136,17 @@ core::Result<void> Renderer::init(const std::string& shaderDir, const std::strin
     }
 
     std::string vertPath = shaderDir + "/chunk.vert.spv";
-    std::string fragPath = shaderDir + "/chunk.frag.spv";
+    std::string gbufferFragPath = shaderDir + "/gbuffer.frag.spv";
 
-    // Fill pipeline (required)
+    // Geometry fill pipeline — outputs to G-Buffer MRT (2 color attachments + depth)
     PipelineConfig fillConfig;
     fillConfig.polygonMode = VK_POLYGON_MODE_FILL;
     fillConfig.depthTestEnable = true;
     fillConfig.depthWriteEnable = true;
     fillConfig.vertShaderPath = vertPath;
-    fillConfig.fragShaderPath = fragPath;
+    fillConfig.fragShaderPath = gbufferFragPath;
+    fillConfig.colorAttachmentFormats = {GBUFFER_RT0_FORMAT, GBUFFER_RT1_FORMAT};
+    fillConfig.depthAttachmentFormat = GBUFFER_DEPTH_FORMAT;
     fillConfig.descriptorSetLayouts = {m_chunkDescriptorSetLayout};
     fillConfig.pushConstantRanges = {pushRange};
 
@@ -308,6 +311,30 @@ core::Result<void> Renderer::init(const std::string& shaderDir, const std::strin
         return std::unexpected(swapResResult.error());
     }
 
+    // Create G-Buffer for deferred rendering
+    auto gbufferResult = GBuffer::create(m_vulkanContext, m_vulkanContext.getSwapchainExtent());
+    if (!gbufferResult.has_value())
+    {
+        return std::unexpected(gbufferResult.error());
+    }
+    m_gbuffer = std::move(gbufferResult.value());
+
+    // Create lighting pipeline (descriptor layout + pipeline layout + pipeline)
+    auto lightingResult = createLightingPipeline(shaderDir);
+    if (!lightingResult.has_value())
+    {
+        return std::unexpected(lightingResult.error());
+    }
+
+    // Allocate lighting descriptor set and write G-Buffer bindings
+    auto lightingDescResult = m_descriptorAllocator->allocate(m_lightingDescriptorSetLayout);
+    if (!lightingDescResult.has_value())
+    {
+        return std::unexpected(lightingDescResult.error());
+    }
+    m_lightingDescriptorSet = lightingDescResult.value();
+    writeLightingDescriptors();
+
     // Initialize ImGui
     auto imguiResult = ImGuiBackend::create(m_vulkanContext, window.getHandle());
     if (!imguiResult.has_value())
@@ -317,7 +344,7 @@ core::Result<void> Renderer::init(const std::string& shaderDir, const std::strin
     m_imguiBackend = std::move(imguiResult.value());
 
     m_isInitialized = true;
-    VX_LOG_INFO("Renderer initialized — {} frames in flight", FRAMES_IN_FLIGHT);
+    VX_LOG_INFO("Renderer initialized — {} frames in flight, deferred rendering active", FRAMES_IN_FLIGHT);
     return {};
 }
 
@@ -449,7 +476,7 @@ core::Result<void> Renderer::createSwapchainResources()
     depthImageInfo.arrayLayers = 1;
     depthImageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
     depthImageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-    depthImageInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    depthImageInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 
     VmaAllocationCreateInfo depthAllocInfo{};
     depthAllocInfo.usage = VMA_MEMORY_USAGE_AUTO;
@@ -510,6 +537,110 @@ void Renderer::destroySwapchainResources()
             m_vulkanContext.getAllocator(), m_swapchainResources.depthImage, m_swapchainResources.depthAllocation);
     }
     m_swapchainResources = {};
+}
+
+core::Result<void> Renderer::createLightingPipeline(const std::string& shaderDir)
+{
+    VkDevice device = m_vulkanContext.getDevice();
+
+    // Build lighting descriptor set layout: 3 combined image samplers for G-Buffer reads
+    DescriptorLayoutBuilder lightBuilder;
+    auto lightLayoutResult =
+        lightBuilder.addBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT) // RT0
+            .addBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)         // RT1
+            .addBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)         // Depth
+            .build(device);
+    if (!lightLayoutResult.has_value())
+    {
+        return std::unexpected(lightLayoutResult.error());
+    }
+    m_lightingDescriptorSetLayout = lightLayoutResult.value();
+
+    // Create lighting pipeline layout with lighting descriptor set + LightingPushConstants
+    VkPushConstantRange lightingPushRange{};
+    lightingPushRange.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    lightingPushRange.offset = 0;
+    lightingPushRange.size = sizeof(LightingPushConstants);
+
+    VkPipelineLayoutCreateInfo lightingLayoutInfo{};
+    lightingLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    lightingLayoutInfo.setLayoutCount = 1;
+    lightingLayoutInfo.pSetLayouts = &m_lightingDescriptorSetLayout;
+    lightingLayoutInfo.pushConstantRangeCount = 1;
+    lightingLayoutInfo.pPushConstantRanges = &lightingPushRange;
+
+    VkResult result = vkCreatePipelineLayout(device, &lightingLayoutInfo, nullptr, &m_lightingPipelineLayout);
+    if (result != VK_SUCCESS)
+    {
+        VX_LOG_ERROR("Failed to create lighting pipeline layout: {}", static_cast<int>(result));
+        return std::unexpected(
+            core::EngineError::vulkan(static_cast<int32_t>(result), "Failed to create lighting pipeline layout"));
+    }
+
+    // Build lighting pipeline: fullscreen triangle, no depth, single swapchain color output
+    VkFormat swapFmt = m_vulkanContext.getSwapchainFormat();
+    PipelineConfig lightingConfig;
+    lightingConfig.vertShaderPath = shaderDir + "/lighting.vert.spv";
+    lightingConfig.fragShaderPath = shaderDir + "/lighting.frag.spv";
+    lightingConfig.colorAttachmentFormats = {swapFmt};
+    lightingConfig.depthAttachmentFormat = VK_FORMAT_UNDEFINED; // no depth for fullscreen pass
+    lightingConfig.depthTestEnable = false;
+    lightingConfig.depthWriteEnable = false;
+    lightingConfig.cullMode = VK_CULL_MODE_NONE; // fullscreen triangle
+    lightingConfig.pipelineLayout = m_lightingPipelineLayout;
+
+    auto lightingPipelineResult = buildPipeline(lightingConfig);
+    if (!lightingPipelineResult.has_value())
+    {
+        return std::unexpected(lightingPipelineResult.error());
+    }
+    m_lightingPipeline = lightingPipelineResult.value();
+
+    VX_LOG_INFO("Lighting pipeline created (deferred rendering)");
+    return {};
+}
+
+void Renderer::writeLightingDescriptors()
+{
+    VkDescriptorImageInfo albedoInfo{};
+    albedoInfo.sampler = m_gbuffer->getSampler();
+    albedoInfo.imageView = m_gbuffer->getAlbedoView();
+    albedoInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+    VkDescriptorImageInfo normalInfo{};
+    normalInfo.sampler = m_gbuffer->getSampler();
+    normalInfo.imageView = m_gbuffer->getNormalView();
+    normalInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+    VkDescriptorImageInfo depthInfo{};
+    depthInfo.sampler = m_gbuffer->getSampler();
+    depthInfo.imageView = m_swapchainResources.depthImageView;
+    depthInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+    std::array<VkWriteDescriptorSet, 3> writes{};
+
+    writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[0].dstSet = m_lightingDescriptorSet;
+    writes[0].dstBinding = 0;
+    writes[0].descriptorCount = 1;
+    writes[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    writes[0].pImageInfo = &albedoInfo;
+
+    writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[1].dstSet = m_lightingDescriptorSet;
+    writes[1].dstBinding = 1;
+    writes[1].descriptorCount = 1;
+    writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    writes[1].pImageInfo = &normalInfo;
+
+    writes[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[2].dstSet = m_lightingDescriptorSet;
+    writes[2].dstBinding = 2;
+    writes[2].descriptorCount = 1;
+    writes[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    writes[2].pImageInfo = &depthInfo;
+
+    vkUpdateDescriptorSets(m_vulkanContext.getDevice(), static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
 }
 
 core::Result<VkShaderModule> Renderer::loadShaderModule(const std::string& path)
@@ -604,7 +735,7 @@ core::Result<VkPipeline> Renderer::buildPipeline(const PipelineConfig& config)
     VkPipelineRasterizationStateCreateInfo raster{};
     raster.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
     raster.polygonMode = config.polygonMode;
-    raster.cullMode = VK_CULL_MODE_BACK_BIT;
+    raster.cullMode = config.cullMode;
     raster.frontFace = VK_FRONT_FACE_CLOCKWISE; // Y-flip in projection reverses winding: world CCW → framebuffer CW
     raster.lineWidth = 1.0f;
 
@@ -612,14 +743,19 @@ core::Result<VkPipeline> Renderer::buildPipeline(const PipelineConfig& config)
     msaa.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
     msaa.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
-    VkPipelineColorBlendAttachmentState blend{};
-    blend.colorWriteMask =
-        VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    // One blend attachment per color attachment — all opaque write-all
+    std::vector<VkPipelineColorBlendAttachmentState> blendAttachments(config.colorAttachmentFormats.size());
+    for (auto& blend : blendAttachments)
+    {
+        blend.colorWriteMask =
+            VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+        blend.blendEnable = config.enableBlending ? VK_TRUE : VK_FALSE;
+    }
 
     VkPipelineColorBlendStateCreateInfo blendState{};
     blendState.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-    blendState.attachmentCount = 1;
-    blendState.pAttachments = &blend;
+    blendState.attachmentCount = static_cast<uint32_t>(blendAttachments.size());
+    blendState.pAttachments = blendAttachments.data();
 
     VkPipelineDepthStencilStateCreateInfo depthStencil{};
     depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
@@ -629,12 +765,13 @@ core::Result<VkPipeline> Renderer::buildPipeline(const PipelineConfig& config)
     depthStencil.depthBoundsTestEnable = VK_FALSE;
     depthStencil.stencilTestEnable = VK_FALSE;
 
-    VkFormat swapFmt = m_vulkanContext.getSwapchainFormat();
     VkPipelineRenderingCreateInfo rendering{};
     rendering.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
-    rendering.colorAttachmentCount = 1;
-    rendering.pColorAttachmentFormats = &swapFmt;
-    rendering.depthAttachmentFormat = VK_FORMAT_D32_SFLOAT;
+    rendering.colorAttachmentCount = static_cast<uint32_t>(config.colorAttachmentFormats.size());
+    rendering.pColorAttachmentFormats = config.colorAttachmentFormats.data();
+    rendering.depthAttachmentFormat = config.depthAttachmentFormat;
+
+    VkPipelineLayout layoutToUse = config.pipelineLayout != VK_NULL_HANDLE ? config.pipelineLayout : m_pipelineLayout;
 
     VkGraphicsPipelineCreateInfo ci{};
     ci.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -649,7 +786,7 @@ core::Result<VkPipeline> Renderer::buildPipeline(const PipelineConfig& config)
     ci.pDepthStencilState = &depthStencil;
     ci.pColorBlendState = &blendState;
     ci.pDynamicState = &dynState;
-    ci.layout = m_pipelineLayout;
+    ci.layout = layoutToUse;
     ci.renderPass = VK_NULL_HANDLE;
 
     VkPipeline pipeline = VK_NULL_HANDLE;
@@ -672,7 +809,12 @@ core::Result<VkPipeline> Renderer::buildPipeline(const PipelineConfig& config)
     return pipeline;
 }
 
-void Renderer::transitionImage(VkCommandBuffer cmd, VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout)
+void Renderer::transitionImage(
+    VkCommandBuffer cmd,
+    VkImage image,
+    VkImageLayout oldLayout,
+    VkImageLayout newLayout,
+    VkImageAspectFlags aspectMask)
 {
     VkImageMemoryBarrier2 barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
@@ -681,6 +823,7 @@ void Renderer::transitionImage(VkCommandBuffer cmd, VkImage image, VkImageLayout
     barrier.newLayout = newLayout;
     barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.subresourceRange.aspectMask = aspectMask;
     barrier.subresourceRange.baseMipLevel = 0;
     barrier.subresourceRange.levelCount = 1;
     barrier.subresourceRange.baseArrayLayer = 0;
@@ -688,7 +831,6 @@ void Renderer::transitionImage(VkCommandBuffer cmd, VkImage image, VkImageLayout
 
     if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
     {
-        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         barrier.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
         barrier.srcAccessMask = VK_ACCESS_2_NONE;
         barrier.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
@@ -696,7 +838,6 @@ void Renderer::transitionImage(VkCommandBuffer cmd, VkImage image, VkImageLayout
     }
     else if (oldLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR)
     {
-        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         barrier.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
         barrier.srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
         barrier.dstStageMask = VK_PIPELINE_STAGE_2_NONE;
@@ -704,12 +845,28 @@ void Renderer::transitionImage(VkCommandBuffer cmd, VkImage image, VkImageLayout
     }
     else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL)
     {
-        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
         barrier.srcStageMask = VK_PIPELINE_STAGE_2_NONE;
         barrier.srcAccessMask = VK_ACCESS_2_NONE;
         barrier.dstStageMask =
             VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
         barrier.dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    }
+    else if (oldLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL &&
+             newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+    {
+        barrier.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+        barrier.srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+        barrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+        barrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
+    }
+    else if (oldLayout == VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL &&
+             newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+    {
+        barrier.srcStageMask =
+            VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
+        barrier.srcAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+        barrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+        barrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
     }
     else
     {
@@ -758,6 +915,20 @@ bool Renderer::beginFrame(game::Window& window, const DebugOverlayState& overlay
         {
             VX_LOG_ERROR("Failed to recreate depth resources after swapchain resize");
         }
+
+        // Recreate G-Buffer at new swapchain extent
+        m_gbuffer.reset();
+        auto gbufResult = GBuffer::create(m_vulkanContext, m_vulkanContext.getSwapchainExtent());
+        if (!gbufResult.has_value())
+        {
+            VX_LOG_ERROR("Failed to recreate G-Buffer after swapchain resize");
+        }
+        else
+        {
+            m_gbuffer = std::move(gbufResult.value());
+            writeLightingDescriptors();
+        }
+
         m_needsSwapchainRecreate = false;
         return false; // skip this frame
     }
@@ -799,14 +970,17 @@ bool Renderer::beginFrame(game::Window& window, const DebugOverlayState& overlay
     beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     vkBeginCommandBuffer(cmd, &beginInfo);
 
-    VkImage swapchainImage = m_vulkanContext.getSwapchainImages()[m_currentImageIndex];
-    transitionImage(cmd, swapchainImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-
-    // Transition depth image to depth attachment layout
+    // Transition G-Buffer images for geometry pass (swapchain transition deferred to endFrame)
+    transitionImage(cmd, m_gbuffer->getAlbedoImage(), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    transitionImage(cmd, m_gbuffer->getNormalImage(), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     transitionImage(
-        cmd, m_swapchainResources.depthImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+        cmd,
+        m_swapchainResources.depthImage,
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+        VK_IMAGE_ASPECT_DEPTH_BIT);
 
-    // Render pass is NOT started here — deferred until renderChunksIndirect()/renderChunks()
+    // Render pass is NOT started here — deferred until renderChunksIndirect()
     // so that compute dispatch can happen before the render pass.
     m_useWireframe = overlay.wireframeMode && m_wireframePipeline != VK_NULL_HANDLE;
     m_renderPassActive = false;
@@ -831,13 +1005,24 @@ void Renderer::beginRenderPass()
     VkCommandBuffer cmd = frame.commandBuffer;
     VkExtent2D extent = m_vulkanContext.getSwapchainExtent();
 
-    VkRenderingAttachmentInfo colorAttachment{};
-    colorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-    colorAttachment.imageView = m_vulkanContext.getSwapchainImageViews()[m_currentImageIndex];
-    colorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    colorAttachment.clearValue.color = {{0.1f, 0.1f, 0.1f, 1.0f}};
+    // G-Buffer geometry pass: 2 color attachments (RT0 albedo+AO, RT1 normal) + depth
+    std::array<VkRenderingAttachmentInfo, 2> colorAttachments{};
+
+    // RT0: albedo.rgb + AO.a
+    colorAttachments[0].sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+    colorAttachments[0].imageView = m_gbuffer->getAlbedoView();
+    colorAttachments[0].imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    colorAttachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    colorAttachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    colorAttachments[0].clearValue.color = {{0.0f, 0.0f, 0.0f, 0.0f}};
+
+    // RT1: octahedral normal
+    colorAttachments[1].sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+    colorAttachments[1].imageView = m_gbuffer->getNormalView();
+    colorAttachments[1].imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    colorAttachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    colorAttachments[1].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    colorAttachments[1].clearValue.color = {{0.0f, 0.0f, 0.0f, 0.0f}};
 
     VkRenderingAttachmentInfo depthAttachment{};
     depthAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
@@ -852,8 +1037,8 @@ void Renderer::beginRenderPass()
     renderingInfo.renderArea.offset = {0, 0};
     renderingInfo.renderArea.extent = extent;
     renderingInfo.layerCount = 1;
-    renderingInfo.colorAttachmentCount = 1;
-    renderingInfo.pColorAttachments = &colorAttachment;
+    renderingInfo.colorAttachmentCount = static_cast<uint32_t>(colorAttachments.size());
+    renderingInfo.pColorAttachments = colorAttachments.data();
     renderingInfo.pDepthAttachment = &depthAttachment;
 
     vkCmdBeginRendering(cmd, &renderingInfo);
@@ -1003,17 +1188,82 @@ void Renderer::endFrame()
 
     auto& frame = m_frames[m_frameIndex];
     VkCommandBuffer cmd = frame.commandBuffer;
+    VkExtent2D extent = m_vulkanContext.getSwapchainExtent();
 
-    // Ensure render pass is active for ImGui (may not be if renderChunksIndirect wasn't called)
+    // Ensure G-Buffer render pass is active (may not be if renderChunksIndirect wasn't called)
     beginRenderPass();
 
-    // Finalize ImGui and render
-    m_imguiBackend->render(cmd);
-
+    // ── End G-Buffer geometry pass ──────────────────────────────────────────
     vkCmdEndRendering(cmd);
     m_renderPassActive = false;
 
+    // ── Transition G-Buffer images for lighting read ────────────────────────
+    transitionImage(cmd, m_gbuffer->getAlbedoImage(), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    transitionImage(cmd, m_gbuffer->getNormalImage(), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    transitionImage(
+        cmd,
+        m_swapchainResources.depthImage,
+        VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        VK_IMAGE_ASPECT_DEPTH_BIT);
+
+    // ── Transition swapchain image for lighting output ──────────────────────
     VkImage swapchainImage = m_vulkanContext.getSwapchainImages()[m_currentImageIndex];
+    transitionImage(cmd, swapchainImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+    // ── Begin lighting pass (swapchain only, no depth) ──────────────────────
+    VkRenderingAttachmentInfo swapAttachment{};
+    swapAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+    swapAttachment.imageView = m_vulkanContext.getSwapchainImageViews()[m_currentImageIndex];
+    swapAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    swapAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE; // lighting overwrites all pixels
+    swapAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+
+    VkRenderingInfo lightingRenderInfo{};
+    lightingRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+    lightingRenderInfo.renderArea.offset = {0, 0};
+    lightingRenderInfo.renderArea.extent = extent;
+    lightingRenderInfo.layerCount = 1;
+    lightingRenderInfo.colorAttachmentCount = 1;
+    lightingRenderInfo.pColorAttachments = &swapAttachment;
+    lightingRenderInfo.pDepthAttachment = nullptr; // no depth for fullscreen pass
+
+    vkCmdBeginRendering(cmd, &lightingRenderInfo);
+
+    VkViewport viewport{};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = static_cast<float>(extent.width);
+    viewport.height = static_cast<float>(extent.height);
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    vkCmdSetViewport(cmd, 0, 1, &viewport);
+
+    VkRect2D scissor{};
+    scissor.offset = {0, 0};
+    scissor.extent = extent;
+    vkCmdSetScissor(cmd, 0, 1, &scissor);
+
+    // ── Draw fullscreen lighting triangle ───────────────────────────────────
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_lightingPipeline);
+    vkCmdBindDescriptorSets(
+        cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_lightingPipelineLayout, 0, 1, &m_lightingDescriptorSet, 0, nullptr);
+
+    LightingPushConstants lightingPC{};
+    lightingPC.sunDirection = glm::normalize(glm::vec3(0.3f, 1.0f, 0.5f));
+    lightingPC.ambientStrength = 0.3f;
+
+    vkCmdPushConstants(
+        cmd, m_lightingPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(LightingPushConstants), &lightingPC);
+
+    vkCmdDraw(cmd, 3, 1, 0, 0); // fullscreen triangle
+
+    // ── Render ImGui on top of the composited result ────────────────────────
+    m_imguiBackend->render(cmd);
+
+    vkCmdEndRendering(cmd);
+
+    // ── Transition swapchain for presentation ───────────────────────────────
     transitionImage(cmd, swapchainImage, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
     vkEndCommandBuffer(cmd);
@@ -1125,6 +1375,7 @@ void Renderer::shutdown()
 
     m_quadIndexBuffer.reset();
 
+    m_gbuffer.reset();
     m_gigabuffer.reset();
 
     destroySwapchainResources();
@@ -1147,14 +1398,33 @@ void Renderer::shutdown()
         m_cullPipeline = VK_NULL_HANDLE;
     }
 
+    if (m_lightingPipeline != VK_NULL_HANDLE)
+    {
+        vkDestroyPipeline(device, m_lightingPipeline, nullptr);
+        m_lightingPipeline = VK_NULL_HANDLE;
+    }
+
     // Destroy descriptor infrastructure (pools first, then layout, then pipeline layout)
-    m_chunkDescriptorSet = VK_NULL_HANDLE; // owned by pool, destroyed with it
+    m_chunkDescriptorSet = VK_NULL_HANDLE;    // owned by pool, destroyed with it
+    m_lightingDescriptorSet = VK_NULL_HANDLE; // owned by pool, destroyed with it
     m_descriptorAllocator.reset();
 
     if (m_chunkDescriptorSetLayout != VK_NULL_HANDLE)
     {
         vkDestroyDescriptorSetLayout(device, m_chunkDescriptorSetLayout, nullptr);
         m_chunkDescriptorSetLayout = VK_NULL_HANDLE;
+    }
+
+    if (m_lightingDescriptorSetLayout != VK_NULL_HANDLE)
+    {
+        vkDestroyDescriptorSetLayout(device, m_lightingDescriptorSetLayout, nullptr);
+        m_lightingDescriptorSetLayout = VK_NULL_HANDLE;
+    }
+
+    if (m_lightingPipelineLayout != VK_NULL_HANDLE)
+    {
+        vkDestroyPipelineLayout(device, m_lightingPipelineLayout, nullptr);
+        m_lightingPipelineLayout = VK_NULL_HANDLE;
     }
 
     if (m_computePipelineLayout != VK_NULL_HANDLE)

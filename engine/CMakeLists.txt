@@ -34,6 +34,7 @@ add_library(VoxelEngine STATIC
         src/renderer/IndirectDrawBuffer.cpp
         src/renderer/ChunkRenderInfoBuffer.cpp
         src/renderer/TextureArray.cpp
+        src/renderer/GBuffer.cpp
         src/renderer/ChunkUploadManager.cpp
         src/renderer/MeshBuilder.cpp
         src/renderer/ModelMesher.cpp

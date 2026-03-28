@@ -41,4 +41,13 @@ inline constexpr uint32_t BLOCK_TEXTURE_MIP_LEVELS = 5;
 /// Maximum number of layers in the block texture array.
 inline constexpr uint32_t MAX_BLOCK_TEXTURES = 256;
 
+/// G-Buffer RT0 format: albedo.rgb + AO.a (sRGB for correct gamma).
+inline constexpr VkFormat GBUFFER_RT0_FORMAT = VK_FORMAT_R8G8B8A8_SRGB;
+
+/// G-Buffer RT1 format: octahedral-encoded normal.xy (half-float precision).
+inline constexpr VkFormat GBUFFER_RT1_FORMAT = VK_FORMAT_R16G16_SFLOAT;
+
+/// G-Buffer / shared depth format.
+inline constexpr VkFormat GBUFFER_DEPTH_FORMAT = VK_FORMAT_D32_SFLOAT;
+
 } // namespace voxel::renderer

@@ -26,6 +26,7 @@ namespace voxel::renderer
 class Camera;
 class ChunkRenderInfoBuffer;
 class DescriptorAllocator;
+class GBuffer;
 class ImGuiBackend;
 class IndirectDrawBuffer;
 class QuadIndexBuffer;
@@ -42,6 +43,14 @@ struct ChunkPushConstants
     float pad[3];             // 12 bytes padding to 80 bytes
 };
 static_assert(sizeof(ChunkPushConstants) == 80);
+
+/// Push constants for the deferred lighting pass.
+struct LightingPushConstants
+{
+    glm::vec3 sunDirection;   // 12 bytes
+    float ambientStrength;    // 4 bytes
+};
+static_assert(sizeof(LightingPushConstants) == 16);
 
 /// Push constants for the compute culling shader (cull.comp).
 struct CullPushConstants
@@ -174,10 +183,15 @@ class Renderer
         VkPolygonMode polygonMode = VK_POLYGON_MODE_FILL;
         bool depthTestEnable = true;
         bool depthWriteEnable = true;
+        bool enableBlending = false;
+        VkCullModeFlags cullMode = VK_CULL_MODE_BACK_BIT;
         std::string vertShaderPath;
         std::string fragShaderPath;
+        std::vector<VkFormat> colorAttachmentFormats;
+        VkFormat depthAttachmentFormat = VK_FORMAT_D32_SFLOAT;
         std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
         std::vector<VkPushConstantRange> pushConstantRanges;
+        VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
     };
 
     core::Result<void> createFrameResources();
@@ -190,7 +204,14 @@ class Renderer
     core::Result<void> createSwapchainResources();
     void destroySwapchainResources();
 
-    void transitionImage(VkCommandBuffer cmd, VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout);
+    void transitionImage(
+        VkCommandBuffer cmd,
+        VkImage image,
+        VkImageLayout oldLayout,
+        VkImageLayout newLayout,
+        VkImageAspectFlags aspectMask = VK_IMAGE_ASPECT_COLOR_BIT);
+    void writeLightingDescriptors();
+    core::Result<void> createLightingPipeline(const std::string& shaderDir);
 
     VulkanContext& m_vulkanContext;
 
@@ -205,6 +226,11 @@ class Renderer
     VkPipelineLayout m_computePipelineLayout = VK_NULL_HANDLE;
     VkPipeline m_cullPipeline = VK_NULL_HANDLE;
 
+    VkDescriptorSetLayout m_lightingDescriptorSetLayout = VK_NULL_HANDLE;
+    VkDescriptorSet m_lightingDescriptorSet = VK_NULL_HANDLE;
+    VkPipelineLayout m_lightingPipelineLayout = VK_NULL_HANDLE;
+    VkPipeline m_lightingPipeline = VK_NULL_HANDLE;
+
     std::unique_ptr<DescriptorAllocator> m_descriptorAllocator;
     VkDescriptorSetLayout m_chunkDescriptorSetLayout = VK_NULL_HANDLE;
     VkDescriptorSet m_chunkDescriptorSet = VK_NULL_HANDLE;
@@ -215,6 +241,7 @@ class Renderer
     std::unique_ptr<IndirectDrawBuffer> m_indirectDrawBuffer;
     std::unique_ptr<ChunkRenderInfoBuffer> m_chunkRenderInfoBuffer;
     std::unique_ptr<TextureArray> m_textureArray;
+    std::unique_ptr<GBuffer> m_gbuffer;
     std::unique_ptr<ImGuiBackend> m_imguiBackend;
 
     SwapchainResources m_swapchainResources{};
