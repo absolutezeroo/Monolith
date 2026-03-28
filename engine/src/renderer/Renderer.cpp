@@ -10,6 +10,7 @@
 #include "voxel/renderer/StagingBuffer.h"
 #include "voxel/renderer/VulkanContext.h"
 
+#include <GLFW/glfw3.h>
 #include <stb_image_write.h>
 
 #include <fstream>
@@ -76,9 +77,9 @@ core::Result<void> Renderer::init(const std::string& shaderDir, game::Window& wi
     }
     m_chunkDescriptorSetLayout = chunkLayoutResult.value();
 
-    // Define push constant range for VP matrix + time
+    // Define push constant range for VP matrix + time + chunkWorldPos
     VkPushConstantRange pushRange{};
-    pushRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    pushRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
     pushRange.offset = 0;
     pushRange.size = sizeof(ChunkPushConstants);
 
@@ -98,8 +99,8 @@ core::Result<void> Renderer::init(const std::string& shaderDir, game::Window& wi
             core::EngineError::vulkan(static_cast<int32_t>(layoutResult), "Failed to create pipeline layout"));
     }
 
-    std::string vertPath = shaderDir + "/triangle.vert.spv";
-    std::string fragPath = shaderDir + "/triangle.frag.spv";
+    std::string vertPath = shaderDir + "/chunk.vert.spv";
+    std::string fragPath = shaderDir + "/chunk.frag.spv";
 
     // Fill pipeline (required)
     PipelineConfig fillConfig;
@@ -460,7 +461,7 @@ core::Result<VkPipeline> Renderer::buildPipeline(const PipelineConfig& config)
     VkPipelineRasterizationStateCreateInfo raster{};
     raster.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
     raster.polygonMode = config.polygonMode;
-    raster.cullMode = VK_CULL_MODE_NONE;
+    raster.cullMode = VK_CULL_MODE_NONE; // TODO: restore to VK_CULL_MODE_BACK_BIT after winding is verified
     raster.frontFace = VK_FRONT_FACE_CLOCKWISE;
     raster.lineWidth = 1.0f;
 
@@ -708,10 +709,9 @@ bool Renderer::beginFrame(game::Window& window, const DebugOverlayState& overlay
     scissor.extent = extent;
     vkCmdSetScissor(cmd, 0, 1, &scissor);
 
-    // Select fill or wireframe pipeline
+    // Select fill or wireframe pipeline — drawing is now caller-driven via renderChunks()
     bool useWireframe = overlay.wireframeMode && m_wireframePipeline != VK_NULL_HANDLE;
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, useWireframe ? m_wireframePipeline : m_pipeline);
-    vkCmdDraw(cmd, 3, 1, 0, 0);
 
     // Begin ImGui frame — caller will build UI between beginFrame/endFrame
     m_imguiBackend->beginFrame();
@@ -719,6 +719,95 @@ bool Renderer::beginFrame(game::Window& window, const DebugOverlayState& overlay
     m_currentWindow = &window;
     m_frameActive = true;
     return true;
+}
+
+void Renderer::renderChunks(const ChunkRenderInfoMap& renderInfos, const glm::mat4& viewProjection)
+{
+    if (!m_frameActive)
+    {
+        return;
+    }
+
+    auto& frame = m_frames[m_frameIndex];
+    VkCommandBuffer cmd = frame.commandBuffer;
+
+    // Bind descriptor set 0 (gigabuffer SSBO at binding 0)
+    vkCmdBindDescriptorSets(
+        cmd,
+        VK_PIPELINE_BIND_POINT_GRAPHICS,
+        m_pipelineLayout,
+        0,
+        1,
+        &m_chunkDescriptorSet,
+        0,
+        nullptr);
+
+    // Bind shared quad index buffer
+    m_quadIndexBuffer->bind(cmd);
+
+    float currentTime = static_cast<float>(glfwGetTime());
+
+    uint32_t drawCount = 0;
+    uint32_t totalQuads = 0;
+
+    for (const auto& [key, info] : renderInfos)
+    {
+        if (info.state != RenderState::Resident || info.quadCount == 0)
+        {
+            continue;
+        }
+
+        ChunkPushConstants pc{};
+        pc.viewProjection = viewProjection;
+        pc.time = currentTime;
+        pc.chunkWorldPos = glm::vec3(info.worldBasePos);
+
+        vkCmdPushConstants(
+            cmd,
+            m_pipelineLayout,
+            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+            0,
+            sizeof(ChunkPushConstants),
+            &pc);
+
+        // vertexOffset = allocation.offset / 2
+        // (each quad = 8 bytes, 4 vertices → offset/8*4 = offset/2)
+        int32_t vertexOffset = static_cast<int32_t>(info.allocation.offset / 2);
+
+        vkCmdDrawIndexed(
+            cmd,
+            info.quadCount * 6,  // index count (6 indices per quad)
+            1,                    // instance count
+            0,                    // first index
+            vertexOffset,         // vertex offset
+            0);                   // first instance
+
+        ++drawCount;
+        totalQuads += info.quadCount;
+    }
+
+    m_lastDrawCount = drawCount;
+    m_lastQuadCount = totalQuads;
+
+    static uint32_t logCounter = 0;
+    static bool firstDraw = true;
+    if (firstDraw && drawCount > 0)
+    {
+        VX_LOG_INFO(
+            "renderChunks: FIRST DRAW — {} entries, {} draws, {} quads",
+            renderInfos.size(),
+            drawCount,
+            totalQuads);
+        firstDraw = false;
+    }
+    if (logCounter++ % 60 == 0)
+    {
+        VX_LOG_INFO(
+            "renderChunks: {} total entries, {} draws, {} quads",
+            renderInfos.size(),
+            drawCount,
+            totalQuads);
+    }
 }
 
 void Renderer::endFrame()

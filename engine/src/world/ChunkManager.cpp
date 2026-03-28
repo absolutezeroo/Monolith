@@ -10,6 +10,7 @@
 #include <glm/geometric.hpp>
 
 #include <algorithm>
+#include <cmath>
 
 namespace voxel::world
 {
@@ -180,9 +181,52 @@ void ChunkManager::update(const glm::dvec3& playerPos)
         return;
     }
 
+    streamChunks(playerPos);
     cleanupCompletedTasks();
     pollMeshResults();
     dispatchDirtySections(playerPos);
+}
+
+void ChunkManager::streamChunks(const glm::dvec3& playerPos)
+{
+    glm::ivec2 playerChunk = worldToChunkCoord(glm::ivec3(
+        static_cast<int>(std::floor(playerPos.x)),
+        static_cast<int>(std::floor(playerPos.y)),
+        static_cast<int>(std::floor(playerPos.z))));
+
+    int rd = m_renderDistance;
+
+    // Load new chunks within render distance (capped per frame)
+    int loaded = 0;
+    for (int dx = -rd; dx <= rd && loaded < MAX_LOADS_PER_FRAME; ++dx)
+    {
+        for (int dz = -rd; dz <= rd && loaded < MAX_LOADS_PER_FRAME; ++dz)
+        {
+            glm::ivec2 coord{playerChunk.x + dx, playerChunk.y + dz};
+            if (m_chunks.find(coord) == m_chunks.end())
+            {
+                loadChunk(coord);
+                ++loaded;
+            }
+        }
+    }
+
+    // Unload chunks beyond render distance + 2 buffer
+    int unloadDist = rd + 2;
+    std::vector<glm::ivec2> toUnload;
+    for (const auto& [coord, column] : m_chunks)
+    {
+        int dx = coord.x - playerChunk.x;
+        int dz = coord.y - playerChunk.y;
+        if (std::abs(dx) > unloadDist || std::abs(dz) > unloadDist)
+        {
+            toUnload.push_back(coord);
+        }
+    }
+    for (const auto& coord : toUnload)
+    {
+        unloadChunk(coord);
+    }
 }
 
 const renderer::ChunkMesh* ChunkManager::getMesh(glm::ivec2 coord, int sectionY) const

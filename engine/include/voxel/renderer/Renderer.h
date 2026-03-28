@@ -1,6 +1,7 @@
 #pragma once
 
 #include "voxel/core/Result.h"
+#include "voxel/renderer/ChunkRenderInfo.h"
 #include "voxel/renderer/Gigabuffer.h"
 #include "voxel/renderer/RendererConstants.h"
 
@@ -30,12 +31,12 @@ class QuadIndexBuffer;
 class StagingBuffer;
 class VulkanContext;
 
-/// Push constants for chunk rendering: VP matrix + animation time.
+/// Push constants for chunk rendering: VP matrix + animation time + chunk world position.
 struct ChunkPushConstants
 {
     glm::mat4 viewProjection; // 64 bytes
     float time;               // 4 bytes
-    float padding[3];         // 12 bytes (align to 16)
+    glm::vec3 chunkWorldPos;  // 12 bytes
 };
 static_assert(sizeof(ChunkPushConstants) == 80);
 
@@ -102,6 +103,23 @@ class Renderer
 
     /// Waits for GPU idle and destroys all owned resources.
     void shutdown();
+
+    /**
+     * @brief Renders all resident chunk sections from the render info map.
+     *
+     * Binds the chunk descriptor set and quad index buffer, then issues one
+     * vkCmdDrawIndexed per resident section. Must be called between beginFrame/endFrame.
+     *
+     * @param renderInfos The map of section keys to GPU render metadata.
+     * @param viewProjection Combined view-projection matrix from the camera.
+     */
+    void renderChunks(const ChunkRenderInfoMap& renderInfos, const glm::mat4& viewProjection);
+
+    /// Returns the number of draw calls issued in the last renderChunks() call.
+    [[nodiscard]] uint32_t getLastDrawCount() const { return m_lastDrawCount; }
+
+    /// Returns the total number of quads rendered in the last renderChunks() call.
+    [[nodiscard]] uint32_t getLastQuadCount() const { return m_lastQuadCount; }
 
     /// Returns the Gigabuffer (non-owning, for stats queries). May be null before init.
     [[nodiscard]] const Gigabuffer* getGigabuffer() const { return m_gigabuffer.get(); }
@@ -179,6 +197,10 @@ class Renderer
     bool m_isInitialized = false;
     bool m_needsSwapchainRecreate = false;
     std::string m_screenshotPath;
+
+    // Render stats from last renderChunks() call
+    uint32_t m_lastDrawCount = 0;
+    uint32_t m_lastQuadCount = 0;
 
     // Per-frame state (set by beginFrame, used by endFrame)
     game::Window* m_currentWindow = nullptr;

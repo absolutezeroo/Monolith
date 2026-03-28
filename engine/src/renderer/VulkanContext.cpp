@@ -118,6 +118,10 @@ core::Result<std::unique_ptr<VulkanContext>> VulkanContext::create(game::Window&
     features12.bufferDeviceAddress = VK_TRUE;
     features12.descriptorIndexing = VK_TRUE;
 
+    VkPhysicalDeviceVulkan11Features features11{};
+    features11.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;
+    features11.shaderDrawParameters = VK_TRUE;
+
     VkPhysicalDeviceFeatures features10{};
     features10.fillModeNonSolid = VK_TRUE; // Required for wireframe (VK_POLYGON_MODE_LINE)
 
@@ -125,6 +129,7 @@ core::Result<std::unique_ptr<VulkanContext>> VulkanContext::create(game::Window&
     auto physResult = selector.set_surface(ctx->m_surface)
                           .set_minimum_version(1, 3)
                           .set_required_features(features10)
+                          .set_required_features_11(features11)
                           .set_required_features_13(features13)
                           .set_required_features_12(features12)
                           .prefer_gpu_device_type(vkb::PreferredDeviceType::discrete)

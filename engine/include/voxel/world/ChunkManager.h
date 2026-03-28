@@ -91,6 +91,8 @@ class ChunkManager
   public:
     static constexpr int MAX_RESULTS_PER_FRAME = 8;
     static constexpr int MAX_DISPATCHES_PER_FRAME = 4;
+    static constexpr int MAX_LOADS_PER_FRAME = 4;
+    static constexpr int DEFAULT_RENDER_DISTANCE = 8;
 
     ChunkManager() = default;
 
@@ -102,6 +104,9 @@ class ChunkManager
 
     /// Set the mesh builder for async meshing. Non-owning pointer.
     void setMeshBuilder(const renderer::MeshBuilder* meshBuilder) { m_meshBuilder = meshBuilder; }
+
+    /// Set render distance in chunks. Chunks beyond this are unloaded.
+    void setRenderDistance(int distance) { m_renderDistance = distance; }
 
     /// Returns the ChunkColumn at the given coordinate, or nullptr if not loaded.
     [[nodiscard]] ChunkColumn* getChunk(glm::ivec2 coord);
@@ -161,8 +166,12 @@ class ChunkManager
     /// Dispatch dirty sections for async meshing, sorted by distance to player.
     void dispatchDirtySections(const glm::dvec3& playerPos);
 
+    /// Load/unload chunks around the player based on render distance.
+    void streamChunks(const glm::dvec3& playerPos);
+
     std::unordered_map<glm::ivec2, std::unique_ptr<ChunkColumn>, ChunkCoordHash> m_chunks;
     WorldGenerator* m_worldGen = nullptr;
+    int m_renderDistance = DEFAULT_RENDER_DISTANCE;
 
     // Async meshing infrastructure
     core::JobSystem* m_jobSystem = nullptr;

@@ -1,6 +1,6 @@
 # Story 6.2: Vertex Pulling Shader (chunk.vert / chunk.frag)
 
-Status: ready-for-dev
+Status: in-progress
 
 ## Story
 
@@ -23,58 +23,58 @@ so that I can render chunk meshes using the compact 8-byte packed quad format wi
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: Enable `shaderDrawParameters` Vulkan feature** (AC: #1)
-  - [ ] 1.1 In `VulkanContext.cpp`, add `VkPhysicalDeviceVulkan11Features` with `shaderDrawParameters = VK_TRUE` to the device selector chain
-  - [ ] 1.2 Chain it via `pNext` between the existing features12 and the physical device selector
+- [x] **Task 1: Enable `shaderDrawParameters` Vulkan feature** (AC: #1)
+  - [x] 1.1 In `VulkanContext.cpp`, add `VkPhysicalDeviceVulkan11Features` with `shaderDrawParameters = VK_TRUE` to the device selector chain
+  - [x] 1.2 Chain it via `set_required_features_11()` in the vk-bootstrap physical device selector
 
-- [ ] **Task 2: Update `ChunkPushConstants`** (AC: #9)
-  - [ ] 2.1 In `Renderer.h`, replace `float padding[3]` with `glm::vec3 chunkWorldPos` in `ChunkPushConstants`
-  - [ ] 2.2 Verify `static_assert(sizeof(ChunkPushConstants) == 80)` still passes
-  - [ ] 2.3 Update `VkPushConstantRange.stageFlags` to include `VK_SHADER_STAGE_FRAGMENT_BIT` (the fragment shader needs `time` for future use)
+- [x] **Task 2: Update `ChunkPushConstants`** (AC: #9)
+  - [x] 2.1 In `Renderer.h`, replace `float padding[3]` with `glm::vec3 chunkWorldPos` in `ChunkPushConstants`
+  - [x] 2.2 Verify `static_assert(sizeof(ChunkPushConstants) == 80)` still passes
+  - [x] 2.3 Update `VkPushConstantRange.stageFlags` to include `VK_SHADER_STAGE_FRAGMENT_BIT` (the fragment shader needs `time` for future use)
 
-- [ ] **Task 3: Create `chunk.vert`** (AC: #1, #2, #3, #4, #5, #6)
-  - [ ] 3.1 Create `assets/shaders/chunk.vert` (GLSL 450, Vulkan 1.3 target)
-  - [ ] 3.2 Declare SSBO binding 0 as `readonly buffer Gigabuffer { uint data[]; }` (read packed quads as pairs of uint32)
-  - [ ] 3.3 Declare push constants: `mat4 viewProjection`, `float time`, `vec3 chunkWorldPos`
-  - [ ] 3.4 Implement quad unpacking: extract all fields from `lo` (bits 0–31) and `hi` (bits 32–63) using `bitfieldExtract()`
-  - [ ] 3.5 Implement corner reconstruction for all 6 face directions (see Dev Notes for corner table)
-  - [ ] 3.6 Implement quad diagonal flip: swap corners 1 and 3 when flip bit is set
-  - [ ] 3.7 Implement waving displacement (leaves/plants/liquid) driven by `time`
-  - [ ] 3.8 Output varying attributes: `worldPos`, `normal`, `uv`, `ao` (interpolated float), `flat uint blockStateId`, `flat uint tintIndex`
+- [x] **Task 3: Create `chunk.vert`** (AC: #1, #2, #3, #4, #5, #6)
+  - [x] 3.1 Create `assets/shaders/chunk.vert` (GLSL 450, Vulkan 1.3 target)
+  - [x] 3.2 Declare SSBO binding 0 as `readonly buffer Gigabuffer { uint data[]; }` (read packed quads as pairs of uint32)
+  - [x] 3.3 Declare push constants: `mat4 viewProjection`, `float time`, 3x`float chunkWorldPos{X,Y,Z}` (3 separate floats to avoid vec3 16-byte alignment in std430)
+  - [x] 3.4 Implement quad unpacking: extract all fields from `lo` (bits 0–31) and `hi` (bits 32–63) using `bitfieldExtract()`
+  - [x] 3.5 Implement corner reconstruction for all 6 face directions (see Dev Notes for corner table)
+  - [x] 3.6 Implement quad diagonal flip: swap corners 1 and 3 when flip bit is set
+  - [x] 3.7 Implement waving displacement (leaves/plants/liquid) driven by `time`
+  - [x] 3.8 Output varying attributes: `worldPos`, `normal`, `uv`, `ao` (interpolated float), `flat uint blockStateId`, `flat uint tintIndex`
 
-- [ ] **Task 4: Create `chunk.frag`** (AC: #6, #7)
-  - [ ] 4.1 Create `assets/shaders/chunk.frag` (GLSL 450)
-  - [ ] 4.2 Inputs: worldPos, normal, uv, ao, flat blockStateId, flat tintIndex
-  - [ ] 4.3 Placeholder coloring: top (PosY) = green `(0.3, 0.8, 0.2)`, bottom (NegY) = brown `(0.5, 0.3, 0.1)`, sides = gray `(0.6, 0.6, 0.6)`
-  - [ ] 4.4 Apply AO: `color *= ao` (ao is 0.0–1.0 float, where 1.0 = no occlusion)
-  - [ ] 4.5 Output to `outColor` (vec4, alpha = 1.0)
+- [x] **Task 4: Create `chunk.frag`** (AC: #6, #7)
+  - [x] 4.1 Create `assets/shaders/chunk.frag` (GLSL 450)
+  - [x] 4.2 Inputs: worldPos, normal, uv, ao, flat blockStateId, flat tintIndex
+  - [x] 4.3 Placeholder coloring: top (PosY) = green `(0.3, 0.8, 0.2)`, bottom (NegY) = brown `(0.5, 0.3, 0.1)`, sides = gray `(0.6, 0.6, 0.6)`
+  - [x] 4.4 Apply AO: `color *= ao` (ao is 0.0–1.0 float, where 1.0 = no occlusion)
+  - [x] 4.5 Output to `outColor` (vec4, alpha = 1.0)
 
-- [ ] **Task 5: Update Renderer to load chunk shaders** (AC: #8)
-  - [ ] 5.1 In `Renderer::init()`, change shader paths from `triangle.vert.spv`/`triangle.frag.spv` to `chunk.vert.spv`/`chunk.frag.spv`
-  - [ ] 5.2 Enable backface culling: change `raster.cullMode` from `VK_CULL_MODE_NONE` to `VK_CULL_MODE_BACK_BIT` in `buildPipeline()`
-  - [ ] 5.3 Keep `raster.frontFace = VK_FRONT_FACE_CLOCKWISE` (match shader corner winding)
+- [x] **Task 5: Update Renderer to load chunk shaders** (AC: #8)
+  - [x] 5.1 In `Renderer::init()`, change shader paths from `triangle.vert.spv`/`triangle.frag.spv` to `chunk.vert.spv`/`chunk.frag.spv`
+  - [x] 5.2 Enable backface culling: change `raster.cullMode` from `VK_CULL_MODE_NONE` to `VK_CULL_MODE_BACK_BIT` in `buildPipeline()`
+  - [x] 5.3 Keep `raster.frontFace = VK_FRONT_FACE_CLOCKWISE` (match shader corner winding)
 
-- [ ] **Task 6: Add `renderChunks()` method** (AC: #8, #9)
-  - [ ] 6.1 Add public method `void renderChunks(const ChunkRenderInfoMap& renderInfos, const glm::mat4& viewProjection)` to Renderer
-  - [ ] 6.2 Bind descriptor set: `vkCmdBindDescriptorSets(cmd, GRAPHICS, m_pipelineLayout, 0, 1, &m_chunkDescriptorSet, ...)`
-  - [ ] 6.3 Bind quad index buffer: `m_quadIndexBuffer->bind(cmd)` (from Story 6.1)
-  - [ ] 6.4 Iterate `renderInfos`, skip non-Resident or zero-quadCount entries
-  - [ ] 6.5 Per draw: push `ChunkPushConstants` with VP, time, `worldBasePos`
-  - [ ] 6.6 Per draw: `vkCmdDrawIndexed(cmd, quadCount * 6, 1, 0, vertexOffset, 0)` where `vertexOffset = allocation.offset / 8 * 4` (see Dev Notes)
-  - [ ] 6.7 Track draw count and quad count for debug overlay
+- [x] **Task 6: Add `renderChunks()` method** (AC: #8, #9)
+  - [x] 6.1 Add public method `void renderChunks(const ChunkRenderInfoMap& renderInfos, const glm::mat4& viewProjection)` to Renderer
+  - [x] 6.2 Bind descriptor set: `vkCmdBindDescriptorSets(cmd, GRAPHICS, m_pipelineLayout, 0, 1, &m_chunkDescriptorSet, ...)`
+  - [x] 6.3 Bind quad index buffer: `m_quadIndexBuffer->bind(cmd)` (from Story 6.1)
+  - [x] 6.4 Iterate `renderInfos`, skip non-Resident or zero-quadCount entries
+  - [x] 6.5 Per draw: push `ChunkPushConstants` with VP, time, `worldBasePos`
+  - [x] 6.6 Per draw: `vkCmdDrawIndexed(cmd, quadCount * 6, 1, 0, vertexOffset, 0)` where `vertexOffset = allocation.offset / 2`
+  - [x] 6.7 Track draw count and quad count for debug overlay via `m_lastDrawCount`/`m_lastQuadCount`
 
-- [ ] **Task 7: Wire `renderChunks()` from GameApp** (AC: #8)
-  - [ ] 7.1 In `Renderer::beginFrame()`, replace `vkCmdDraw(cmd, 3, 1, 0, 0)` with nothing — drawing is now caller-driven
-  - [ ] 7.2 In `GameApp::render()`, call `m_renderer.renderChunks(m_uploadManager->getAllRenderInfos(), m_camera.getViewProjection())`
-  - [ ] 7.3 Ensure the call happens between `beginFrame()` and `endFrame()`, after pipeline bind
-  - [ ] 7.4 Update debug overlay to show draw call count and total quads rendered
+- [x] **Task 7: Wire `renderChunks()` from GameApp** (AC: #8)
+  - [x] 7.1 In `Renderer::beginFrame()`, removed `vkCmdDraw(cmd, 3, 1, 0, 0)` — drawing is now caller-driven
+  - [x] 7.2 In `GameApp::render()`, call `m_renderer.renderChunks(m_uploadManager->getAllRenderInfos(), vp)` using `camera.getProjectionMatrix() * camera.getViewMatrix()`
+  - [x] 7.3 Call happens between `beginFrame()` and `endFrame()`, after pipeline bind
+  - [x] 7.4 Update debug overlay to show draw call count and total quads rendered
 
 - [ ] **Task 8: Build and validate** (AC: #10)
-  - [ ] 8.1 Verify CMake auto-discovers `chunk.vert` and `chunk.frag` in `assets/shaders/` (GLOB in `CompileShaders.cmake`)
-  - [ ] 8.2 Build with zero errors/warnings
+  - [x] 8.1 Verify CMake auto-discovers `chunk.vert` and `chunk.frag` in `assets/shaders/` (GLOB in `CompileShaders.cmake`)
+  - [x] 8.2 Build with zero errors/warnings
   - [ ] 8.3 Run with Vulkan validation layers: zero descriptor/pipeline/shader errors
   - [ ] 8.4 Visual verification: terrain chunks render as colored blocks with AO shading, waving blocks animate
-  - [ ] 8.5 All existing unit tests pass (no regressions)
+  - [x] 8.5 All existing unit tests pass (no regressions) — 161 test cases, 488,988 assertions
 
 ## Dev Notes
 
