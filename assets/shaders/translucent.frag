@@ -11,6 +11,11 @@ layout(location = 5) flat in uint fragTintIndex;
 // ── Block texture array (binding 4) ────────────────────────────────────────
 layout(set = 0, binding = 4) uniform sampler2DArray blockTextures;
 
+// ── Tint palette SSBO (binding 5) ─────────────────────────────────────────
+layout(std430, set = 0, binding = 5) readonly buffer TintPaletteSSBO {
+    vec4 colors[8];
+} tintPalette;
+
 // ── Push constants (shared with chunk.vert) ─────────────────────────────────
 layout(push_constant) uniform PushConstants {
     mat4 viewProjection;    // 64 bytes (offset 0)
@@ -33,6 +38,10 @@ void main()
     if (texColor.a < 0.01)
         discard;
 
+    // Apply biome tint (index 0 = white = no change)
+    vec3 tint = tintPalette.colors[fragTintIndex].rgb;
+    vec3 tintedColor = texColor.rgb * tint;
+
     // Directional + ambient lighting (matches deferred lighting pass via shared push constants)
     vec3 normal = normalize(fragNormal);
     float NdotL = max(dot(normal, pc.sunDirection.xyz), 0.0);
@@ -41,5 +50,5 @@ void main()
     // Apply AO
     lighting *= fragAO;
 
-    outColor = vec4(texColor.rgb * lighting, texColor.a);
+    outColor = vec4(tintedColor * lighting, texColor.a);
 }

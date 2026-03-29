@@ -3,6 +3,7 @@
 #include "voxel/core/Result.h"
 #include "voxel/renderer/Gigabuffer.h"
 #include "voxel/renderer/RendererConstants.h"
+#include "voxel/renderer/TintPalette.h"
 
 #include <vk_mem_alloc.h>
 #include <volk.h>
@@ -170,6 +171,9 @@ class Renderer
     [[nodiscard]] const QuadIndexBuffer* getQuadIndexBuffer() const { return m_quadIndexBuffer.get(); }
     [[nodiscard]] const TextureArray* getTextureArray() const { return m_textureArray.get(); }
 
+    /// Upload a TintPalette to the GPU. Converts vec3 → vec4 (w=1) for std430 alignment.
+    void updateTintPalette(const TintPalette& palette);
+
   private:
     /// Extent-dependent resources that must be recreated on swapchain resize.
     struct SwapchainResources
@@ -248,6 +252,10 @@ class Renderer
     std::unique_ptr<TextureArray> m_textureArray;
     std::unique_ptr<GBuffer> m_gbuffer;
     std::unique_ptr<ImGuiBackend> m_imguiBackend;
+
+    VkBuffer m_tintPaletteBuffer = VK_NULL_HANDLE;
+    VmaAllocation m_tintPaletteAllocation = VK_NULL_HANDLE;
+    glm::vec4* m_tintPaletteMapped = nullptr;
 
     SwapchainResources m_swapchainResources{};
 

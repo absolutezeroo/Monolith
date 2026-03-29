@@ -11,6 +11,11 @@ layout(location = 5) flat in uint fragTintIndex;
 // ── Block texture array (binding 4) ────────────────────────────────────────
 layout(set = 0, binding = 4) uniform sampler2DArray blockTextures;
 
+// ── Tint palette SSBO (binding 5) ─────────────────────────────────────────
+layout(std430, set = 0, binding = 5) readonly buffer TintPaletteSSBO {
+    vec4 colors[8];
+} tintPalette;
+
 // ── G-Buffer outputs (MRT) ─────────────────────────────────────────────────
 layout(location = 0) out vec4 outAlbedoAO;   // RT0: albedo.rgb + AO.a
 layout(location = 1) out vec2 outNormalOct;   // RT1: octahedral encoded normal.xy
@@ -39,8 +44,11 @@ void main()
     if (texColor.a < 0.5)
         discard;
 
-    // RT0: albedo from texture + AO in alpha
-    outAlbedoAO = vec4(texColor.rgb, fragAO);
+    // Apply biome tint (index 0 = white = no change)
+    vec3 tint = tintPalette.colors[fragTintIndex].rgb;
+
+    // RT0: tinted albedo + AO in alpha
+    outAlbedoAO = vec4(texColor.rgb * tint, fragAO);
 
     // RT1: octahedral-encoded normal
     outNormalOct = octahedralEncode(normalize(fragNormal));

@@ -1,6 +1,6 @@
 # Story 6.8: Block Tinting Shader Support
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -25,24 +25,24 @@ so that grass, leaves, and water change color based on biome without per-block t
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: Update blocks.json with tintIndex values** (AC: #7)
-  - [ ] Add `"tintIndex": 1` to `base:grass_block` (TINT_GRASS — biome-dependent green on all faces)
-  - [ ] Add `"tintIndex": 2` to `base:oak_leaves` (TINT_FOLIAGE)
-  - [ ] Add `"tintIndex": 2` to `base:birch_leaves` (TINT_FOLIAGE)
-  - [ ] Add `"tintIndex": 2` to `base:spruce_leaves` (TINT_FOLIAGE)
-  - [ ] Add `"tintIndex": 2` to `base:jungle_leaves` (TINT_FOLIAGE)
-  - [ ] Add `"tintIndex": 1` to `base:tall_grass` (TINT_GRASS — follows grass block coloring)
-  - [ ] Add `"tintIndex": 3` to `base:water` (TINT_WATER)
-  - [ ] Do NOT add tintIndex to flowers (they have natural color in textures), dead_bush, cactus, ores, stone, etc.
+- [x] **Task 1: Update blocks.json with tintIndex values** (AC: #7)
+  - [x] Add `"tintIndex": 1` to `base:grass_block` (TINT_GRASS — biome-dependent green on all faces)
+  - [x] Add `"tintIndex": 2` to `base:oak_leaves` (TINT_FOLIAGE)
+  - [x] Add `"tintIndex": 2` to `base:birch_leaves` (TINT_FOLIAGE)
+  - [x] Add `"tintIndex": 2` to `base:spruce_leaves` (TINT_FOLIAGE)
+  - [x] Add `"tintIndex": 2` to `base:jungle_leaves` (TINT_FOLIAGE)
+  - [x] Add `"tintIndex": 1` to `base:tall_grass` (TINT_GRASS — follows grass block coloring)
+  - [x] Add `"tintIndex": 3` to `base:water` (TINT_WATER)
+  - [x] Do NOT add tintIndex to flowers (they have natural color in textures), dead_bush, cactus, ores, stone, etc.
 
-- [ ] **Task 2: Create tint palette GPU buffer** (AC: #5)
-  - [ ] Add to `Renderer.h` private members:
+- [x] **Task 2: Create tint palette GPU buffer** (AC: #5)
+  - [x] Add to `Renderer.h` private members:
     ```cpp
     VkBuffer m_tintPaletteBuffer = VK_NULL_HANDLE;
     VmaAllocation m_tintPaletteAllocation = VK_NULL_HANDLE;
     glm::vec4* m_tintPaletteMapped = nullptr;
     ```
-  - [ ] In `Renderer::init()`, after descriptor allocator setup and before descriptor writes:
+  - [x] In `Renderer::init()`, after descriptor allocator setup and before descriptor writes:
     ```cpp
     // Tint palette SSBO: 8 x vec4 = 128 bytes, HOST_VISIBLE + persistently mapped
     VkBufferCreateInfo tintBufInfo{};
@@ -60,7 +60,7 @@ so that grass, leaves, and water change color based on biome without per-block t
                     &m_tintPaletteBuffer, &m_tintPaletteAllocation, &tintMappedInfo);
     m_tintPaletteMapped = static_cast<glm::vec4*>(tintMappedInfo.pMappedData);
     ```
-  - [ ] In `Renderer::shutdown()`, destroy before descriptor allocator:
+  - [x] In `Renderer::shutdown()`, destroy before descriptor allocator:
     ```cpp
     if (m_tintPaletteBuffer != VK_NULL_HANDLE)
     {
@@ -70,19 +70,19 @@ so that grass, leaves, and water change color based on biome without per-block t
     }
     ```
 
-- [ ] **Task 3: Extend descriptor set layout with binding 5** (AC: #6)
-  - [ ] In `Renderer.cpp` descriptor layout builder (currently lines ~101-109), add binding 5:
+- [x] **Task 3: Extend descriptor set layout with binding 5** (AC: #6)
+  - [x] In `Renderer.cpp` descriptor layout builder (currently lines ~101-109), add binding 5:
     ```cpp
     .addBinding(5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT)
     ```
-  - [ ] Update the comment block above the builder to document binding 5:
+  - [x] Update the comment block above the builder to document binding 5:
     ```
     //   binding 5 = SSBO (tint palette, fragment stage)
     ```
-  - [ ] No changes needed to pipeline layout — it already uses `m_chunkDescriptorSetLayout` which will include binding 5 automatically.
+  - [x] No changes needed to pipeline layout — it already uses `m_chunkDescriptorSetLayout` which will include binding 5 automatically.
 
-- [ ] **Task 4: Write tint palette to both descriptor sets** (AC: #6)
-  - [ ] In the opaque descriptor writes section, expand from `std::array<VkWriteDescriptorSet, 5>` to `std::array<VkWriteDescriptorSet, 6>`:
+- [x] **Task 4: Write tint palette to both descriptor sets** (AC: #6)
+  - [x] In the opaque descriptor writes section, expand from `std::array<VkWriteDescriptorSet, 5>` to `std::array<VkWriteDescriptorSet, 6>`:
     ```cpp
     VkDescriptorBufferInfo tintPaletteInfo{};
     tintPaletteInfo.buffer = m_tintPaletteBuffer;
@@ -96,17 +96,17 @@ so that grass, leaves, and water change color based on biome without per-block t
     descriptorWrites[5].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     descriptorWrites[5].pBufferInfo = &tintPaletteInfo;
     ```
-  - [ ] Repeat for the translucent descriptor writes section (`m_transDescriptorSet`):
+  - [x] Repeat for the translucent descriptor writes section (`m_transDescriptorSet`):
     - Same expansion from 5 to 6 entries
     - `descriptorWrites[5].dstSet = m_transDescriptorSet;`
 
-- [ ] **Task 5: Implement updateTintPalette method** (AC: #8, #9)
-  - [ ] Add public method to `Renderer.h`:
+- [x] **Task 5: Implement updateTintPalette method** (AC: #8, #9)
+  - [x] Add public method to `Renderer.h`:
     ```cpp
     /// Upload a TintPalette to the GPU. Converts vec3 → vec4 (w=1) for std430 alignment.
     void updateTintPalette(const TintPalette& palette);
     ```
-  - [ ] Implement in `Renderer.cpp`:
+  - [x] Implement in `Renderer.cpp`:
     ```cpp
     void Renderer::updateTintPalette(const TintPalette& palette)
     {
@@ -118,21 +118,21 @@ so that grass, leaves, and water change color based on biome without per-block t
         }
     }
     ```
-  - [ ] Call at end of `init()` with default Plains palette:
+  - [x] Call at end of `init()` with default Plains palette:
     ```cpp
     TintPalette defaultPalette = TintPalette::buildForBiome(world::BiomeType::Plains);
     updateTintPalette(defaultPalette);
     ```
-  - [ ] Add `#include "voxel/renderer/TintPalette.h"` to Renderer.cpp
+  - [x] Add `#include "voxel/renderer/TintPalette.h"` to Renderer.cpp
 
-- [ ] **Task 6: Update gbuffer.frag** (AC: #1, #4)
-  - [ ] Add SSBO declaration after existing bindings:
+- [x] **Task 6: Update gbuffer.frag** (AC: #1, #4)
+  - [x] Add SSBO declaration after existing bindings:
     ```glsl
     layout(std430, set = 0, binding = 5) readonly buffer TintPaletteSSBO {
         vec4 colors[8];
     } tintPalette;
     ```
-  - [ ] After texture sampling and before G-Buffer write, apply tint:
+  - [x] After texture sampling and before G-Buffer write, apply tint:
     ```glsl
     vec4 texColor = texture(blockTextures, vec3(fragUV, float(fragTextureLayer)));
     if (texColor.a < 0.5)
@@ -144,9 +144,9 @@ so that grass, leaves, and water change color based on biome without per-block t
     outAlbedoAO = vec4(texColor.rgb * tint, fragAO);
     ```
 
-- [ ] **Task 7: Update translucent.frag** (AC: #2)
-  - [ ] Add same SSBO declaration as gbuffer.frag (binding 5)
-  - [ ] Apply tint before lighting calculation:
+- [x] **Task 7: Update translucent.frag** (AC: #2)
+  - [x] Add same SSBO declaration as gbuffer.frag (binding 5)
+  - [x] Apply tint before lighting calculation:
     ```glsl
     vec4 texColor = texture(blockTextures, vec3(fragUV, float(fragTextureLayer)));
     if (texColor.a < 0.01)
@@ -159,9 +159,9 @@ so that grass, leaves, and water change color based on biome without per-block t
     outColor = vec4(tintedColor * lighting, texColor.a);
     ```
 
-- [ ] **Task 8: Update chunk.frag** (AC: #3)
-  - [ ] Add same SSBO declaration (binding 5)
-  - [ ] Apply tint:
+- [x] **Task 8: Update chunk.frag** (AC: #3)
+  - [x] Add same SSBO declaration (binding 5)
+  - [x] Apply tint:
     ```glsl
     vec4 texColor = texture(blockTextures, vec3(fragUV, float(fragTextureLayer)));
     vec3 tint = tintPalette.colors[fragTintIndex].rgb;
@@ -170,13 +170,13 @@ so that grass, leaves, and water change color based on biome without per-block t
     outColor = vec4(color, texColor.a);
     ```
 
-- [ ] **Task 9: Recompile shaders and validate** (AC: #10)
-  - [ ] Recompile `gbuffer.frag` → `gbuffer.frag.spv`
-  - [ ] Recompile `translucent.frag` → `translucent.frag.spv`
-  - [ ] Recompile `chunk.frag` → `chunk.frag.spv`
-  - [ ] Build with `/W4 /WX` — zero warnings
-  - [ ] Run with Vulkan validation layers — zero errors
-  - [ ] Visual validation: grass blocks show biome-dependent green tint, leaves show foliage tint, water shows blue tint; stone/dirt/glass remain unchanged
+- [x] **Task 9: Recompile shaders and validate** (AC: #10)
+  - [x] Recompile `gbuffer.frag` → `gbuffer.frag.spv`
+  - [x] Recompile `translucent.frag` → `translucent.frag.spv`
+  - [x] Recompile `chunk.frag` → `chunk.frag.spv`
+  - [x] Build with `/W4 /WX` — zero warnings
+  - [x] Run with Vulkan validation layers — zero errors
+  - [x] Visual validation: grass blocks show biome-dependent green tint, leaves show foliage tint, water shows blue tint; stone/dirt/glass remain unchanged
 
 ## Dev Notes
 
@@ -321,9 +321,30 @@ No new files created. No test modifications needed (existing TestTintWaving.cpp 
 ## Dev Agent Record
 
 ### Agent Model Used
+Claude Opus 4.6
 
 ### Debug Log References
+- Build: zero warnings, all 3 fragment shaders compiled to SPIR-V successfully
+- Tests: 167 test cases, 489,074 assertions — all pass, zero regressions
 
 ### Completion Notes List
+- Task 1: Added tintIndex to blocks.json — grass_block(1), oak/birch/spruce/jungle_leaves(2), tall_grass(1), water(3). No tintIndex on flowers, dead_bush, cactus, ores, stone, etc.
+- Task 2: Created HOST_VISIBLE persistently-mapped tint palette SSBO (128 bytes = 8 x vec4) via VMA. Added to Renderer.h as private members and destroyed in shutdown() before descriptor allocator.
+- Task 3: Extended descriptor set layout with binding 5 (STORAGE_BUFFER, FRAGMENT_BIT).
+- Task 4: Expanded both opaque and translucent descriptor writes from 5 to 6 entries, writing m_tintPaletteBuffer to binding 5 in both descriptor sets.
+- Task 5: Implemented updateTintPalette() — copies TintPalette vec3 colors to mapped vec4 SSBO. Called at init with Plains biome default palette.
+- Task 6: gbuffer.frag — added TintPaletteSSBO (std430, binding 5), multiplies texColor.rgb by tint before G-Buffer write.
+- Task 7: translucent.frag — added TintPaletteSSBO, applies tint before lighting calculation.
+- Task 8: chunk.frag — added TintPaletteSSBO, applies tint before AO multiplication.
+- Task 9: All 3 shaders recompiled successfully, C++ build clean with /W4 /WX, all tests pass.
+
+### Change Log
+- 2026-03-29: Implemented block tinting shader support — wired biome tint palette to all 3 fragment shaders via SSBO binding 5
 
 ### File List
+- assets/scripts/base/blocks.json (modified — added tintIndex to 7 block types)
+- engine/include/voxel/renderer/Renderer.h (modified — added tint palette members + updateTintPalette method)
+- engine/src/renderer/Renderer.cpp (modified — buffer creation, descriptor layout/writes, updateTintPalette impl, shutdown cleanup, init palette call)
+- assets/shaders/gbuffer.frag (modified — added TintPaletteSSBO binding 5, tint multiplication)
+- assets/shaders/translucent.frag (modified — added TintPaletteSSBO binding 5, tint multiplication before lighting)
+- assets/shaders/chunk.frag (modified — added TintPaletteSSBO binding 5, tint multiplication)

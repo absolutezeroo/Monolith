@@ -88,6 +88,31 @@ core::Result<void> Renderer::init(const std::string& shaderDir, const std::strin
     m_textureArray = std::move(textureResult.value());
 
     VkDevice device = m_vulkanContext.getDevice();
+    VmaAllocator allocator = m_vulkanContext.getAllocator();
+
+    // Tint palette SSBO: 8 x vec4 = 128 bytes, HOST_VISIBLE + persistently mapped
+    {
+        VkBufferCreateInfo tintBufInfo{};
+        tintBufInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+        tintBufInfo.size = TintPalette::MAX_ENTRIES * sizeof(glm::vec4);
+        tintBufInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+
+        VmaAllocationCreateInfo tintAllocInfo{};
+        tintAllocInfo.usage = VMA_MEMORY_USAGE_AUTO;
+        tintAllocInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
+
+        VmaAllocationInfo tintMappedInfo{};
+        VkResult tintResult =
+            vmaCreateBuffer(allocator, &tintBufInfo, &tintAllocInfo, &m_tintPaletteBuffer, &m_tintPaletteAllocation, &tintMappedInfo);
+        if (tintResult != VK_SUCCESS)
+        {
+            VX_LOG_ERROR("Failed to create tint palette buffer: {}", static_cast<int>(tintResult));
+            return std::unexpected(
+                core::EngineError::vulkan(static_cast<int32_t>(tintResult), "Failed to create tint palette buffer"));
+        }
+        m_tintPaletteMapped = static_cast<glm::vec4*>(tintMappedInfo.pMappedData);
+        VX_LOG_INFO("Tint palette buffer created ({} bytes, persistently mapped)", TintPalette::MAX_ENTRIES * sizeof(glm::vec4));
+    }
 
     // Create descriptor allocator
     m_descriptorAllocator = std::make_unique<DescriptorAllocator>(device);
@@ -98,6 +123,7 @@ core::Result<void> Renderer::init(const std::string& shaderDir, const std::strin
     //   binding 2 = SSBO (indirect command buffer, compute stage)
     //   binding 3 = SSBO (indirect draw count buffer, compute stage)
     //   binding 4 = COMBINED_IMAGE_SAMPLER (block texture array, fragment stage)
+    //   binding 5 = SSBO (tint palette, fragment stage)
     DescriptorLayoutBuilder layoutBuilder;
     auto chunkLayoutResult =
         layoutBuilder.addBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT)
@@ -106,6 +132,7 @@ core::Result<void> Renderer::init(const std::string& shaderDir, const std::strin
             .addBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
             .addBinding(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT)
             .addBinding(4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
+            .addBinding(5, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT)
             .build(device);
     if (!chunkLayoutResult.has_value())
     {
@@ -322,7 +349,12 @@ core::Result<void> Renderer::init(const std::string& shaderDir, const std::strin
     textureInfo.imageView = m_textureArray->getImageView();
     textureInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-    std::array<VkWriteDescriptorSet, 5> descriptorWrites{};
+    VkDescriptorBufferInfo tintPaletteInfo{};
+    tintPaletteInfo.buffer = m_tintPaletteBuffer;
+    tintPaletteInfo.offset = 0;
+    tintPaletteInfo.range = VK_WHOLE_SIZE;
+
+    std::array<VkWriteDescriptorSet, 6> descriptorWrites{};
 
     // Binding 0: gigabuffer SSBO
     descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -364,6 +396,14 @@ core::Result<void> Renderer::init(const std::string& shaderDir, const std::strin
     descriptorWrites[4].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     descriptorWrites[4].pImageInfo = &textureInfo;
 
+    // Binding 5: tint palette SSBO
+    descriptorWrites[5].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[5].dstSet = m_chunkDescriptorSet;
+    descriptorWrites[5].dstBinding = 5;
+    descriptorWrites[5].descriptorCount = 1;
+    descriptorWrites[5].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    descriptorWrites[5].pBufferInfo = &tintPaletteInfo;
+
     vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
 
     // Allocate translucent descriptor set (same layout, but with translucent indirect buffers)
@@ -385,7 +425,7 @@ core::Result<void> Renderer::init(const std::string& shaderDir, const std::strin
     transIndirectCountInfo.offset = 0;
     transIndirectCountInfo.range = VK_WHOLE_SIZE;
 
-    std::array<VkWriteDescriptorSet, 5> transDescWrites{};
+    std::array<VkWriteDescriptorSet, 6> transDescWrites{};
 
     // Binding 0: same gigabuffer
     transDescWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -427,6 +467,14 @@ core::Result<void> Renderer::init(const std::string& shaderDir, const std::strin
     transDescWrites[4].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     transDescWrites[4].pImageInfo = &textureInfo;
 
+    // Binding 5: same tint palette SSBO
+    transDescWrites[5].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    transDescWrites[5].dstSet = m_transDescriptorSet;
+    transDescWrites[5].dstBinding = 5;
+    transDescWrites[5].descriptorCount = 1;
+    transDescWrites[5].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    transDescWrites[5].pBufferInfo = &tintPaletteInfo;
+
     vkUpdateDescriptorSets(device, static_cast<uint32_t>(transDescWrites.size()), transDescWrites.data(), 0, nullptr);
 
     // Create depth buffer and other extent-dependent resources
@@ -467,6 +515,10 @@ core::Result<void> Renderer::init(const std::string& shaderDir, const std::strin
         return std::unexpected(imguiResult.error());
     }
     m_imguiBackend = std::move(imguiResult.value());
+
+    // Initialize tint palette with default Plains biome colors
+    TintPalette defaultPalette = TintPalette::buildForBiome(world::BiomeType::Plains);
+    updateTintPalette(defaultPalette);
 
     m_isInitialized = true;
     VX_LOG_INFO("Renderer initialized — {} frames in flight, deferred rendering active", FRAMES_IN_FLIGHT);
@@ -1608,6 +1660,19 @@ void Renderer::endFrame()
     m_frameIndex = (m_frameIndex + 1) % FRAMES_IN_FLIGHT;
 }
 
+void Renderer::updateTintPalette(const TintPalette& palette)
+{
+    if (m_tintPaletteMapped == nullptr)
+    {
+        return;
+    }
+    for (uint8_t i = 0; i < TintPalette::MAX_ENTRIES; ++i)
+    {
+        glm::vec3 color = palette.getColor(i);
+        m_tintPaletteMapped[i] = glm::vec4(color, 1.0f);
+    }
+}
+
 void Renderer::shutdown()
 {
     if (!m_isInitialized)
@@ -1623,6 +1688,14 @@ void Renderer::shutdown()
 
     m_stagingBuffer.reset();
     m_textureArray.reset();
+
+    // Destroy tint palette buffer before descriptor allocator
+    if (m_tintPaletteBuffer != VK_NULL_HANDLE)
+    {
+        vmaDestroyBuffer(m_vulkanContext.getAllocator(), m_tintPaletteBuffer, m_tintPaletteAllocation);
+        m_tintPaletteBuffer = VK_NULL_HANDLE;
+        m_tintPaletteMapped = nullptr;
+    }
 
     // Destroy indirect/ChunkRenderInfo buffers before DescriptorAllocator (they are referenced by descriptors)
     m_transIndirectDrawBuffer.reset();
