@@ -36,6 +36,29 @@ struct ChunkLoadedEvent
     math::IVec2 coord;
 };
 
+/// Compile-time mapping from EventType enum values to their event struct types.
+/// Prevents mismatching EventType and TEvent at the call site.
+template <EventType>
+struct EventTypeTraits;
+
+template <>
+struct EventTypeTraits<EventType::BlockPlaced>
+{
+    using Type = BlockPlacedEvent;
+};
+
+template <>
+struct EventTypeTraits<EventType::BlockBroken>
+{
+    using Type = BlockBrokenEvent;
+};
+
+template <>
+struct EventTypeTraits<EventType::ChunkLoaded>
+{
+    using Type = ChunkLoadedEvent;
+};
+
 /// Opaque handle returned by subscribe(), used for unsubscribe().
 using SubscriptionId = core::uint32;
 
@@ -43,27 +66,30 @@ using SubscriptionId = core::uint32;
 ///
 /// Main-thread only — no mutex. Subscribe with a typed callback,
 /// publish with a typed event. Type safety is enforced at compile time
-/// via templates; internally callbacks are stored type-erased.
+/// via EventTypeTraits — the EventType template parameter determines
+/// the event struct type, making mismatches impossible.
 ///
 /// Usage:
 /// @code
 ///   EventBus bus;
-///   auto id = bus.subscribe<BlockPlacedEvent>(EventType::BlockPlaced,
+///   auto id = bus.subscribe<EventType::BlockPlaced>(
 ///       [](const BlockPlacedEvent& e) { /* react */ });
-///   bus.publish(EventType::BlockPlaced, BlockPlacedEvent{{1,2,3}, 5});
+///   bus.publish<EventType::BlockPlaced>(BlockPlacedEvent{{1,2,3}, 5});
 ///   bus.unsubscribe(EventType::BlockPlaced, id);
 /// @endcode
 class EventBus
 {
   public:
     /// Subscribe a typed callback to an event type. Returns a handle for unsubscribe.
-    template <typename TEvent>
-    SubscriptionId subscribe(EventType type, std::function<void(const TEvent&)> callback)
+    template <EventType E>
+    SubscriptionId subscribe(std::function<void(const typename EventTypeTraits<E>::Type&)> callback)
     {
+        VX_ASSERT(m_nextId != 0, "SubscriptionId overflow");
         SubscriptionId id = m_nextId++;
-        // Wrap the typed callback into a type-erased void* callback.
-        auto erased = [cb = std::move(callback)](const void* data) { cb(*static_cast<const TEvent*>(data)); };
-        m_subscribers[type].push_back(Subscriber{id, std::move(erased)});
+        auto erased = [cb = std::move(callback)](const void* data) {
+            cb(*static_cast<const typename EventTypeTraits<E>::Type*>(data));
+        };
+        m_subscribers[E].push_back(Subscriber{id, std::move(erased)});
         return id;
     }
 
@@ -71,10 +97,10 @@ class EventBus
     void unsubscribe(EventType type, SubscriptionId id);
 
     /// Publish an event to all subscribers of the given type.
-    template <typename TEvent>
-    void publish(EventType type, const TEvent& event)
+    template <EventType E>
+    void publish(const typename EventTypeTraits<E>::Type& event)
     {
-        auto it = m_subscribers.find(type);
+        auto it = m_subscribers.find(E);
         if (it == m_subscribers.end())
         {
             return;

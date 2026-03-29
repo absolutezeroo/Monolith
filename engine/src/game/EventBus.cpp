@@ -1,7 +1,5 @@
 #include "voxel/game/EventBus.h"
 
-#include <algorithm>
-
 namespace voxel::game
 {
 
@@ -13,9 +11,7 @@ void EventBus::unsubscribe(EventType type, SubscriptionId id)
         return;
     }
 
-    auto& subs = it->second;
-    auto removed = std::remove_if(subs.begin(), subs.end(), [id](const Subscriber& s) { return s.id == id; });
-    subs.erase(removed, subs.end());
+    std::erase_if(it->second, [id](const Subscriber& s) { return s.id == id; });
 }
 
 core::usize EventBus::subscriberCount(EventType type) const
