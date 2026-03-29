@@ -16,7 +16,9 @@
 #include "voxel/renderer/VulkanContext.h"
 
 #include <GLFW/glfw3.h>
+#include <glm/ext/scalar_constants.hpp>
 
+#include <cmath>
 #include <fstream>
 #include <stb_image_write.h>
 #include <vector>
@@ -173,7 +175,7 @@ core::Result<void> Renderer::init(const std::string& shaderDir, const std::strin
     fillConfig.depthWriteEnable = true;
     fillConfig.vertShaderPath = vertPath;
     fillConfig.fragShaderPath = gbufferFragPath;
-    fillConfig.colorAttachmentFormats = {GBUFFER_RT0_FORMAT, GBUFFER_RT1_FORMAT};
+    fillConfig.colorAttachmentFormats = {GBUFFER_RT0_FORMAT, GBUFFER_RT1_FORMAT, GBUFFER_RT2_FORMAT};
     fillConfig.depthAttachmentFormat = GBUFFER_DEPTH_FORMAT;
 
     auto fillResult = buildPipeline(fillConfig);
@@ -329,7 +331,7 @@ core::Result<void> Renderer::init(const std::string& shaderDir, const std::strin
         modelConfig.depthBiasSlopeFactor = -1.0f;
         modelConfig.vertShaderPath = modelVertPath;
         modelConfig.fragShaderPath = gbufferFragPath;
-        modelConfig.colorAttachmentFormats = {GBUFFER_RT0_FORMAT, GBUFFER_RT1_FORMAT};
+        modelConfig.colorAttachmentFormats = {GBUFFER_RT0_FORMAT, GBUFFER_RT1_FORMAT, GBUFFER_RT2_FORMAT};
         modelConfig.depthAttachmentFormat = GBUFFER_DEPTH_FORMAT;
 
         auto modelPipelineResult = buildPipeline(modelConfig);
@@ -859,12 +861,13 @@ core::Result<void> Renderer::createLightingPipeline(const std::string& shaderDir
 {
     VkDevice device = m_vulkanContext.getDevice();
 
-    // Build lighting descriptor set layout: 3 combined image samplers for G-Buffer reads
+    // Build lighting descriptor set layout: 4 combined image samplers for G-Buffer reads
     DescriptorLayoutBuilder lightBuilder;
     auto lightLayoutResult =
         lightBuilder.addBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT) // RT0
             .addBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)         // RT1
             .addBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)         // Depth
+            .addBinding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)         // RT2 Light
             .build(device);
     if (!lightLayoutResult.has_value())
     {
@@ -933,7 +936,12 @@ void Renderer::writeLightingDescriptors()
     depthInfo.imageView = m_swapchainResources.depthImageView;
     depthInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-    std::array<VkWriteDescriptorSet, 3> writes{};
+    VkDescriptorImageInfo lightInfo{};
+    lightInfo.sampler = m_gbuffer->getSampler();
+    lightInfo.imageView = m_gbuffer->getLightView();
+    lightInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+    std::array<VkWriteDescriptorSet, 4> writes{};
 
     writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     writes[0].dstSet = m_lightingDescriptorSet;
@@ -955,6 +963,13 @@ void Renderer::writeLightingDescriptors()
     writes[2].descriptorCount = 1;
     writes[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     writes[2].pImageInfo = &depthInfo;
+
+    writes[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[3].dstSet = m_lightingDescriptorSet;
+    writes[3].dstBinding = 3;
+    writes[3].descriptorCount = 1;
+    writes[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    writes[3].pImageInfo = &lightInfo;
 
     vkUpdateDescriptorSets(m_vulkanContext.getDevice(), static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
 }
@@ -1265,6 +1280,33 @@ bool Renderer::beginFrame(game::Window& window, const DebugOverlayState& overlay
         return false; // skip this frame
     }
 
+    // ── Advance day/night cycle ─────────────────────────────────────────────
+    double currentTime = glfwGetTime();
+    if (m_lastFrameTime > 0.0)
+    {
+        float deltaTime = static_cast<float>(currentTime - m_lastFrameTime);
+        m_timeOfDay += deltaTime / m_cycleDuration;
+        m_timeOfDay -= static_cast<float>(static_cast<int>(m_timeOfDay)); // wrap at 1.0
+
+        // Compute day/night factor: 1.0 at noon, 0.1 at midnight
+        constexpr float TWO_PI = 6.2831853f;
+        constexpr float HALF_PI = 1.5707963f;
+        m_dayNightFactor = 0.55f + 0.45f * std::sin(TWO_PI * m_timeOfDay - HALF_PI);
+
+        // Compute sun direction: east→zenith→west semicircle
+        float sunAngle = (m_timeOfDay - 0.25f) * glm::pi<float>();
+        m_sunDirection.x = -std::cos(sunAngle);
+        m_sunDirection.y = std::sin(sunAngle);
+        m_sunDirection.z = 0.3f;
+        m_sunDirection = glm::normalize(m_sunDirection);
+        if (m_sunDirection.y < 0.0f)
+        {
+            m_sunDirection.y = 0.0f;
+            m_sunDirection = glm::normalize(m_sunDirection);
+        }
+    }
+    m_lastFrameTime = currentTime;
+
     m_stagingBuffer->beginFrame(m_frameIndex);
 
     m_currentImageIndex = 0;
@@ -1305,6 +1347,7 @@ bool Renderer::beginFrame(game::Window& window, const DebugOverlayState& overlay
     // Transition G-Buffer images for geometry pass (swapchain transition deferred to endFrame)
     transitionImage(cmd, m_gbuffer->getAlbedoImage(), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     transitionImage(cmd, m_gbuffer->getNormalImage(), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    transitionImage(cmd, m_gbuffer->getLightImage(), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     transitionImage(
         cmd,
         m_swapchainResources.depthImage,
@@ -1337,8 +1380,8 @@ void Renderer::beginRenderPass()
     VkCommandBuffer cmd = frame.commandBuffer;
     VkExtent2D extent = m_vulkanContext.getSwapchainExtent();
 
-    // G-Buffer geometry pass: 2 color attachments (RT0 albedo+AO, RT1 normal) + depth
-    std::array<VkRenderingAttachmentInfo, 2> colorAttachments{};
+    // G-Buffer geometry pass: 3 color attachments (RT0 albedo+AO, RT1 normal, RT2 light) + depth
+    std::array<VkRenderingAttachmentInfo, 3> colorAttachments{};
 
     // RT0: albedo.rgb + AO.a
     colorAttachments[0].sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
@@ -1355,6 +1398,14 @@ void Renderer::beginRenderPass()
     colorAttachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     colorAttachments[1].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     colorAttachments[1].clearValue.color = {{0.0f, 0.0f, 0.0f, 0.0f}};
+
+    // RT2: skyLight.r + blockLight.g
+    colorAttachments[2].sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+    colorAttachments[2].imageView = m_gbuffer->getLightView();
+    colorAttachments[2].imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    colorAttachments[2].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    colorAttachments[2].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    colorAttachments[2].clearValue.color = {{0.0f, 0.0f, 0.0f, 0.0f}};
 
     VkRenderingAttachmentInfo depthAttachment{};
     depthAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
@@ -1506,8 +1557,9 @@ void Renderer::renderChunksIndirect(
     ChunkPushConstants pc{};
     pc.viewProjection = viewProjection;
     pc.time = currentTime;
-    pc.ambientStrength = 0.3f;
-    pc.sunDirection = glm::vec4(glm::normalize(glm::vec3(0.3f, 1.0f, 0.5f)), 0.0f);
+    pc.ambientStrength = m_ambientFloor;
+    pc.dayNightFactor = m_dayNightFactor;
+    pc.sunDirection = glm::vec4(m_sunDirection, 0.0f);
 
     vkCmdPushConstants(
         cmd,
@@ -1570,6 +1622,7 @@ void Renderer::endFrame()
     // ── Transition G-Buffer images for lighting read ────────────────────────
     transitionImage(cmd, m_gbuffer->getAlbedoImage(), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     transitionImage(cmd, m_gbuffer->getNormalImage(), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    transitionImage(cmd, m_gbuffer->getLightImage(), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     transitionImage(
         cmd,
         m_swapchainResources.depthImage,
@@ -1620,8 +1673,10 @@ void Renderer::endFrame()
         cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_lightingPipelineLayout, 0, 1, &m_lightingDescriptorSet, 0, nullptr);
 
     LightingPushConstants lightingPC{};
-    lightingPC.sunDirection = glm::normalize(glm::vec3(0.3f, 1.0f, 0.5f));
-    lightingPC.ambientStrength = 0.3f;
+    lightingPC.sunDirection = m_sunDirection;
+    lightingPC.ambientStrength = m_ambientFloor;
+    lightingPC.dayNightFactor = m_dayNightFactor;
+    lightingPC.timeOfDay = m_timeOfDay;
 
     vkCmdPushConstants(
         cmd, m_lightingPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(LightingPushConstants), &lightingPC);
@@ -1696,8 +1751,9 @@ void Renderer::endFrame()
     ChunkPushConstants transPC{};
     transPC.viewProjection = m_lastViewProjection;
     transPC.time = static_cast<float>(glfwGetTime());
-    transPC.ambientStrength = 0.3f;
-    transPC.sunDirection = glm::vec4(glm::normalize(glm::vec3(0.3f, 1.0f, 0.5f)), 0.0f);
+    transPC.ambientStrength = m_ambientFloor;
+    transPC.dayNightFactor = m_dayNightFactor;
+    transPC.sunDirection = glm::vec4(m_sunDirection, 0.0f);
     vkCmdPushConstants(
         cmd, m_pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
         0, sizeof(ChunkPushConstants), &transPC);

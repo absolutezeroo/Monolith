@@ -47,6 +47,9 @@ inline constexpr VkFormat GBUFFER_RT0_FORMAT = VK_FORMAT_R8G8B8A8_SRGB;
 /// G-Buffer RT1 format: octahedral-encoded normal.xy (half-float precision).
 inline constexpr VkFormat GBUFFER_RT1_FORMAT = VK_FORMAT_R16G16_SFLOAT;
 
+/// G-Buffer RT2 format: skyLight.r + blockLight.g (8-bit per channel, sufficient for 16 light levels).
+inline constexpr VkFormat GBUFFER_RT2_FORMAT = VK_FORMAT_R8G8_UNORM;
+
 /// G-Buffer / shared depth format.
 inline constexpr VkFormat GBUFFER_DEPTH_FORMAT = VK_FORMAT_D32_SFLOAT;
 

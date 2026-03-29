@@ -43,7 +43,8 @@ struct ChunkPushConstants
     glm::mat4 viewProjection; // 64 bytes, offset 0
     float time;               // 4 bytes,  offset 64
     float ambientStrength;    // 4 bytes,  offset 68
-    float pad[2];             // 8 bytes,  offset 72
+    float dayNightFactor;     // 4 bytes,  offset 72
+    float pad;                // 4 bytes,  offset 76
     glm::vec4 sunDirection;   // 16 bytes, offset 80 (w unused)
 };
 static_assert(sizeof(ChunkPushConstants) == 96);
@@ -53,8 +54,10 @@ struct LightingPushConstants
 {
     glm::vec3 sunDirection;   // 12 bytes
     float ambientStrength;    // 4 bytes
+    float dayNightFactor;     // 4 bytes
+    float timeOfDay;          // 4 bytes
 };
-static_assert(sizeof(LightingPushConstants) == 16);
+static_assert(sizeof(LightingPushConstants) == 24);
 
 /// Push constants for the compute culling shader (cull.comp).
 struct CullPushConstants
@@ -175,6 +178,21 @@ class Renderer
     /// Upload a TintPalette to the GPU. Converts vec3 → vec4 (w=1) for std430 alignment.
     void updateTintPalette(const TintPalette& palette);
 
+    /// Sets the time of day (0.0 = midnight, 0.5 = noon, 1.0 = next midnight).
+    void setTimeOfDay(float t) { m_timeOfDay = t - static_cast<float>(static_cast<int>(t)); }
+
+    /// Returns the current time of day [0.0, 1.0).
+    [[nodiscard]] float getTimeOfDay() const { return m_timeOfDay; }
+
+    /// Sets the full day cycle duration in seconds (default 1200 = 20 minutes).
+    void setCycleDuration(float seconds) { m_cycleDuration = seconds; }
+
+    /// Returns the current cycle duration in seconds.
+    [[nodiscard]] float getCycleDuration() const { return m_cycleDuration; }
+
+    /// Returns the current day/night factor [0.1, 1.0].
+    [[nodiscard]] float getDayNightFactor() const { return m_dayNightFactor; }
+
   private:
     /// Extent-dependent resources that must be recreated on swapchain resize.
     struct SwapchainResources
@@ -281,6 +299,14 @@ class Renderer
 
     // Cached VP matrix from renderChunksIndirect() for translucent pass
     glm::mat4 m_lastViewProjection{1.0f};
+
+    // Day/night cycle state
+    float m_timeOfDay = 0.5f;          // [0.0, 1.0] — 0.0 = midnight, 0.5 = noon
+    float m_cycleDuration = 1200.0f;   // seconds for a full day (default 20 minutes)
+    float m_dayNightFactor = 1.0f;     // computed each frame from m_timeOfDay
+    float m_ambientFloor = 0.02f;      // minimum ambient so caves aren't pitch-black
+    glm::vec3 m_sunDirection{0.0f, 1.0f, 0.3f}; // computed each frame
+    double m_lastFrameTime = 0.0;      // for delta time calculation
 
     // Per-frame state (set by beginFrame, used by endFrame)
     game::Window* m_currentWindow = nullptr;

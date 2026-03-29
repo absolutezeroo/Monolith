@@ -61,6 +61,24 @@ core::Result<std::unique_ptr<GBuffer>> GBuffer::create(VulkanContext& context, V
             core::EngineError::vulkan(static_cast<int32_t>(result), "Failed to create G-Buffer RT1 image"));
     }
 
+    // ── RT2: skyLight.r + blockLight.g ─────────────────────────────────────
+    VkImageCreateInfo lightImageInfo = albedoImageInfo;
+    lightImageInfo.format = GBUFFER_RT2_FORMAT;
+
+    result = vmaCreateImage(
+        gbuffer->m_allocator,
+        &lightImageInfo,
+        &allocInfo,
+        &gbuffer->m_lightImage,
+        &gbuffer->m_lightAllocation,
+        nullptr);
+    if (result != VK_SUCCESS)
+    {
+        VX_LOG_ERROR("Failed to create G-Buffer RT2 image: {}", static_cast<int>(result));
+        return std::unexpected(
+            core::EngineError::vulkan(static_cast<int32_t>(result), "Failed to create G-Buffer RT2 image"));
+    }
+
     // ── Image views ─────────────────────────────────────────────────────────
     VkImageViewCreateInfo viewInfo{};
     viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -91,6 +109,16 @@ core::Result<std::unique_ptr<GBuffer>> GBuffer::create(VulkanContext& context, V
             core::EngineError::vulkan(static_cast<int32_t>(result), "Failed to create G-Buffer RT1 image view"));
     }
 
+    viewInfo.image = gbuffer->m_lightImage;
+    viewInfo.format = GBUFFER_RT2_FORMAT;
+    result = vkCreateImageView(gbuffer->m_device, &viewInfo, nullptr, &gbuffer->m_lightView);
+    if (result != VK_SUCCESS)
+    {
+        VX_LOG_ERROR("Failed to create G-Buffer RT2 image view: {}", static_cast<int>(result));
+        return std::unexpected(
+            core::EngineError::vulkan(static_cast<int32_t>(result), "Failed to create G-Buffer RT2 image view"));
+    }
+
     // ── Shared sampler (nearest, clamp-to-edge) ─────────────────────────────
     VkSamplerCreateInfo samplerInfo{};
     samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -108,7 +136,13 @@ core::Result<std::unique_ptr<GBuffer>> GBuffer::create(VulkanContext& context, V
             core::EngineError::vulkan(static_cast<int32_t>(result), "Failed to create G-Buffer sampler"));
     }
 
-    VX_LOG_INFO("G-Buffer created {}x{} (RT0={}, RT1={})", extent.width, extent.height, "R8G8B8A8_SRGB", "R16G16_SFLOAT");
+    VX_LOG_INFO(
+        "G-Buffer created {}x{} (RT0={}, RT1={}, RT2={})",
+        extent.width,
+        extent.height,
+        "R8G8B8A8_SRGB",
+        "R16G16_SFLOAT",
+        "R8G8_UNORM");
     return gbuffer;
 }
 
@@ -117,6 +151,14 @@ GBuffer::~GBuffer()
     if (m_sampler != VK_NULL_HANDLE)
     {
         vkDestroySampler(m_device, m_sampler, nullptr);
+    }
+    if (m_lightView != VK_NULL_HANDLE)
+    {
+        vkDestroyImageView(m_device, m_lightView, nullptr);
+    }
+    if (m_lightImage != VK_NULL_HANDLE)
+    {
+        vmaDestroyImage(m_allocator, m_lightImage, m_lightAllocation);
     }
     if (m_normalView != VK_NULL_HANDLE)
     {

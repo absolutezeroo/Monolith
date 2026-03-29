@@ -14,7 +14,7 @@ namespace voxel::renderer
 class VulkanContext;
 
 /**
- * @brief G-Buffer for deferred rendering: two color render targets (albedo+AO, normal).
+ * @brief G-Buffer for deferred rendering: three color render targets (albedo+AO, normal, light).
  *
  * Does NOT own the depth buffer — that is shared with SwapchainResources in Renderer.
  * Follows RAII factory pattern: private ctor, static create(), deleted copy/move.
@@ -42,6 +42,8 @@ class GBuffer
     [[nodiscard]] VkImageView getAlbedoView() const { return m_albedoView; }
     [[nodiscard]] VkImage getNormalImage() const { return m_normalImage; }
     [[nodiscard]] VkImageView getNormalView() const { return m_normalView; }
+    [[nodiscard]] VkImage getLightImage() const { return m_lightImage; }
+    [[nodiscard]] VkImageView getLightView() const { return m_lightView; }
     [[nodiscard]] VkSampler getSampler() const { return m_sampler; }
     [[nodiscard]] VkExtent2D getExtent() const { return m_extent; }
 
@@ -55,6 +57,10 @@ class GBuffer
     VkImage m_normalImage = VK_NULL_HANDLE;
     VmaAllocation m_normalAllocation = VK_NULL_HANDLE;
     VkImageView m_normalView = VK_NULL_HANDLE;
+
+    VkImage m_lightImage = VK_NULL_HANDLE;
+    VmaAllocation m_lightAllocation = VK_NULL_HANDLE;
+    VkImageView m_lightView = VK_NULL_HANDLE;
 
     VkSampler m_sampler = VK_NULL_HANDLE;
 

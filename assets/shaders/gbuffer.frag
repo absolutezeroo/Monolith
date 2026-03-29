@@ -7,8 +7,8 @@ layout(location = 2) in vec2 fragUV;
 layout(location = 3) in float fragAO;
 layout(location = 4) flat in uint fragTextureLayer;
 layout(location = 5) flat in uint fragTintIndex;
-layout(location = 6) in float fragSkyLight;   // Wired but unused until 8.2
-layout(location = 7) in float fragBlockLight;  // Wired but unused until 8.2
+layout(location = 6) in float fragSkyLight;
+layout(location = 7) in float fragBlockLight;
 
 // ── Block texture array (binding 4) ────────────────────────────────────────
 layout(set = 0, binding = 4) uniform sampler2DArray blockTextures;
@@ -21,6 +21,7 @@ layout(std430, set = 0, binding = 5) readonly buffer TintPaletteSSBO {
 // ── G-Buffer outputs (MRT) ─────────────────────────────────────────────────
 layout(location = 0) out vec4 outAlbedoAO;   // RT0: albedo.rgb + AO.a
 layout(location = 1) out vec2 outNormalOct;   // RT1: octahedral encoded normal.xy
+layout(location = 2) out vec2 outLight;       // RT2: skyLight.r + blockLight.g
 
 // ── Octahedral normal encoding ─────────────────────────────────────────────
 // Maps a unit-length 3D normal to a 2D coordinate in [0,1].
@@ -54,4 +55,7 @@ void main()
 
     // RT1: octahedral-encoded normal
     outNormalOct = octahedralEncode(normalize(fragNormal));
+
+    // RT2: per-vertex light values for deferred lighting pass
+    outLight = vec2(fragSkyLight, fragBlockLight);
 }

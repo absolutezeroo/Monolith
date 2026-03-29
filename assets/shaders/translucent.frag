@@ -7,8 +7,8 @@ layout(location = 2) in vec2 fragUV;
 layout(location = 3) in float fragAO;
 layout(location = 4) flat in uint fragTextureLayer;
 layout(location = 5) flat in uint fragTintIndex;
-layout(location = 6) in float fragSkyLight;   // Wired but unused until 8.2
-layout(location = 7) in float fragBlockLight;  // Wired but unused until 8.2
+layout(location = 6) in float fragSkyLight;
+layout(location = 7) in float fragBlockLight;
 
 // ── Block texture array (binding 4) ────────────────────────────────────────
 layout(set = 0, binding = 4) uniform sampler2DArray blockTextures;
@@ -23,7 +23,7 @@ layout(push_constant) uniform PushConstants {
     mat4 viewProjection;    // 64 bytes (offset 0)
     float time;             // 4 bytes  (offset 64)
     float ambientStrength;  // 4 bytes  (offset 68)
-    float _pad0;            // 4 bytes  (offset 72)
+    float dayNightFactor;   // 4 bytes  (offset 72)
     float _pad1;            // 4 bytes  (offset 76)
     vec4 sunDirection;      // 16 bytes (offset 80, w unused)
 } pc;
@@ -44,13 +44,29 @@ void main()
     vec3 tint = tintPalette.colors[fragTintIndex].rgb;
     vec3 tintedColor = texColor.rgb * tint;
 
-    // Directional + ambient lighting (matches deferred lighting pass via shared push constants)
+    // Voxel-based lighting (matches deferred lighting pass formula)
+    // Sky contribution: modulated by day/night cycle
+    vec3 skyContribution = fragSkyLight * pc.dayNightFactor * vec3(0.95, 0.95, 1.0);
+
+    // Block contribution: warm orange, always full strength
+    vec3 blockContribution = fragBlockLight * vec3(1.0, 0.85, 0.7);
+
+    // Take max (not add) — matches Minecraft behavior
+    vec3 lightLevel = max(skyContribution, blockContribution);
+
+    // Minimum ambient so caves aren't pitch black
+    lightLevel = max(lightLevel, vec3(pc.ambientStrength));
+
+    // Directional sun as subtle bonus
     vec3 normal = normalize(fragNormal);
     float NdotL = max(dot(normal, pc.sunDirection.xyz), 0.0);
-    float lighting = pc.ambientStrength + (1.0 - pc.ambientStrength) * NdotL;
+    vec3 sunBonus = tintedColor * NdotL * 0.15 * pc.dayNightFactor;
 
     // Apply AO
-    lighting *= fragAO;
+    float ao = mix(0.4, 1.0, fragAO);
 
-    outColor = vec4(tintedColor * lighting, texColor.a);
+    // Combine
+    vec3 color = (tintedColor * lightLevel + sunBonus) * ao;
+
+    outColor = vec4(color, texColor.a);
 }

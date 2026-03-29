@@ -5,7 +5,7 @@
 project: VoxelForge
 methodology: BMAD v6 + Game Dev Studio
 created: 2026-03-24
-last_updated: 2026-03-30  # Story 8.3 → done
+last_updated: 2026-03-30  # Story 9.1 → ready-for-dev
 
 # Status values: backlog | ready | in-progress | review | done | blocked
 
@@ -289,19 +289,19 @@ epics:
         assigned_to: dev-agent
       - id: "8.4"
         title: "Deferred Lighting Pass + Day/Night Cycle"
-        status: ready-for-dev
+        status: review
         assigned_to: dev-agent
 
   - id: 9
     name: "Lua Scripting (Complete Block Callback System)"
     priority: P1
-    status: backlog
+    status: in-progress
     dependencies: [ 3, 7 ]
     stories:
       - id: "9.1"
         title: "sol2 + LuaJIT Integration"
-        status: backlog
-        assigned_to: null
+        status: ready-for-dev
+        assigned_to: dev-agent
       - id: "9.2"
         title: "Block Registration + Placement & Destruction Callbacks"
         status: backlog

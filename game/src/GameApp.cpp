@@ -661,6 +661,38 @@ void GameApp::buildDebugOverlay()
 
         ImGui::Separator();
 
+        // Day/night cycle display
+        {
+            float tod = m_renderer.getTimeOfDay();
+            int hours = static_cast<int>(tod * 24.0f) % 24;
+            int minutes = static_cast<int>(tod * 24.0f * 60.0f) % 60;
+            const char* phase = "Night";
+            if (tod >= 0.20f && tod < 0.30f)
+                phase = "Dawn";
+            else if (tod >= 0.30f && tod < 0.70f)
+                phase = "Day";
+            else if (tod >= 0.70f && tod < 0.80f)
+                phase = "Dusk";
+            ImGui::Text("Time: %02d:%02d (%s)", hours, minutes, phase);
+            ImGui::Text("DayNight: %.2f", m_renderer.getDayNightFactor());
+        }
+
+        // Time-of-day override slider
+        {
+            float tod = m_renderer.getTimeOfDay();
+            if (ImGui::SliderFloat("Time of Day", &tod, 0.0f, 1.0f, "%.3f"))
+            {
+                m_renderer.setTimeOfDay(tod);
+            }
+            float cycleMins = m_renderer.getCycleDuration() / 60.0f;
+            if (ImGui::SliderFloat("Cycle (min)", &cycleMins, 1.0f, 60.0f, "%.0f"))
+            {
+                m_renderer.setCycleDuration(cycleMins * 60.0f);
+            }
+        }
+
+        ImGui::Separator();
+
         ImGui::SliderFloat("FOV", &m_overlayState.fov, 50.0f, 110.0f, "%.0f");
         ImGui::SliderFloat("Sensitivity", &m_overlayState.sensitivity, 0.01f, 0.5f, "%.3f");
     }
