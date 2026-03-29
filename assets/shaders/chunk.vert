@@ -15,7 +15,9 @@ struct ChunkRenderInfo {
     uint quadCount;            // opaque
     uint transGigabufferOffset;// translucent
     uint transQuadCount;       // translucent
-    uint _pad0, _pad1, _pad2, _pad3; // pad to 64 bytes
+    uint modelGigabufferOffset;       // model vertex byte offset
+    uint modelVertexCount;            // model vertex count
+    uint _pad0, _pad1;                // pad to 64 bytes
 };
 layout(std430, set = 0, binding = 1) readonly buffer ChunkInfoSSBO {
     ChunkRenderInfo infos[];

@@ -36,7 +36,7 @@ void ModelMesher::emitBox(
     const glm::vec3& offset,
     const glm::vec3& minCorner,
     const glm::vec3& maxCorner,
-    uint16_t blockStateId,
+    const uint16_t textureIndices[6],
     uint8_t ao,
     uint8_t flags,
     uint8_t faceMask,
@@ -54,7 +54,7 @@ void ModelMesher::emitBox(
     {
         emitQuad(
             {x1, y0, z0}, {x1, y0, z1}, {x1, y1, z1}, {x1, y1, z0},
-            {1.0f, 0.0f, 0.0f}, blockStateId, ao, flags, outVertices);
+            {1.0f, 0.0f, 0.0f}, textureIndices[0], ao, flags, outVertices);
     }
 
     // -X face (bit 1)
@@ -62,7 +62,7 @@ void ModelMesher::emitBox(
     {
         emitQuad(
             {x0, y0, z1}, {x0, y0, z0}, {x0, y1, z0}, {x0, y1, z1},
-            {-1.0f, 0.0f, 0.0f}, blockStateId, ao, flags, outVertices);
+            {-1.0f, 0.0f, 0.0f}, textureIndices[1], ao, flags, outVertices);
     }
 
     // +Y face (bit 2)
@@ -70,7 +70,7 @@ void ModelMesher::emitBox(
     {
         emitQuad(
             {x0, y1, z0}, {x1, y1, z0}, {x1, y1, z1}, {x0, y1, z1},
-            {0.0f, 1.0f, 0.0f}, blockStateId, ao, flags, outVertices);
+            {0.0f, 1.0f, 0.0f}, textureIndices[2], ao, flags, outVertices);
     }
 
     // -Y face (bit 3)
@@ -78,7 +78,7 @@ void ModelMesher::emitBox(
     {
         emitQuad(
             {x0, y0, z1}, {x1, y0, z1}, {x1, y0, z0}, {x0, y0, z0},
-            {0.0f, -1.0f, 0.0f}, blockStateId, ao, flags, outVertices);
+            {0.0f, -1.0f, 0.0f}, textureIndices[3], ao, flags, outVertices);
     }
 
     // +Z face (bit 4)
@@ -86,7 +86,7 @@ void ModelMesher::emitBox(
     {
         emitQuad(
             {x1, y0, z1}, {x0, y0, z1}, {x0, y1, z1}, {x1, y1, z1},
-            {0.0f, 0.0f, 1.0f}, blockStateId, ao, flags, outVertices);
+            {0.0f, 0.0f, 1.0f}, textureIndices[4], ao, flags, outVertices);
     }
 
     // -Z face (bit 5)
@@ -94,7 +94,7 @@ void ModelMesher::emitBox(
     {
         emitQuad(
             {x0, y0, z0}, {x1, y0, z0}, {x1, y1, z0}, {x0, y1, z0},
-            {0.0f, 0.0f, -1.0f}, blockStateId, ao, flags, outVertices);
+            {0.0f, 0.0f, -1.0f}, textureIndices[5], ao, flags, outVertices);
     }
 }
 
@@ -104,7 +104,6 @@ void ModelMesher::generateSlab(
     int z,
     const world::BlockDefinition& blockDef,
     const world::StateMap& state,
-    uint16_t stateId,
     uint8_t ao,
     uint8_t faceMask,
     std::vector<ModelVertex>& outVertices)
@@ -118,7 +117,7 @@ void ModelMesher::generateSlab(
 
     uint8_t flags = static_cast<uint8_t>((blockDef.tintIndex & 0x1) | ((blockDef.waving & 0x3) << 1));
 
-    emitBox(offset, minCorner, maxCorner, stateId, ao, flags, faceMask, outVertices);
+    emitBox(offset, minCorner, maxCorner, blockDef.textureIndices, ao, flags, faceMask, outVertices);
 }
 
 void ModelMesher::generateCross(
@@ -126,7 +125,6 @@ void ModelMesher::generateCross(
     int y,
     int z,
     const world::BlockDefinition& blockDef,
-    uint16_t stateId,
     std::vector<ModelVertex>& outVertices)
 {
     float fx = static_cast<float>(x);
@@ -139,13 +137,16 @@ void ModelMesher::generateCross(
     glm::vec3 normalA = glm::normalize(glm::vec3(-1.0f, 0.0f, 1.0f));
     glm::vec3 normalB = glm::normalize(glm::vec3(1.0f, 0.0f, 1.0f));
 
+    // Cross blocks use a single texture for all quads (PosX face index)
+    uint16_t texLayer = blockDef.textureIndices[0];
+
     // Quad A: diagonal from (-X,-Z) to (+X,+Z) — front
     emitQuad(
         {fx + 0.0f, fy + 0.0f, fz + 0.0f},
         {fx + 1.0f, fy + 0.0f, fz + 1.0f},
         {fx + 1.0f, fy + 1.0f, fz + 1.0f},
         {fx + 0.0f, fy + 1.0f, fz + 0.0f},
-        normalA, stateId, 3, flags, outVertices);
+        normalA, texLayer, 3, flags, outVertices);
 
     // Quad A: back face (reverse winding)
     emitQuad(
@@ -153,7 +154,7 @@ void ModelMesher::generateCross(
         {fx + 0.0f, fy + 0.0f, fz + 0.0f},
         {fx + 0.0f, fy + 1.0f, fz + 0.0f},
         {fx + 1.0f, fy + 1.0f, fz + 1.0f},
-        -normalA, stateId, 3, flags, outVertices);
+        -normalA, texLayer, 3, flags, outVertices);
 
     // Quad B: diagonal from (+X,-Z) to (-X,+Z) — front
     emitQuad(
@@ -161,7 +162,7 @@ void ModelMesher::generateCross(
         {fx + 0.0f, fy + 0.0f, fz + 1.0f},
         {fx + 0.0f, fy + 1.0f, fz + 1.0f},
         {fx + 1.0f, fy + 1.0f, fz + 0.0f},
-        normalB, stateId, 3, flags, outVertices);
+        normalB, texLayer, 3, flags, outVertices);
 
     // Quad B: back face (reverse winding)
     emitQuad(
@@ -169,7 +170,7 @@ void ModelMesher::generateCross(
         {fx + 1.0f, fy + 0.0f, fz + 0.0f},
         {fx + 1.0f, fy + 1.0f, fz + 0.0f},
         {fx + 0.0f, fy + 1.0f, fz + 1.0f},
-        -normalB, stateId, 3, flags, outVertices);
+        -normalB, texLayer, 3, flags, outVertices);
 }
 
 void ModelMesher::generateTorch(
@@ -178,7 +179,6 @@ void ModelMesher::generateTorch(
     int z,
     const world::BlockDefinition& blockDef,
     const world::StateMap& state,
-    uint16_t stateId,
     uint8_t faceMask,
     std::vector<ModelVertex>& outVertices)
 {
@@ -219,7 +219,7 @@ void ModelMesher::generateTorch(
     glm::vec3 minCorner(TORCH_MIN_XZ, 0.0f, TORCH_MIN_XZ);
     glm::vec3 maxCorner(TORCH_MAX_XZ, TORCH_HEIGHT, TORCH_MAX_XZ);
 
-    emitBox(offset, minCorner, maxCorner, stateId, 3, flags, faceMask, outVertices);
+    emitBox(offset, minCorner, maxCorner, blockDef.textureIndices, 3, flags, faceMask, outVertices);
 }
 
 } // namespace voxel::renderer

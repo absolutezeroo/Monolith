@@ -30,6 +30,8 @@ struct ChunkRenderInfo
     uint32_t quadCount = 0;                 // Number of opaque quads (for draw command)
     GigabufferAllocation transAllocation{};  // Gigabuffer sub-allocation (translucent)
     uint32_t transQuadCount = 0;             // Number of translucent quads
+    GigabufferAllocation modelAllocation{};  // Gigabuffer sub-allocation (model vertices)
+    uint32_t modelVertexCount = 0;           // Number of ModelVertex entries
     glm::ivec3 worldBasePos{0};             // Section world origin (chunkX*16, sectionY*16, chunkZ*16)
     RenderState state = RenderState::None;
 };
@@ -44,7 +46,9 @@ struct GpuChunkRenderInfo
     uint32_t quadCount;             // number of opaque quads                  (4 bytes,  offset 36)
     uint32_t transGigabufferOffset; // byte offset into gigabuffer (translucent) (4 bytes, offset 40)
     uint32_t transQuadCount;        // number of translucent quads             (4 bytes,  offset 44)
-    uint32_t pad[4];                // explicit padding to 64 bytes            (16 bytes, offset 48)
+    uint32_t modelGigabufferOffset; // byte offset into gigabuffer (model vertices) (4 bytes, offset 48)
+    uint32_t modelVertexCount;      // number of ModelVertex entries            (4 bytes,  offset 52)
+    uint32_t pad[2];                // explicit padding to 64 bytes            (8 bytes,  offset 56)
 };
 static_assert(sizeof(GpuChunkRenderInfo) == 64, "GpuChunkRenderInfo must be 64 bytes for std430 layout");
 static_assert(offsetof(GpuChunkRenderInfo, quadCount) == 36, "quadCount must be at offset 36");
@@ -62,7 +66,9 @@ inline GpuChunkRenderInfo buildGpuInfo(const ChunkRenderInfo& info)
         .quadCount = info.quadCount,
         .transGigabufferOffset = static_cast<uint32_t>(info.transAllocation.offset),
         .transQuadCount = info.transQuadCount,
-        .pad = {0, 0, 0, 0},
+        .modelGigabufferOffset = static_cast<uint32_t>(info.modelAllocation.offset),
+        .modelVertexCount = info.modelVertexCount,
+        .pad = {0, 0},
     };
 }
 

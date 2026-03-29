@@ -30,6 +30,7 @@ class DescriptorAllocator;
 class GBuffer;
 class ImGuiBackend;
 class IndirectDrawBuffer;
+class ModelIndirectDrawBuffer;
 class QuadIndexBuffer;
 class StagingBuffer;
 class TextureArray;
@@ -196,6 +197,9 @@ class Renderer
         std::vector<VkFormat> colorAttachmentFormats;
         VkFormat depthAttachmentFormat = VK_FORMAT_D32_SFLOAT;
         VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
+        bool depthBiasEnable = false;
+        float depthBiasConstantFactor = 0.0f;
+        float depthBiasSlopeFactor = 0.0f;
     };
 
     core::Result<void> createFrameResources();
@@ -233,6 +237,11 @@ class Renderer
     VkPipeline m_translucentPipeline = VK_NULL_HANDLE;
     VkPipeline m_cullTranslucentPipeline = VK_NULL_HANDLE;
     std::unique_ptr<IndirectDrawBuffer> m_transIndirectDrawBuffer;
+
+    VkPipeline m_modelPipeline = VK_NULL_HANDLE;
+    VkPipeline m_cullModelPipeline = VK_NULL_HANDLE;
+    std::unique_ptr<ModelIndirectDrawBuffer> m_modelIndirectDrawBuffer;
+    VkDescriptorSet m_modelDescriptorSet = VK_NULL_HANDLE;
 
     VkDescriptorSetLayout m_lightingDescriptorSetLayout = VK_NULL_HANDLE;
     VkDescriptorSet m_lightingDescriptorSet = VK_NULL_HANDLE;

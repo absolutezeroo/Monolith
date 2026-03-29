@@ -9,6 +9,7 @@
 #include "voxel/renderer/GBuffer.h"
 #include "voxel/renderer/ImGuiBackend.h"
 #include "voxel/renderer/IndirectDrawBuffer.h"
+#include "voxel/renderer/ModelIndirectDrawBuffer.h"
 #include "voxel/renderer/QuadIndexBuffer.h"
 #include "voxel/renderer/StagingBuffer.h"
 #include "voxel/renderer/TextureArray.h"
@@ -315,6 +316,73 @@ core::Result<void> Renderer::init(const std::string& shaderDir, const std::strin
     }
     m_transIndirectDrawBuffer = std::move(transIndirectResult.value());
 
+    // Create model graphics pipeline: model.vert + gbuffer.frag, no backface culling (crosses are double-sided)
+    {
+        std::string modelVertPath = shaderDir + "/model.vert.spv";
+        PipelineConfig modelConfig;
+        modelConfig.polygonMode = VK_POLYGON_MODE_FILL;
+        modelConfig.depthTestEnable = true;
+        modelConfig.depthWriteEnable = true;
+        modelConfig.cullMode = VK_CULL_MODE_NONE; // crosses need double-sided rendering
+        modelConfig.depthBiasEnable = true;
+        modelConfig.depthBiasConstantFactor = -2.0f; // push model geometry slightly closer to prevent Z-fighting
+        modelConfig.depthBiasSlopeFactor = -1.0f;
+        modelConfig.vertShaderPath = modelVertPath;
+        modelConfig.fragShaderPath = gbufferFragPath;
+        modelConfig.colorAttachmentFormats = {GBUFFER_RT0_FORMAT, GBUFFER_RT1_FORMAT};
+        modelConfig.depthAttachmentFormat = GBUFFER_DEPTH_FORMAT;
+
+        auto modelPipelineResult = buildPipeline(modelConfig);
+        if (!modelPipelineResult.has_value())
+        {
+            return std::unexpected(modelPipelineResult.error());
+        }
+        m_modelPipeline = modelPipelineResult.value();
+        VX_LOG_INFO("Model graphics pipeline created");
+    }
+
+    // Create model cull compute pipeline
+    {
+        std::string cullModelPath = shaderDir + "/cull_model.comp.spv";
+        auto cullModelShaderResult = loadShaderModule(cullModelPath);
+        if (!cullModelShaderResult.has_value())
+        {
+            return std::unexpected(cullModelShaderResult.error());
+        }
+        VkShaderModule cullModelShader = cullModelShaderResult.value();
+
+        VkPipelineShaderStageCreateInfo computeModelStageInfo{};
+        computeModelStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        computeModelStageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+        computeModelStageInfo.module = cullModelShader;
+        computeModelStageInfo.pName = "main";
+
+        VkComputePipelineCreateInfo computeModelPipelineInfo{};
+        computeModelPipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+        computeModelPipelineInfo.stage = computeModelStageInfo;
+        computeModelPipelineInfo.layout = m_computePipelineLayout;
+
+        VkResult cullModelPipelineResult =
+            vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computeModelPipelineInfo, nullptr, &m_cullModelPipeline);
+        vkDestroyShaderModule(device, cullModelShader, nullptr);
+
+        if (cullModelPipelineResult != VK_SUCCESS)
+        {
+            VX_LOG_ERROR("Failed to create model culling pipeline: {}", static_cast<int>(cullModelPipelineResult));
+            return std::unexpected(core::EngineError::vulkan(
+                static_cast<int32_t>(cullModelPipelineResult), "Failed to create model culling pipeline"));
+        }
+        VX_LOG_INFO("Model culling pipeline created");
+    }
+
+    // Create model indirect draw buffer (VkDrawIndirectCommand, not indexed)
+    auto modelIndirectResult = ModelIndirectDrawBuffer::create(m_vulkanContext, MAX_RENDERABLE_SECTIONS);
+    if (!modelIndirectResult.has_value())
+    {
+        return std::unexpected(modelIndirectResult.error());
+    }
+    m_modelIndirectDrawBuffer = std::move(modelIndirectResult.value());
+
     // Allocate chunk descriptor set and write gigabuffer to binding 0
     auto descriptorSetResult = m_descriptorAllocator->allocate(m_chunkDescriptorSetLayout);
     if (!descriptorSetResult.has_value())
@@ -476,6 +544,77 @@ core::Result<void> Renderer::init(const std::string& shaderDir, const std::strin
     transDescWrites[5].pBufferInfo = &tintPaletteInfo;
 
     vkUpdateDescriptorSets(device, static_cast<uint32_t>(transDescWrites.size()), transDescWrites.data(), 0, nullptr);
+
+    // Allocate model descriptor set (same layout, but with model indirect buffers at binding 2/3)
+    auto modelDescResult = m_descriptorAllocator->allocate(m_chunkDescriptorSetLayout);
+    if (!modelDescResult.has_value())
+    {
+        return std::unexpected(modelDescResult.error());
+    }
+    m_modelDescriptorSet = modelDescResult.value();
+
+    // Write model descriptor set: same gigabuffer + chunkRenderInfo + texture + tint, different indirect buffers
+    VkDescriptorBufferInfo modelIndirectCommandInfo{};
+    modelIndirectCommandInfo.buffer = m_modelIndirectDrawBuffer->getCommandBuffer();
+    modelIndirectCommandInfo.offset = 0;
+    modelIndirectCommandInfo.range = VK_WHOLE_SIZE;
+
+    VkDescriptorBufferInfo modelIndirectCountInfo{};
+    modelIndirectCountInfo.buffer = m_modelIndirectDrawBuffer->getCountBuffer();
+    modelIndirectCountInfo.offset = 0;
+    modelIndirectCountInfo.range = VK_WHOLE_SIZE;
+
+    std::array<VkWriteDescriptorSet, 6> modelDescWrites{};
+
+    // Binding 0: same gigabuffer
+    modelDescWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    modelDescWrites[0].dstSet = m_modelDescriptorSet;
+    modelDescWrites[0].dstBinding = 0;
+    modelDescWrites[0].descriptorCount = 1;
+    modelDescWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    modelDescWrites[0].pBufferInfo = &gigabufferInfo;
+
+    // Binding 1: same ChunkRenderInfo
+    modelDescWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    modelDescWrites[1].dstSet = m_modelDescriptorSet;
+    modelDescWrites[1].dstBinding = 1;
+    modelDescWrites[1].descriptorCount = 1;
+    modelDescWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    modelDescWrites[1].pBufferInfo = &chunkRenderInfoInfo;
+
+    // Binding 2: model indirect command buffer
+    modelDescWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    modelDescWrites[2].dstSet = m_modelDescriptorSet;
+    modelDescWrites[2].dstBinding = 2;
+    modelDescWrites[2].descriptorCount = 1;
+    modelDescWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    modelDescWrites[2].pBufferInfo = &modelIndirectCommandInfo;
+
+    // Binding 3: model indirect draw count buffer
+    modelDescWrites[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    modelDescWrites[3].dstSet = m_modelDescriptorSet;
+    modelDescWrites[3].dstBinding = 3;
+    modelDescWrites[3].descriptorCount = 1;
+    modelDescWrites[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    modelDescWrites[3].pBufferInfo = &modelIndirectCountInfo;
+
+    // Binding 4: same texture array
+    modelDescWrites[4].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    modelDescWrites[4].dstSet = m_modelDescriptorSet;
+    modelDescWrites[4].dstBinding = 4;
+    modelDescWrites[4].descriptorCount = 1;
+    modelDescWrites[4].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    modelDescWrites[4].pImageInfo = &textureInfo;
+
+    // Binding 5: same tint palette SSBO
+    modelDescWrites[5].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    modelDescWrites[5].dstSet = m_modelDescriptorSet;
+    modelDescWrites[5].dstBinding = 5;
+    modelDescWrites[5].descriptorCount = 1;
+    modelDescWrites[5].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    modelDescWrites[5].pBufferInfo = &tintPaletteInfo;
+
+    vkUpdateDescriptorSets(device, static_cast<uint32_t>(modelDescWrites.size()), modelDescWrites.data(), 0, nullptr);
 
     // Create depth buffer and other extent-dependent resources
     auto swapResResult = createSwapchainResources();
@@ -915,6 +1054,9 @@ core::Result<VkPipeline> Renderer::buildPipeline(const PipelineConfig& config)
     raster.cullMode = config.cullMode;
     raster.frontFace = VK_FRONT_FACE_CLOCKWISE; // Y-flip in projection reverses winding: world CCW → framebuffer CW
     raster.lineWidth = 1.0f;
+    raster.depthBiasEnable = config.depthBiasEnable ? VK_TRUE : VK_FALSE;
+    raster.depthBiasConstantFactor = config.depthBiasConstantFactor;
+    raster.depthBiasSlopeFactor = config.depthBiasSlopeFactor;
 
     VkPipelineMultisampleStateCreateInfo msaa{};
     msaa.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
@@ -1273,9 +1415,10 @@ void Renderer::renderChunksIndirect(
         return;
     }
 
-    // 1. Reset draw counts to 0 via vkCmdFillBuffer (opaque + translucent)
+    // 1. Reset draw counts to 0 via vkCmdFillBuffer (opaque + translucent + model)
     m_indirectDrawBuffer->recordCountReset(cmd);
     m_transIndirectDrawBuffer->recordCountReset(cmd);
+    m_modelIndirectDrawBuffer->recordCountReset(cmd);
 
     // 2. Barrier: TRANSFER_DST → COMPUTE_SHADER (fill completes before compute reads/writes)
     VkMemoryBarrier2 fillToComputeBarrier{};
@@ -1320,6 +1463,14 @@ void Renderer::renderChunksIndirect(
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_cullTranslucentPipeline);
     vkCmdBindDescriptorSets(
         cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_computePipelineLayout, 0, 1, &m_transDescriptorSet, 0, nullptr);
+    vkCmdPushConstants(
+        cmd, m_computePipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(CullPushConstants), &cullPC);
+    vkCmdDispatch(cmd, groupCount, 1, 1);
+
+    // 5c. Dispatch model cull shader
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_cullModelPipeline);
+    vkCmdBindDescriptorSets(
+        cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_computePipelineLayout, 0, 1, &m_modelDescriptorSet, 0, nullptr);
     vkCmdPushConstants(
         cmd, m_computePipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(CullPushConstants), &cullPC);
     vkCmdDispatch(cmd, groupCount, 1, 1);
@@ -1375,6 +1526,22 @@ void Renderer::renderChunksIndirect(
         0,                                         // offset into count buffer
         MAX_RENDERABLE_SECTIONS,                   // maxDrawCount (GPU clamps to this)
         sizeof(VkDrawIndexedIndirectCommand));     // stride
+
+    // 12. Model indirect draw: non-indexed triangle list (no index buffer needed)
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_modelPipeline);
+    vkCmdBindDescriptorSets(
+        cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout, 0, 1, &m_modelDescriptorSet, 0, nullptr);
+    vkCmdPushConstants(
+        cmd, m_pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+        0, sizeof(ChunkPushConstants), &pc);
+    vkCmdDrawIndirectCount(
+        cmd,
+        m_modelIndirectDrawBuffer->getCommandBuffer(),
+        0,
+        m_modelIndirectDrawBuffer->getCountBuffer(),
+        0,
+        MAX_RENDERABLE_SECTIONS,
+        sizeof(VkDrawIndirectCommand));
 
     // V1: display highWaterMark as approximate stats — no GPU readback
     m_lastDrawCount = totalSections; // upper bound (actual may be less due to culling)
@@ -1699,6 +1866,7 @@ void Renderer::shutdown()
     }
 
     // Destroy indirect/ChunkRenderInfo buffers before DescriptorAllocator (they are referenced by descriptors)
+    m_modelIndirectDrawBuffer.reset();
     m_transIndirectDrawBuffer.reset();
     m_indirectDrawBuffer.reset();
     m_chunkRenderInfoBuffer.reset();
@@ -1728,10 +1896,22 @@ void Renderer::shutdown()
         m_cullTranslucentPipeline = VK_NULL_HANDLE;
     }
 
+    if (m_cullModelPipeline != VK_NULL_HANDLE)
+    {
+        vkDestroyPipeline(device, m_cullModelPipeline, nullptr);
+        m_cullModelPipeline = VK_NULL_HANDLE;
+    }
+
     if (m_cullPipeline != VK_NULL_HANDLE)
     {
         vkDestroyPipeline(device, m_cullPipeline, nullptr);
         m_cullPipeline = VK_NULL_HANDLE;
+    }
+
+    if (m_modelPipeline != VK_NULL_HANDLE)
+    {
+        vkDestroyPipeline(device, m_modelPipeline, nullptr);
+        m_modelPipeline = VK_NULL_HANDLE;
     }
 
     if (m_translucentPipeline != VK_NULL_HANDLE)
@@ -1749,6 +1929,7 @@ void Renderer::shutdown()
     // Destroy descriptor infrastructure (pools first, then layout, then pipeline layout)
     m_chunkDescriptorSet = VK_NULL_HANDLE;    // owned by pool, destroyed with it
     m_transDescriptorSet = VK_NULL_HANDLE;    // owned by pool, destroyed with it
+    m_modelDescriptorSet = VK_NULL_HANDLE;    // owned by pool, destroyed with it
     m_lightingDescriptorSet = VK_NULL_HANDLE; // owned by pool, destroyed with it
     m_descriptorAllocator.reset();
 

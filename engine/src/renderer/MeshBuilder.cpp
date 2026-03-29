@@ -951,7 +951,7 @@ void MeshBuilder::buildNonCubicPass(
 
                 size_t prevCount = mesh.modelVertices.size();
                 world::StateMap state = m_registry.getStateValues(blockId);
-                m_modelRegistry.getModelVertices(x, y, z, blockDef, state, blockId, faceMask, mesh.modelVertices);
+                m_modelRegistry.getModelVertices(x, y, z, blockDef, state, faceMask, mesh.modelVertices);
 
                 // Set light on all newly added vertices
                 for (size_t v = prevCount; v < mesh.modelVertices.size(); ++v)

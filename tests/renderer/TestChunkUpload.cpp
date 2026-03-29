@@ -362,7 +362,9 @@ TEST_CASE("GpuChunkRenderInfo has correct size and layout", "[renderer][chunk-up
     CHECK(offsetof(GpuChunkRenderInfo, quadCount) == 36);
     CHECK(offsetof(GpuChunkRenderInfo, transGigabufferOffset) == 40);
     CHECK(offsetof(GpuChunkRenderInfo, transQuadCount) == 44);
-    CHECK(offsetof(GpuChunkRenderInfo, pad) == 48);
+    CHECK(offsetof(GpuChunkRenderInfo, modelGigabufferOffset) == 48);
+    CHECK(offsetof(GpuChunkRenderInfo, modelVertexCount) == 52);
+    CHECK(offsetof(GpuChunkRenderInfo, pad) == 56);
 }
 
 TEST_CASE("buildGpuInfo computes correct bounding sphere", "[renderer][chunk-upload]")

@@ -45,6 +45,10 @@ void ChunkUploadManager::processUploads(world::ChunkManager& chunkManager, const
                 {
                     queueDeferredFree(it->second.transAllocation);
                 }
+                if (it->second.modelAllocation.size > 0)
+                {
+                    queueDeferredFree(it->second.modelAllocation);
+                }
             }
 
             // Free GPU slot if this section had one (prevents slot leak on empty remesh)
@@ -64,7 +68,9 @@ void ChunkUploadManager::processUploads(world::ChunkManager& chunkManager, const
             continue;
         }
 
-        // If existing Resident allocation for this section, queue deferred free (remesh)
+        // If existing Resident allocation for this section, queue deferred free (remesh).
+        // Reset state immediately to prevent double-queueing if another mesh arrives
+        // before the pending upload completes (common on startup with staging saturation).
         auto it = m_renderInfos.find(skey);
         if (it != m_renderInfos.end() && it->second.state == RenderState::Resident)
         {
@@ -73,6 +79,14 @@ void ChunkUploadManager::processUploads(world::ChunkManager& chunkManager, const
             {
                 queueDeferredFree(it->second.transAllocation);
             }
+            if (it->second.modelAllocation.size > 0)
+            {
+                queueDeferredFree(it->second.modelAllocation);
+            }
+            it->second.state = RenderState::None;
+            it->second.allocation = {};
+            it->second.transAllocation = {};
+            it->second.modelAllocation = {};
         }
 
         // Calculate distance to player for priority
@@ -215,12 +229,50 @@ bool ChunkUploadManager::uploadSingle(const SectionKey& key, const ChunkMesh& me
         }
     }
 
+    // 2b. Upload model vertices (if any)
+    GigabufferAllocation modelAlloc{};
+    uint32_t modelCount = 0;
+    if (mesh.modelVertexCount > 0)
+    {
+        VkDeviceSize modelSize = static_cast<VkDeviceSize>(mesh.modelVertexCount) * sizeof(ModelVertex);
+        auto modelAllocResult = m_gigabuffer.allocate(modelSize);
+        if (!modelAllocResult.has_value())
+        {
+            VX_LOG_WARN(
+                "Gigabuffer full for model vertices — section ({},{}) y={} models skipped",
+                key.chunkCoord.x,
+                key.chunkCoord.y,
+                key.sectionY);
+        }
+        else
+        {
+            auto modelUpload = m_stagingBuffer.uploadToGigabuffer(
+                mesh.modelVertices.data(), modelSize, modelAllocResult->offset);
+            if (!modelUpload.has_value())
+            {
+                VX_LOG_WARN(
+                    "Staging full for model vertices — section ({},{}) y={} models skipped",
+                    key.chunkCoord.x,
+                    key.chunkCoord.y,
+                    key.sectionY);
+                m_gigabuffer.free(*modelAllocResult);
+            }
+            else
+            {
+                modelAlloc = *modelAllocResult;
+                modelCount = mesh.modelVertexCount;
+            }
+        }
+    }
+
     // 3. Store render info
     ChunkRenderInfo renderInfo{
         .allocation = opaqueAlloc,
         .quadCount = opaqueCount,
         .transAllocation = transAlloc,
         .transQuadCount = transCount,
+        .modelAllocation = modelAlloc,
+        .modelVertexCount = modelCount,
         .worldBasePos = glm::ivec3{
             key.chunkCoord.x * world::ChunkSection::SIZE,
             key.sectionY * world::ChunkSection::SIZE,
@@ -292,6 +344,10 @@ void ChunkUploadManager::onChunkUnloaded(glm::ivec2 coord)
             {
                 queueDeferredFree(it->second.transAllocation);
             }
+            if (it->second.modelAllocation.size > 0)
+            {
+                queueDeferredFree(it->second.modelAllocation);
+            }
         }
         m_renderInfos.erase(skey);
 
@@ -343,6 +399,10 @@ uint32_t ChunkUploadManager::deferredFreeCount() const
 
 void ChunkUploadManager::queueDeferredFree(const GigabufferAllocation& allocation)
 {
+    if (allocation.size == 0)
+    {
+        return; // Nothing to free — skip empty/failed allocations
+    }
     m_deferredFrees.push_back(DeferredFree{.allocation = allocation, .framesRemaining = FRAMES_IN_FLIGHT});
 }
 

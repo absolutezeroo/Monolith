@@ -34,6 +34,7 @@ add_library(VoxelEngine STATIC
         src/world/StructureGenerator.cpp
         src/renderer/QuadIndexBuffer.cpp
         src/renderer/IndirectDrawBuffer.cpp
+        src/renderer/ModelIndirectDrawBuffer.cpp
         src/renderer/ChunkRenderInfoBuffer.cpp
         src/renderer/TextureArray.cpp
         src/renderer/GBuffer.cpp
