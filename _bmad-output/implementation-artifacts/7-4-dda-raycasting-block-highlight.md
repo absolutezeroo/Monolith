@@ -1,6 +1,6 @@
 # Story 7.4: DDA Raycasting + Block Highlight
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -20,33 +20,33 @@ so that block targeting for place/break works.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Create RaycastResult struct and raycast function (AC: 1, 2, 3, 4)
-  - [ ] 1.1 Create `engine/include/voxel/physics/Raycast.h` with `RaycastResult` struct and `raycast()` free function declaration
-  - [ ] 1.2 Create `engine/src/physics/Raycast.cpp` implementing Amanatides & Woo DDA
-  - [ ] 1.3 Register new source file in `engine/CMakeLists.txt`
-- [ ] Task 2: Integrate raycast into GameApp (AC: 6)
-  - [ ] 2.1 Add `#include "voxel/physics/Raycast.h"` to GameApp.h
-  - [ ] 2.2 Add `voxel::physics::RaycastResult m_raycastResult{}` member to GameApp
-  - [ ] 2.3 In `GameApp::render()`, before drawing, compute ray from `m_camera.getPosition()` + `m_camera.getForward()` and call `raycast()`
-  - [ ] 2.4 Store result in `m_raycastResult` for use by highlight drawing and debug overlay
-- [ ] Task 3: Render block highlight wireframe (AC: 5)
-  - [ ] 3.1 Add `GameApp::drawBlockHighlight()` private method
-  - [ ] 3.2 If `m_raycastResult.hit`, project the 8 corners of the targeted block AABB to screen space using VP matrix
-  - [ ] 3.3 Draw 12 edges as lines on ImGui foreground draw list (white, 2px, slight alpha)
-  - [ ] 3.4 Call `drawBlockHighlight()` in `GameApp::render()` alongside `drawCrosshair()`
-- [ ] Task 4: Add targeted block info to debug overlay (AC: 6)
-  - [ ] 4.1 In `buildDebugOverlay()`, show targeted block position, face, distance, and block string ID when hit
-- [ ] Task 5: Unit tests (AC: 7)
-  - [ ] 5.1 Create `tests/physics/TestRaycast.cpp`
-  - [ ] 5.2 Register new test file in `tests/CMakeLists.txt`
-  - [ ] 5.3 Test: ray straight down onto flat ground hits correct block and returns NegY face
-  - [ ] 5.4 Test: ray into wall returns correct block position and face (PosX, NegX, PosZ, NegZ)
-  - [ ] 5.5 Test: ray into empty air returns no hit
-  - [ ] 5.6 Test: ray exceeding max distance returns no hit
-  - [ ] 5.7 Test: `previousPos` is the air block before the hit (placement position)
-  - [ ] 5.8 Test: ray passes through non-solid/transparent blocks (glass has `hasCollision=true` so it stops, but air/water with `hasCollision=false` is skipped)
-  - [ ] 5.9 Test: diagonal ray through multiple voxels hits the first solid one
-  - [ ] 5.10 Test: ray origin inside a solid block returns immediate hit at that position (edge case: player clipped into block)
+- [x] Task 1: Create RaycastResult struct and raycast function (AC: 1, 2, 3, 4)
+  - [x] 1.1 Create `engine/include/voxel/physics/Raycast.h` with `RaycastResult` struct and `raycast()` free function declaration
+  - [x] 1.2 Create `engine/src/physics/Raycast.cpp` implementing Amanatides & Woo DDA
+  - [x] 1.3 Register new source file in `engine/CMakeLists.txt`
+- [x] Task 2: Integrate raycast into GameApp (AC: 6)
+  - [x] 2.1 Add `#include "voxel/physics/Raycast.h"` to GameApp.h
+  - [x] 2.2 Add `voxel::physics::RaycastResult m_raycastResult{}` member to GameApp
+  - [x] 2.3 In `GameApp::render()`, before drawing, compute ray from `m_camera.getPosition()` + `m_camera.getForward()` and call `raycast()`
+  - [x] 2.4 Store result in `m_raycastResult` for use by highlight drawing and debug overlay
+- [x] Task 3: Render block highlight wireframe (AC: 5)
+  - [x] 3.1 Add `GameApp::drawBlockHighlight()` private method
+  - [x] 3.2 If `m_raycastResult.hit`, project the 8 corners of the targeted block AABB to screen space using VP matrix
+  - [x] 3.3 Draw 12 edges as lines on ImGui foreground draw list (white, 2px, slight alpha)
+  - [x] 3.4 Call `drawBlockHighlight()` in `GameApp::render()` alongside `drawCrosshair()`
+- [x] Task 4: Add targeted block info to debug overlay (AC: 6)
+  - [x] 4.1 In `buildDebugOverlay()`, show targeted block position, face, distance, and block string ID when hit
+- [x] Task 5: Unit tests (AC: 7)
+  - [x] 5.1 Create `tests/physics/TestRaycast.cpp`
+  - [x] 5.2 Register new test file in `tests/CMakeLists.txt`
+  - [x] 5.3 Test: ray straight down onto flat ground hits correct block and returns NegY face
+  - [x] 5.4 Test: ray into wall returns correct block position and face (PosX, NegX, PosZ, NegZ)
+  - [x] 5.5 Test: ray into empty air returns no hit
+  - [x] 5.6 Test: ray exceeding max distance returns no hit
+  - [x] 5.7 Test: `previousPos` is the air block before the hit (placement position)
+  - [x] 5.8 Test: ray passes through non-solid/transparent blocks (glass has `hasCollision=true` so it stops, but air/water with `hasCollision=false` is skipped)
+  - [x] 5.9 Test: diagonal ray through multiple voxels hits the first solid one
+  - [x] 5.10 Test: ray origin inside a solid block returns immediate hit at that position (edge case: player clipped into block)
 
 ## Dev Notes
 
@@ -351,8 +351,37 @@ Tests use the same pattern as `TestPlayerController.cpp` — create a `ChunkMana
 
 ### Agent Model Used
 
+Claude Opus 4.6
+
 ### Debug Log References
+
+None — clean implementation with zero build errors and all tests passing on first run.
 
 ### Completion Notes List
 
+- Implemented Amanatides & Woo DDA algorithm in `voxel::physics::raycast()` free function (~95 lines)
+- `RaycastResult` struct contains hit, blockPos, previousPos, face, distance — all ACs satisfied
+- Y bounds checked against `ChunkColumn::COLUMN_HEIGHT` constant (not hardcoded 255)
+- Block highlight wireframe via ImGui `ImDrawList` — projects 8 AABB corners to screen, draws 12 edges, skips behind-camera vertices
+- Z-fighting prevention with 0.002 AABB expansion offset
+- Raycast runs per-frame in `render()` for responsive feel (not tick-based)
+- Debug overlay shows targeted block position, string ID, face name, and distance
+- 8 test cases (62 assertions) covering all AC-7 scenarios: hit, miss, face ID, max distance, previousPos, non-solid skip, diagonal, origin-inside-block
+- Full regression suite: 212 test cases, 489560 assertions — all pass
+
 ### File List
+
+**New files:**
+- `engine/include/voxel/physics/Raycast.h` — RaycastResult struct + raycast() declaration
+- `engine/src/physics/Raycast.cpp` — Amanatides & Woo DDA implementation
+- `tests/physics/TestRaycast.cpp` — 8 unit test cases
+
+**Modified files:**
+- `engine/CMakeLists.txt` — Added `src/physics/Raycast.cpp` to sources
+- `tests/CMakeLists.txt` — Added `physics/TestRaycast.cpp` to test sources
+- `game/src/GameApp.h` — Added raycast include, `m_raycastResult` member, `drawBlockHighlight()` declaration
+- `game/src/GameApp.cpp` — Raycast in render(), drawBlockHighlight() implementation, debug overlay target info
+
+## Change Log
+
+- 2026-03-29: Implemented Story 7.4 — DDA Raycasting + Block Highlight (all tasks complete)

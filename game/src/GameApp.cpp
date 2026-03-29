@@ -417,6 +417,23 @@ void GameApp::buildDebugOverlay()
             facing = "West (-X)";
         ImGui::Text("Facing: %s", facing);
 
+        if (m_raycastResult.hit)
+        {
+            auto& bp = m_raycastResult.blockPos;
+            uint16_t blockId = m_chunkManager.getBlock(bp);
+            const auto& def = m_blockRegistry.getBlockType(blockId);
+            static constexpr const char* FACE_NAMES[] = {"+X", "-X", "+Y", "-Y", "+Z", "-Z"};
+            int faceIdx = static_cast<int>(m_raycastResult.face);
+            ImGui::Text(
+                "Target: %d, %d, %d (%s) face=%s d=%.1f",
+                bp.x,
+                bp.y,
+                bp.z,
+                def.stringId.c_str(),
+                FACE_NAMES[faceIdx],
+                m_raycastResult.distance);
+        }
+
         ImGui::Separator();
 
         const auto* giga = m_renderer.getGigabuffer();
@@ -492,6 +509,75 @@ void GameApp::drawCrosshair()
         ImVec2(center.x, center.y + CROSSHAIR_SIZE),
         col,
         CROSSHAIR_THICKNESS);
+}
+
+void GameApp::drawBlockHighlight()
+{
+    if (!m_raycastResult.hit)
+    {
+        return;
+    }
+
+    ImDrawList* draw = ImGui::GetForegroundDrawList();
+    ImVec2 vpSize = ImGui::GetMainViewport()->Size;
+
+    glm::mat4 vp = m_camera.getProjectionMatrix() * m_camera.getViewMatrix();
+
+    // Block AABB: integer position -> (pos, pos+1)
+    glm::vec3 bmin = glm::vec3(m_raycastResult.blockPos);
+    glm::vec3 bmax = bmin + glm::vec3(1.0f);
+
+    // Slight expansion to prevent z-fighting with block faces
+    constexpr float OFFSET = 0.002f;
+    bmin -= glm::vec3(OFFSET);
+    bmax += glm::vec3(OFFSET);
+
+    // 8 cube corners
+    glm::vec3 corners[8] = {
+        {bmin.x, bmin.y, bmin.z}, {bmax.x, bmin.y, bmin.z}, {bmax.x, bmax.y, bmin.z}, {bmin.x, bmax.y, bmin.z},
+        {bmin.x, bmin.y, bmax.z}, {bmax.x, bmin.y, bmax.z}, {bmax.x, bmax.y, bmax.z}, {bmin.x, bmax.y, bmax.z},
+    };
+
+    // Project corners to screen space
+    ImVec2 screenPts[8];
+    bool behindCamera[8];
+    for (int i = 0; i < 8; ++i)
+    {
+        glm::vec4 clip = vp * glm::vec4(corners[i], 1.0f);
+        behindCamera[i] = (clip.w <= 0.0f);
+        if (!behindCamera[i])
+        {
+            float invW = 1.0f / clip.w;
+            float ndcX = clip.x * invW;
+            float ndcY = clip.y * invW;
+            // Projection matrix already flips Y for Vulkan (proj[1][1] *= -1),
+            // so NDC Y goes -1=top to +1=bottom — map directly to screen coords.
+            screenPts[i].x = (ndcX * 0.5f + 0.5f) * vpSize.x;
+            screenPts[i].y = (ndcY * 0.5f + 0.5f) * vpSize.y;
+        }
+    }
+
+    // 12 edges of a cube (index pairs)
+    constexpr int edges[12][2] = {
+        {0, 1}, {1, 2}, {2, 3}, {3, 0}, // front face
+        {4, 5}, {5, 6}, {6, 7}, {7, 4}, // back face
+        {0, 4}, {1, 5}, {2, 6}, {3, 7}, // connecting edges
+    };
+
+    auto lineCol = IM_COL32(255, 255, 255, 180);
+    constexpr float LINE_THICKNESS = 2.0f;
+
+    for (const auto& edge : edges)
+    {
+        int a = edge[0];
+        int b = edge[1];
+        // Skip any edge where either endpoint is behind the camera
+        if (behindCamera[a] || behindCamera[b])
+        {
+            continue;
+        }
+        draw->AddLine(screenPts[a], screenPts[b], lineCol, LINE_THICKNESS);
+    }
 }
 
 void GameApp::drawHotbar()
@@ -607,6 +693,14 @@ void GameApp::render(double /*alpha*/)
             m_uploadManager->processDeferredFrees();
         }
 
+        // Raycast from camera every frame for responsive targeting
+        {
+            glm::vec3 origin = glm::vec3(m_camera.getPosition()); // dvec3 -> vec3 is fine for 6-block range
+            glm::vec3 dir = m_camera.getForward();
+            m_raycastResult =
+                voxel::physics::raycast(origin, dir, voxel::physics::MAX_REACH, m_chunkManager, m_blockRegistry);
+        }
+
         // Render chunk sections via GPU-driven compute culling + indirect draw
         {
             glm::mat4 vp = m_camera.getProjectionMatrix() * m_camera.getViewMatrix();
@@ -618,6 +712,7 @@ void GameApp::render(double /*alpha*/)
         if (m_input->isCursorCaptured())
         {
             drawCrosshair();
+            drawBlockHighlight();
         }
         drawHotbar();
         m_renderer.endFrame();

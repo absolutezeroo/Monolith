@@ -7,6 +7,7 @@
 #include "voxel/game/GameLoop.h"
 #include "voxel/game/PlayerController.h"
 #include "voxel/input/InputManager.h"
+#include "voxel/physics/Raycast.h"
 #include "voxel/renderer/Camera.h"
 #include "voxel/renderer/ChunkUploadManager.h"
 #include "voxel/renderer/MeshBuilder.h"
@@ -48,6 +49,7 @@ class GameApp : public voxel::game::GameLoop
     void handleInputToggles();
     void buildDebugOverlay();
     void drawCrosshair();
+    void drawBlockHighlight();
     void drawHotbar();
     void toggleFullscreen();
     void captureScreenshot();
@@ -69,6 +71,9 @@ class GameApp : public voxel::game::GameLoop
     std::unique_ptr<voxel::renderer::MeshBuilder> m_meshBuilder;
     std::unique_ptr<voxel::world::WorldGenerator> m_worldGen;
     voxel::world::ChunkManager m_chunkManager;
+
+    // Raycast result (updated each frame in render())
+    voxel::physics::RaycastResult m_raycastResult{};
 
     // Player physics controller
     voxel::game::PlayerController m_player;

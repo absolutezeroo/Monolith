@@ -44,6 +44,7 @@ add_library(VoxelEngine STATIC
         src/renderer/TintPalette.cpp
         src/world/WorldGenerator.cpp
         src/input/InputManager.cpp
+        src/physics/Raycast.cpp
 )
 
 target_include_directories(VoxelEngine

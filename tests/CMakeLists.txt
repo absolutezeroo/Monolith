@@ -35,6 +35,7 @@ add_executable(VoxelTests
     game/TestCommandQueue.cpp
     game/TestEventBus.cpp
     game/TestPlayerController.cpp
+    physics/TestRaycast.cpp
 )
 
 target_link_libraries(VoxelTests
