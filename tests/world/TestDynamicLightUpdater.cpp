@@ -311,6 +311,73 @@ TEST_CASE("DynamicLightUpdater", "[world][light]")
         uint8_t skyBetween = col->getLightMap(4).getSkyLight(8, 1, 8); // Y=65
         REQUIRE(skyBetween < 15);
     }
+
+    SECTION("place emissive+opaque block (glowstone) — emits light correctly")
+    {
+        auto f = createDynFixture();
+        ChunkColumn* col = f->manager.getChunk({0, 0});
+        REQUIRE(col != nullptr);
+
+        // Place glowstone (emission=15, lightFilter=15) at (8,8,8)
+        const BlockDefinition& gsDef = f->registry.getBlockType(f->ids.glowstone);
+        col->setBlock(8, 8, 8, f->ids.glowstone);
+        DynamicLightUpdater::onBlockPlaced(*col, 8, 8, 8, gsDef, f->manager, f->registry);
+
+        // Glowstone itself should have full emission
+        REQUIRE(col->getLightMap(0).getBlockLight(8, 8, 8) == 15);
+        // Neighbors should have correct BFS falloff
+        REQUIRE(col->getLightMap(0).getBlockLight(9, 8, 8) == 14);
+        REQUIRE(col->getLightMap(0).getBlockLight(10, 8, 8) == 13);
+        REQUIRE(col->getLightMap(0).getBlockLight(0, 8, 8) == 7);
+    }
+
+    SECTION("break emissive+opaque block (glowstone) — light removed")
+    {
+        auto f = createDynFixture();
+        ChunkColumn* col = f->manager.getChunk({0, 0});
+        REQUIRE(col != nullptr);
+
+        // Setup: place glowstone, propagate
+        col->setBlock(8, 8, 8, f->ids.glowstone);
+        BlockLightPropagator::propagateColumn(*col, f->registry);
+
+        REQUIRE(col->getLightMap(0).getBlockLight(8, 8, 8) == 15);
+        REQUIRE(col->getLightMap(0).getBlockLight(9, 8, 8) == 14);
+
+        // Break glowstone
+        const BlockDefinition& gsDef = f->registry.getBlockType(f->ids.glowstone);
+        col->setBlock(8, 8, 8, BLOCK_AIR);
+        DynamicLightUpdater::onBlockBroken(*col, 8, 8, 8, gsDef, f->manager, f->registry);
+
+        // All light should be removed
+        REQUIRE(col->getLightMap(0).getBlockLight(8, 8, 8) == 0);
+        REQUIRE(col->getLightMap(0).getBlockLight(9, 8, 8) == 0);
+    }
+
+    SECTION("cross-chunk X boundary — torch light propagates into neighbor")
+    {
+        auto f = createDynFixture();
+        // Load a neighbor chunk at (1,0)
+        f->manager.loadChunk({1, 0});
+
+        ChunkColumn* col = f->manager.getChunk({0, 0});
+        ChunkColumn* neighbor = f->manager.getChunk({1, 0});
+        REQUIRE(col != nullptr);
+        REQUIRE(neighbor != nullptr);
+
+        // Place torch at localX=14 in chunk (0,0) → world X=14, near +X boundary
+        const BlockDefinition& torchDef = f->registry.getBlockType(f->ids.torch);
+        col->setBlock(14, 8, 8, f->ids.torch);
+        DynamicLightUpdater::onBlockPlaced(*col, 14, 8, 8, torchDef, f->manager, f->registry);
+
+        // Light should propagate within chunk (0,0)
+        REQUIRE(col->getLightMap(0).getBlockLight(14, 8, 8) == 14);
+        REQUIRE(col->getLightMap(0).getBlockLight(15, 8, 8) == 13);
+
+        // Light should cross into neighbor chunk (1,0) at localX=0 (world X=16)
+        REQUIRE(neighbor->getLightMap(0).getBlockLight(0, 8, 8) == 12);
+        REQUIRE(neighbor->getLightMap(0).getBlockLight(1, 8, 8) == 11);
+    }
 }
 
 TEST_CASE("DynamicLightUpdater performance", "[world][light][!benchmark]")
@@ -321,31 +388,25 @@ TEST_CASE("DynamicLightUpdater performance", "[world][light][!benchmark]")
 
     const BlockDefinition& torchDef = f->registry.getBlockType(f->ids.torch);
 
-    BENCHMARK("single torch place")
+    BENCHMARK_ADVANCED("single torch place")(Catch::Benchmark::Chronometer meter)
     {
-        // Reset: clear all light
-        col->clearAllLight();
-        col->setBlock(8, 8, 8, BLOCK_AIR);
-
-        // Place torch
-        col->setBlock(8, 8, 8, f->ids.torch);
-        DynamicLightUpdater::onBlockPlaced(*col, 8, 8, 8, torchDef, f->manager, f->registry);
+        meter.measure([&] {
+            col->clearAllLight();
+            col->setBlock(8, 8, 8, f->ids.torch);
+            DynamicLightUpdater::onBlockPlaced(*col, 8, 8, 8, torchDef, f->manager, f->registry);
+        });
     };
 
-    // Setup: place torch so we can benchmark breaking it
-    col->clearAllLight();
-    col->setBlock(8, 8, 8, f->ids.torch);
-    BlockLightPropagator::propagateColumn(*col, f->registry);
-
-    BENCHMARK("single torch break")
+    BENCHMARK_ADVANCED("single torch break")(Catch::Benchmark::Chronometer meter)
     {
-        // Break torch
-        col->setBlock(8, 8, 8, BLOCK_AIR);
-        DynamicLightUpdater::onBlockBroken(*col, 8, 8, 8, torchDef, f->manager, f->registry);
-
-        // Re-setup for next iteration
+        // Setup before each batch: place torch and propagate
         col->clearAllLight();
         col->setBlock(8, 8, 8, f->ids.torch);
         BlockLightPropagator::propagateColumn(*col, f->registry);
+
+        meter.measure([&] {
+            col->setBlock(8, 8, 8, BLOCK_AIR);
+            DynamicLightUpdater::onBlockBroken(*col, 8, 8, 8, torchDef, f->manager, f->registry);
+        });
     };
 }

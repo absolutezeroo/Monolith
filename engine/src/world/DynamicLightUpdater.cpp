@@ -580,16 +580,21 @@ void DynamicLightUpdater::onBlockPlaced(
     if (newBlock.lightFilter == MAX_LIGHT_LEVEL)
     {
         LightMap& lm = column.getLightMap(sectionY);
-        uint8_t existingBlockLight = lm.getBlockLight(localX, localY, localZ);
-        uint8_t existingSkyLight = lm.getSkyLight(localX, localY, localZ);
 
-        if (existingBlockLight > 0)
+        // Only remove block light that was passing through — skip if this block is the emitter
+        // (its own emission was just seeded in step 1 and must not be stripped).
+        if (newBlock.lightEmission == 0)
         {
-            lm.setBlockLight(localX, localY, localZ, 0);
-            column.markDirty(sectionY);
-            floodRemoveBlockLight(column, localX, worldY, localZ, existingBlockLight, manager, registry);
+            uint8_t existingBlockLight = lm.getBlockLight(localX, localY, localZ);
+            if (existingBlockLight > 0)
+            {
+                lm.setBlockLight(localX, localY, localZ, 0);
+                column.markDirty(sectionY);
+                floodRemoveBlockLight(column, localX, worldY, localZ, existingBlockLight, manager, registry);
+            }
         }
 
+        uint8_t existingSkyLight = lm.getSkyLight(localX, localY, localZ);
         if (existingSkyLight > 0)
         {
             lm.setSkyLight(localX, localY, localZ, 0);

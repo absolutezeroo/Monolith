@@ -93,8 +93,8 @@ core::Result<GigabufferAllocation> Gigabuffer::allocate(VkDeviceSize size, VkDev
 void Gigabuffer::free(const GigabufferAllocation& allocation)
 {
     vmaVirtualFree(m_virtualBlock, allocation.handle);
-    // VX_LOG_DEBUG(
-    //     "Gigabuffer: freed {} bytes at offset {}, total used: {}", allocation.size, allocation.offset, usedBytes());
+    VX_LOG_DEBUG(
+        "Gigabuffer: freed {} bytes at offset {}, total used: {}", allocation.size, allocation.offset, usedBytes());
 }
 
 VkDeviceSize Gigabuffer::usedBytes() const

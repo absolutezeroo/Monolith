@@ -1,6 +1,6 @@
 # Story 8.3: Dynamic Light Updates
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -22,55 +22,55 @@ so that the world stays consistently lit during gameplay.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Create DynamicLightUpdater class (AC: 1–4, 6)
-  - [ ] 1.1 Create `engine/include/voxel/world/DynamicLightUpdater.h`
-  - [ ] 1.2 Create `engine/src/world/DynamicLightUpdater.cpp`
-  - [ ] 1.3 Implement `static void onBlockBroken(ChunkColumn& column, int localX, int worldY, int localZ, const BlockDefinition& oldBlock, ChunkManager& manager, const BlockRegistry& registry)`
-  - [ ] 1.4 Implement `static void onBlockPlaced(ChunkColumn& column, int localX, int worldY, int localZ, const BlockDefinition& newBlock, ChunkManager& manager, const BlockRegistry& registry)`
-  - [ ] 1.5 Implement private helper `floodRemoveBlockLight(...)` — reverse-BFS that zeroes block light from an origin outward
-  - [ ] 1.6 Implement private helper `floodRemoveSkyLight(...)` — reverse-BFS that zeroes sky light from an origin outward
-  - [ ] 1.7 Implement private helper `reseedBlockLight(...)` — BFS re-propagation from remaining block light sources at the removal boundary
-  - [ ] 1.8 Implement private helper `reseedSkyLight(...)` — BFS re-propagation from remaining sky light sources at the removal boundary
+- [x] Task 1: Create DynamicLightUpdater class (AC: 1–4, 6)
+  - [x] 1.1 Create `engine/include/voxel/world/DynamicLightUpdater.h`
+  - [x] 1.2 Create `engine/src/world/DynamicLightUpdater.cpp`
+  - [x] 1.3 Implement `static void onBlockBroken(ChunkColumn& column, int localX, int worldY, int localZ, const BlockDefinition& oldBlock, ChunkManager& manager, const BlockRegistry& registry)`
+  - [x] 1.4 Implement `static void onBlockPlaced(ChunkColumn& column, int localX, int worldY, int localZ, const BlockDefinition& newBlock, ChunkManager& manager, const BlockRegistry& registry)`
+  - [x] 1.5 Implement private helper `floodRemoveBlockLight(...)` — reverse-BFS that zeroes block light from an origin outward
+  - [x] 1.6 Implement private helper `floodRemoveSkyLight(...)` — reverse-BFS that zeroes sky light from an origin outward
+  - [x] 1.7 Implement private helper `reseedBlockLight(...)` — BFS re-propagation from remaining block light sources at the removal boundary
+  - [x] 1.8 Implement private helper `reseedSkyLight(...)` — BFS re-propagation from remaining sky light sources at the removal boundary
 
-- [ ] Task 2: Implement reverse-BFS light removal algorithm (AC: 2, 4)
-  - [ ] 2.1 Use two queues: `removeQueue` (positions to remove) and `reseedQueue` (boundary positions to re-propagate from)
-  - [ ] 2.2 For each position popped from `removeQueue`: if its light value > 0 and came from the removed source (value < removed value), zero it and enqueue neighbors into `removeQueue`
-  - [ ] 2.3 If a neighbor has light >= the current value being removed (meaning it has an independent source), add it to `reseedQueue` instead
-  - [ ] 2.4 After `removeQueue` drains, BFS from `reseedQueue` to refill correct values
+- [x] Task 2: Implement reverse-BFS light removal algorithm (AC: 2, 4)
+  - [x] 2.1 Use two queues: `removeQueue` (positions to remove) and `reseedQueue` (boundary positions to re-propagate from)
+  - [x] 2.2 For each position popped from `removeQueue`: if its light value > 0 and came from the removed source (value < removed value), zero it and enqueue neighbors into `removeQueue`
+  - [x] 2.3 If a neighbor has light >= the current value being removed (meaning it has an independent source), add it to `reseedQueue` instead
+  - [x] 2.4 After `removeQueue` drains, BFS from `reseedQueue` to refill correct values
 
-- [ ] Task 3: Heightmap maintenance (AC: 8)
-  - [ ] 3.1 On block break: if `oldBlock.lightFilter == 15` and `worldY >= column.getHeight(localX, localZ)`, rescan that (x,z) column top-down to find new highest opaque block
-  - [ ] 3.2 On block place: if `newBlock.lightFilter == 15` and `worldY > column.getHeight(localX, localZ)`, set heightmap to `worldY`
-  - [ ] 3.3 When heightmap changes, trigger sky light re-propagation for affected (x,z) column
+- [x] Task 3: Heightmap maintenance (AC: 8)
+  - [x] 3.1 On block break: if `oldBlock.lightFilter == 15` and `worldY >= column.getHeight(localX, localZ)`, rescan that (x,z) column top-down to find new highest opaque block
+  - [x] 3.2 On block place: if `newBlock.lightFilter == 15` and `worldY > column.getHeight(localX, localZ)`, set heightmap to `worldY`
+  - [x] 3.3 When heightmap changes, trigger sky light re-propagation for affected (x,z) column
 
-- [ ] Task 4: Section dirty marking + cross-boundary handling (AC: 5, 6, 7)
-  - [ ] 4.1 Track which sections had light values modified during BFS (use `std::unordered_set<SectionKey>` or similar)
-  - [ ] 4.2 After light update completes, mark all modified sections dirty via `column->markDirty(sectionY)` and neighbor columns' `markDirty()` for cross-chunk changes
-  - [ ] 4.3 Handle Y section transitions: when BFS crosses y%16 boundary, switch to adjacent section's LightMap
-  - [ ] 4.4 Handle X/Z chunk transitions: when BFS crosses x/z column boundary, look up neighbor via `ChunkManager::getChunk()`
+- [x] Task 4: Section dirty marking + cross-boundary handling (AC: 5, 6, 7)
+  - [x] 4.1 Track which sections had light values modified during BFS (use `std::unordered_set<SectionKey>` or similar)
+  - [x] 4.2 After light update completes, mark all modified sections dirty via `column->markDirty(sectionY)` and neighbor columns' `markDirty()` for cross-chunk changes
+  - [x] 4.3 Handle Y section transitions: when BFS crosses y%16 boundary, switch to adjacent section's LightMap
+  - [x] 4.4 Handle X/Z chunk transitions: when BFS crosses x/z column boundary, look up neighbor via `ChunkManager::getChunk()`
 
-- [ ] Task 5: Hook into EventBus (AC: 1–5)
-  - [ ] 5.1 Add `updateLightAfterBlockChange(const glm::ivec3& worldPos, uint16_t oldBlockId, uint16_t newBlockId)` method to `ChunkManager`
-  - [ ] 5.2 In `GameApp` initialization (or `ChunkManager` setup), subscribe to `EventType::BlockPlaced` and `EventType::BlockBroken`
-  - [ ] 5.3 On `BlockBrokenEvent`: call `updateLightAfterBlockChange(pos, previousId, BLOCK_AIR)`
-  - [ ] 5.4 On `BlockPlacedEvent`: call `updateLightAfterBlockChange(pos, BLOCK_AIR, blockId)`
+- [x] Task 5: Hook into EventBus (AC: 1–5)
+  - [x] 5.1 Add `updateLightAfterBlockChange(const glm::ivec3& worldPos, uint16_t oldBlockId, uint16_t newBlockId)` method to `ChunkManager`
+  - [x] 5.2 In `GameApp` initialization (or `ChunkManager` setup), subscribe to `EventType::BlockPlaced` and `EventType::BlockBroken`
+  - [x] 5.3 On `BlockBrokenEvent`: call `updateLightAfterBlockChange(pos, previousId, BLOCK_AIR)`
+  - [x] 5.4 On `BlockPlacedEvent`: call `updateLightAfterBlockChange(pos, BLOCK_AIR, blockId)`
 
-- [ ] Task 6: Unit tests (AC: 1–9)
-  - [ ] 6.1 Create `tests/world/TestDynamicLightUpdater.cpp`
-  - [ ] 6.2 Test: break opaque wall next to torch — light fills gap (values match expected BFS falloff)
-  - [ ] 6.3 Test: place opaque block in lit area — light removed behind block, correct shadow cast
-  - [ ] 6.4 Test: place torch (lightEmission=14) — BFS produces correct falloff
-  - [ ] 6.5 Test: break torch — all contributed light removed, area goes dark
-  - [ ] 6.6 Test: two torches, break one — remaining torch keeps its area lit at correct values
-  - [ ] 6.7 Test: break block at section Y boundary — light crosses into adjacent section
-  - [ ] 6.8 Test: sky light recovery — break opaque roof block, sky light (15) floods down
-  - [ ] 6.9 Test: place opaque block above surface — heightmap updated, sky light blocked below
-  - [ ] 6.10 Performance benchmark: single torch place/break < 1ms (use Catch2 BENCHMARK)
+- [x] Task 6: Unit tests (AC: 1–9)
+  - [x] 6.1 Create `tests/world/TestDynamicLightUpdater.cpp`
+  - [x] 6.2 Test: break opaque wall next to torch — light fills gap (values match expected BFS falloff)
+  - [x] 6.3 Test: place opaque block in lit area — light removed behind block, correct shadow cast
+  - [x] 6.4 Test: place torch (lightEmission=14) — BFS produces correct falloff
+  - [x] 6.5 Test: break torch — all contributed light removed, area goes dark
+  - [x] 6.6 Test: two torches, break one — remaining torch keeps its area lit at correct values
+  - [x] 6.7 Test: break block at section Y boundary — light crosses into adjacent section
+  - [x] 6.8 Test: sky light recovery — break opaque roof block, sky light (15) floods down
+  - [x] 6.9 Test: place opaque block above surface — heightmap updated, sky light blocked below
+  - [x] 6.10 Performance benchmark: single torch place/break < 1ms (use Catch2 BENCHMARK_ADVANCED)
 
-- [ ] Task 7: CMakeLists + build (AC: all)
-  - [ ] 7.1 Add `DynamicLightUpdater.cpp` to `engine/CMakeLists.txt`
-  - [ ] 7.2 Add `TestDynamicLightUpdater.cpp` to `tests/CMakeLists.txt`
-  - [ ] 7.3 Build and verify zero warnings
+- [x] Task 7: CMakeLists + build (AC: all)
+  - [x] 7.1 Add `DynamicLightUpdater.cpp` to `engine/CMakeLists.txt`
+  - [x] 7.2 Add `TestDynamicLightUpdater.cpp` to `tests/CMakeLists.txt`
+  - [x] 7.3 Build and verify zero warnings
 
 ## Dev Notes
 
@@ -429,9 +429,26 @@ The block place/break system (7.5) publishes `BlockPlacedEvent`/`BlockBrokenEven
 ## Dev Agent Record
 
 ### Agent Model Used
+Claude Opus 4.6 (implementation), Claude Opus 4.6 (code review)
 
 ### Debug Log References
 
 ### Completion Notes List
+- Implementation complete: DynamicLightUpdater with reverse-BFS light removal and reseeding
+- Code review fix: emissive+opaque block placement bug — `onBlockPlaced()` was stripping its own emission during opacity handling
+- Code review fix: benchmark re-setup was included in measurement body — switched to `BENCHMARK_ADVANCED`
+- Code review fix: reverted out-of-scope Gigabuffer.cpp debug log change
+- Code review addition: glowstone placement/break tests, cross-chunk X boundary test
+- 363 assertions passing across 10 test cases
 
 ### File List
+| Action | File |
+|--------|------|
+| NEW | `engine/include/voxel/world/DynamicLightUpdater.h` |
+| NEW | `engine/src/world/DynamicLightUpdater.cpp` |
+| NEW | `tests/world/TestDynamicLightUpdater.cpp` |
+| MODIFY | `engine/include/voxel/world/ChunkManager.h` |
+| MODIFY | `engine/src/world/ChunkManager.cpp` |
+| MODIFY | `game/src/GameApp.cpp` |
+| MODIFY | `engine/CMakeLists.txt` |
+| MODIFY | `tests/CMakeLists.txt` |
