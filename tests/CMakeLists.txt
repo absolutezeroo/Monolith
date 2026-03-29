@@ -34,6 +34,7 @@ add_executable(VoxelTests
     world/TestWorldGenerator.cpp
     game/TestCommandQueue.cpp
     game/TestEventBus.cpp
+    game/TestPlayerController.cpp
 )
 
 target_link_libraries(VoxelTests

@@ -8,6 +8,7 @@ add_library(VoxelEngine STATIC
         src/game/Window.cpp
         src/game/GameLoop.cpp
         src/game/EventBus.cpp
+        src/game/PlayerController.cpp
         src/renderer/VmaImpl.cpp
         src/renderer/VulkanContext.cpp
         src/renderer/DescriptorAllocator.cpp

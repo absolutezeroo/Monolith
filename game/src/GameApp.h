@@ -4,6 +4,7 @@
 #include "voxel/core/JobSystem.h"
 #include "voxel/core/Result.h"
 #include "voxel/game/GameLoop.h"
+#include "voxel/game/PlayerController.h"
 #include "voxel/input/InputManager.h"
 #include "voxel/renderer/Camera.h"
 #include "voxel/renderer/ChunkUploadManager.h"
@@ -67,6 +68,10 @@ class GameApp : public voxel::game::GameLoop
     std::unique_ptr<voxel::renderer::MeshBuilder> m_meshBuilder;
     std::unique_ptr<voxel::world::WorldGenerator> m_worldGen;
     voxel::world::ChunkManager m_chunkManager;
+
+    // Player physics controller
+    voxel::game::PlayerController m_player;
+    bool m_flyMode = true; // Start in fly mode — toggled with F7
 
     // HUD state
     int m_hotbarSlot = 0;

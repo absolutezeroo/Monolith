@@ -45,7 +45,7 @@ GameApp::~GameApp()
     {
         m_config.setFov(m_camera.getFov());
         m_config.setSensitivity(m_camera.getSensitivity());
-        m_config.setLastPlayerPosition(m_camera.getPosition());
+        m_config.setLastPlayerPosition(m_flyMode ? m_camera.getPosition() : m_player.getEyePosition());
 
         int w = 0;
         int h = 0;
@@ -191,6 +191,21 @@ void GameApp::handleInputToggles()
     {
         m_input->setCursorCaptured(false);
     }
+    if (m_input->wasKeyPressed(GLFW_KEY_F7))
+    {
+        m_flyMode = !m_flyMode;
+        if (!m_flyMode)
+        {
+            // Entering physics mode: init player at camera position
+            m_player.init(m_camera.getPosition(), m_chunkManager, m_blockRegistry);
+        }
+        else
+        {
+            // Entering fly mode: snap camera to player eye position
+            m_camera.setPosition(m_player.getEyePosition());
+        }
+        VX_LOG_INFO("[F7] Fly mode: {}", m_flyMode ? "ON" : "OFF");
+    }
 
     // Hotbar: number keys 1-9
     for (int i = 0; i < HOTBAR_SLOTS; ++i)
@@ -231,17 +246,27 @@ void GameApp::tick(double dt)
         m_camera.processMouseDelta(delta.x, delta.y);
     }
 
-    // Camera movement — only when ImGui doesn't want keyboard
+    // Movement — only when ImGui doesn't want keyboard
     if (!io.WantCaptureKeyboard)
     {
-        m_camera.update(
-            fdt,
-            m_input->isKeyDown(GLFW_KEY_W),
-            m_input->isKeyDown(GLFW_KEY_S),
-            m_input->isKeyDown(GLFW_KEY_A),
-            m_input->isKeyDown(GLFW_KEY_D),
-            m_input->isKeyDown(GLFW_KEY_SPACE),
-            m_input->isKeyDown(GLFW_KEY_LEFT_SHIFT));
+        if (m_flyMode)
+        {
+            // Fly mode: direct camera movement (existing behavior)
+            m_camera.update(
+                fdt,
+                m_input->isKeyDown(GLFW_KEY_W),
+                m_input->isKeyDown(GLFW_KEY_S),
+                m_input->isKeyDown(GLFW_KEY_A),
+                m_input->isKeyDown(GLFW_KEY_D),
+                m_input->isKeyDown(GLFW_KEY_SPACE),
+                m_input->isKeyDown(GLFW_KEY_LEFT_SHIFT));
+        }
+        else
+        {
+            // Physics mode: PlayerController handles collision
+            m_player.update(fdt, *m_input, m_camera, m_chunkManager, m_blockRegistry);
+            m_camera.setPosition(m_player.getEyePosition());
+        }
     }
 
     // Sync overlay sliders back to camera
@@ -340,6 +365,13 @@ void GameApp::buildDebugOverlay()
 
         ImGui::Text("[F4] Wireframe: %s", m_overlayState.wireframeMode ? "ON" : "OFF");
         ImGui::Text("[F5] Chunk borders: %s", m_overlayState.showChunkBorders ? "ON" : "OFF");
+        ImGui::Text("[F7] Fly mode: %s", m_flyMode ? "ON" : "OFF");
+        if (!m_flyMode)
+        {
+            ImGui::Text("OnGround: %s", m_player.isOnGround() ? "YES" : "NO");
+            auto vel = m_player.getVelocity();
+            ImGui::Text("Velocity: %.2f, %.2f, %.2f", vel.x, vel.y, vel.z);
+        }
 
         ImGui::Separator();
 
