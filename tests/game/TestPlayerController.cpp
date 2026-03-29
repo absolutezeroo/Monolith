@@ -367,3 +367,76 @@ TEST_CASE("PlayerController: terminal velocity is capped", "[game][physics]")
     CHECK(player.getVelocity().y >= -PlayerController::TERMINAL_VELOCITY);
     CHECK(player.getVelocity().y <= -PlayerController::TERMINAL_VELOCITY + 2.0f);
 }
+
+TEST_CASE("PlayerController: step-up works when player straddles block boundary", "[game][physics]")
+{
+    auto registry = makeTestRegistry();
+    ChunkManager cm;
+    setupFlatGround(cm, registry, 64);
+
+    uint16_t stoneId = registry.getIdByName("base:stone");
+
+    // Place a step-up ledge at x=12, z=5 only (not z=4).
+    // Player at z=4.8 spans [4.5, 5.1], straddling blocks z=4 and z=5.
+    // The obstacle is only in z=5 — step-up must check the full footprint to detect it.
+    for (int x = 12; x <= 20; ++x)
+    {
+        cm.setBlock(glm::ivec3{x, 65, 5}, stoneId);
+    }
+
+    PlayerController player;
+    player.init(glm::dvec3{10.0, 65.0, 4.8}, cm, registry);
+
+    // Settle on ground
+    constexpr float dt = 0.05f;
+    constexpr glm::vec3 noMove{0.0f};
+    for (int i = 0; i < 10; ++i)
+    {
+        player.tickPhysics(dt, noMove, cm, registry);
+    }
+    REQUIRE(player.isOnGround());
+
+    double startY = player.getPosition().y;
+
+    // Walk toward the step in +X
+    constexpr glm::vec3 walkRight{1.0f, 0.0f, 0.0f};
+    bool steppedUp = false;
+    for (int i = 0; i < 100; ++i)
+    {
+        player.tickPhysics(dt, walkRight, cm, registry);
+        if (player.getPosition().y > startY + 0.5 && player.getPosition().x > 13.0)
+        {
+            steppedUp = true;
+            break;
+        }
+    }
+
+    CHECK(steppedUp);
+    CHECK(player.getPosition().x > 12.0);
+}
+
+TEST_CASE("PlayerController: spawn safety with fractional Y detects head-level block", "[game][physics]")
+{
+    auto registry = makeTestRegistry();
+    ChunkManager cm;
+    setupFlatGround(cm, registry, 64);
+
+    uint16_t stoneId = registry.getIdByName("base:stone");
+
+    // Place a solid block at y=67. Player at y=65.3 spans [65.3, 67.1],
+    // overlapping blocks 65, 66, 67. Block at 67 should be detected.
+    for (int x = 7; x <= 9; ++x)
+    {
+        for (int z = 7; z <= 9; ++z)
+        {
+            cm.setBlock(glm::ivec3{x, 67, z}, stoneId);
+        }
+    }
+
+    PlayerController player;
+    // Spawn at fractional Y — head extends into the solid block at y=67
+    player.init(glm::dvec3{8.0, 65.3, 8.0}, cm, registry);
+
+    // Player should have been pushed above the obstruction (y >= 68)
+    CHECK(player.getPosition().y >= 68.0);
+}

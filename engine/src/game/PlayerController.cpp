@@ -288,40 +288,57 @@ bool PlayerController::tryStepUp(
     testPos[axis] += static_cast<double>(delta);
     auto testPosF = glm::vec3(testPos);
 
-    // Compute the block position we'd collide with
-    int blockX = 0;
-    int blockZ = 0;
+    // Compute the range of blocks the player's leading edge overlaps.
+    // The player footprint can straddle two blocks on the perpendicular axis.
+    int leadingEdge = 0;
+    int perpMin = 0;
+    int perpMax = 0;
 
     if (axis == 0)
     {
-        blockX = delta > 0.0f ? static_cast<int>(std::floor(testPosF.x + HALF_EXTENTS.x))
-                              : static_cast<int>(std::floor(testPosF.x - HALF_EXTENTS.x));
-        blockZ = static_cast<int>(std::floor(pos.z));
+        leadingEdge = delta > 0.0f ? static_cast<int>(std::floor(testPosF.x + HALF_EXTENTS.x))
+                                   : static_cast<int>(std::floor(testPosF.x - HALF_EXTENTS.x));
+        perpMin = static_cast<int>(std::floor(pos.z - HALF_EXTENTS.z));
+        perpMax = static_cast<int>(std::floor(pos.z + HALF_EXTENTS.z));
     }
     else
     {
-        blockX = static_cast<int>(std::floor(pos.x));
-        blockZ = delta > 0.0f ? static_cast<int>(std::floor(testPosF.z + HALF_EXTENTS.z))
-                              : static_cast<int>(std::floor(testPosF.z - HALF_EXTENTS.z));
+        leadingEdge = delta > 0.0f ? static_cast<int>(std::floor(testPosF.z + HALF_EXTENTS.z))
+                                   : static_cast<int>(std::floor(testPosF.z - HALF_EXTENTS.z));
+        perpMin = static_cast<int>(std::floor(pos.x - HALF_EXTENTS.x));
+        perpMax = static_cast<int>(std::floor(pos.x + HALF_EXTENTS.x));
     }
 
-    // Is there a solid block at feet level?
-    uint16_t feetBlock = world.getBlock(glm::ivec3{blockX, feetY, blockZ});
-    if (feetBlock == world::BLOCK_AIR || !registry.getBlockType(feetBlock).hasCollision)
-    {
-        return false; // No obstacle at feet level
-    }
-
-    // Is the block above the obstacle clear?
     int stepTopY = feetY + 1;
     if (stepTopY > WORLD_MAX_Y)
     {
         return false;
     }
-    uint16_t aboveBlock = world.getBlock(glm::ivec3{blockX, stepTopY, blockZ});
-    if (aboveBlock != world::BLOCK_AIR && registry.getBlockType(aboveBlock).hasCollision)
+
+    // Check all blocks at the leading edge for a feet-level obstacle
+    bool foundObstacle = false;
+    for (int p = perpMin; p <= perpMax; ++p)
     {
-        return false; // Obstacle above the step
+        int bx = (axis == 0) ? leadingEdge : p;
+        int bz = (axis == 0) ? p : leadingEdge;
+
+        uint16_t feetBlock = world.getBlock(glm::ivec3{bx, feetY, bz});
+        if (feetBlock != world::BLOCK_AIR && registry.getBlockType(feetBlock).hasCollision)
+        {
+            foundObstacle = true;
+
+            // If the block above is also solid, obstacle is 2+ blocks tall — can't step
+            uint16_t aboveBlock = world.getBlock(glm::ivec3{bx, stepTopY, bz});
+            if (aboveBlock != world::BLOCK_AIR && registry.getBlockType(aboveBlock).hasCollision)
+            {
+                return false;
+            }
+        }
+    }
+
+    if (!foundObstacle)
+    {
+        return false; // No obstacle at feet level
     }
 
     // Check headroom: player is 1.8 blocks tall at the stepped-up position
@@ -365,16 +382,18 @@ void PlayerController::ensureNotInsideBlock(world::ChunkManager& world, const wo
     int centerX = static_cast<int>(std::floor(m_position.x));
     int centerZ = static_cast<int>(std::floor(m_position.z));
 
-    // Check if current position is already valid
-    auto isPositionClear = [&](int y) -> bool {
-        if (y < WORLD_MIN_Y || y + 1 > WORLD_MAX_Y)
+    // Check all blocks the player overlaps vertically (height = 1.8 blocks).
+    // With fractional Y the player can span 3 blocks instead of 2.
+    auto isPositionClear = [&](double feetY) -> bool {
+        int minY = static_cast<int>(std::floor(feetY));
+        int maxY = static_cast<int>(std::floor(feetY + static_cast<double>(HALF_EXTENTS.y * 2.0f) - 0.001));
+        if (minY < WORLD_MIN_Y || maxY > WORLD_MAX_Y)
         {
             return false;
         }
-        // Player occupies 2 blocks vertically from feet position
-        for (int dy = 0; dy < 2; ++dy)
+        for (int y = minY; y <= maxY; ++y)
         {
-            uint16_t blockId = world.getBlock(glm::ivec3{centerX, y + dy, centerZ});
+            uint16_t blockId = world.getBlock(glm::ivec3{centerX, y, centerZ});
             if (blockId != world::BLOCK_AIR && registry.getBlockType(blockId).hasCollision)
             {
                 return false;
@@ -383,7 +402,7 @@ void PlayerController::ensureNotInsideBlock(world::ChunkManager& world, const wo
         return true;
     };
 
-    if (isPositionClear(startY))
+    if (isPositionClear(m_position.y))
     {
         return; // Already in a valid position
     }
@@ -392,7 +411,7 @@ void PlayerController::ensureNotInsideBlock(world::ChunkManager& world, const wo
     int maxScanY = std::min(startY + 256, static_cast<int>(world::ChunkColumn::COLUMN_HEIGHT) - 2);
     for (int y = startY + 1; y <= maxScanY; ++y)
     {
-        if (isPositionClear(y))
+        if (isPositionClear(static_cast<double>(y)))
         {
             m_position.y = static_cast<double>(y);
             if (core::Log::getLogger())

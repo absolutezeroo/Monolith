@@ -1,6 +1,6 @@
 # Story 7.2: AABB Swept Collision
 
-Status: review
+Status: done
 
 ## Story
 
@@ -306,3 +306,8 @@ Claude Opus 4.6
 ### Change Log
 
 - **2026-03-29**: Implemented Story 7.2 — AABB Swept Collision. Created PlayerController class with swept AABB collision (Y→X→Z), step-up logic, spawn safety, and fly mode toggle. 9 unit tests added, all passing.
+- **2026-03-29**: Code review fixes applied:
+  - [M1] `tryStepUp` now checks all block positions the player footprint overlaps on the perpendicular axis (was only checking center block, missing obstacles at block boundaries).
+  - [M2] `ensureNotInsideBlock` now handles fractional Y positions correctly — computes actual block range from player height instead of hardcoded 2-block check.
+  - Added 2 regression tests: step-up at block boundary, spawn safety with fractional Y.
+  - All 191 tests pass (489,378 assertions), zero regressions.
