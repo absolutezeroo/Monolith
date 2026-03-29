@@ -32,6 +32,8 @@ add_executable(VoxelTests
     world/TestSplineCurve.cpp
     world/TestStructureGenerator.cpp
     world/TestWorldGenerator.cpp
+    game/TestCommandQueue.cpp
+    game/TestEventBus.cpp
 )
 
 target_link_libraries(VoxelTests
