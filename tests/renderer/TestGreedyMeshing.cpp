@@ -599,6 +599,84 @@ TEST_CASE("Greedy meshing translucent quad routing", "[renderer][meshing][greedy
     }
 }
 
+// Helper: register glass as RenderType::Translucent (matches blocks.json production config).
+static uint16_t registerTranslucentGlass(BlockRegistry& registry)
+{
+    BlockDefinition def;
+    def.stringId = "base:transglass";
+    def.isSolid = true;
+    def.isTransparent = true;
+    def.modelType = ModelType::FullCube;
+    def.renderType = RenderType::Translucent;
+    def.textureIndices[0] = 10;
+    def.textureIndices[1] = 10;
+    def.textureIndices[2] = 10;
+    def.textureIndices[3] = 10;
+    def.textureIndices[4] = 10;
+    def.textureIndices[5] = 10;
+    auto result = registry.registerBlock(std::move(def));
+    REQUIRE(result.has_value());
+    return registry.getIdByName("base:transglass");
+}
+
+TEST_CASE("AC12: translucent glass between two stones", "[renderer][meshing][translucent][ac12]")
+{
+    BlockRegistry registry;
+    uint16_t stoneId = registerStone(registry);
+    uint16_t glassId = registerTranslucentGlass(registry);
+    MeshBuilder builder(registry);
+
+    SECTION("glass quads route to translucentQuads, stone quads to opaque (naive)")
+    {
+        ChunkSection section;
+        section.setBlock(7, 8, 8, stoneId);
+        section.setBlock(8, 8, 8, glassId);
+        section.setBlock(9, 8, 8, stoneId);
+
+        ChunkMesh mesh = builder.buildNaive(section, NO_NEIGHBORS);
+
+        // Stone[7]: 6 faces (PosX toward glass emitted — glass is transparent)
+        // Glass[8]: 6 faces (NegX toward stone[7], PosX toward stone[9], +4 air faces)
+        // Stone[9]: 6 faces (NegX toward glass emitted — glass is transparent)
+        // All 3 blocks emit all 6 faces. Stone quads go to opaque, glass quads to translucent.
+        REQUIRE(mesh.quadCount == 12);           // 2 stones * 6 faces
+        REQUIRE(mesh.translucentQuadCount == 6); // 1 glass * 6 faces
+    }
+
+    SECTION("glass quads route to translucentQuads, stone quads to opaque (greedy)")
+    {
+        ChunkSection section;
+        section.setBlock(7, 8, 8, stoneId);
+        section.setBlock(8, 8, 8, glassId);
+        section.setBlock(9, 8, 8, stoneId);
+
+        ChunkMesh mesh = builder.buildGreedy(section, NO_NEIGHBORS);
+
+        REQUIRE(mesh.quadCount == 12);
+        REQUIRE(mesh.translucentQuadCount == 6);
+    }
+
+    SECTION("glass faces toward stone ARE emitted (naive)")
+    {
+        ChunkSection section;
+        section.setBlock(7, 8, 8, stoneId);
+        section.setBlock(8, 8, 8, glassId);
+
+        ChunkMesh mesh = builder.buildNaive(section, NO_NEIGHBORS);
+
+        // Glass should emit NegX face toward stone (transparent toward opaque).
+        bool foundGlassTowardStone = false;
+        for (const uint64_t quad : mesh.translucentQuads)
+        {
+            if (unpackX(quad) == 8 && unpackFace(quad) == BlockFace::NegX)
+            {
+                foundGlassTowardStone = true;
+            }
+        }
+        REQUIRE(foundGlassTowardStone);
+    }
+}
+
 TEST_CASE("Greedy meshing performance benchmarks", "[renderer][meshing][greedy][!benchmark]")
 {
     BlockRegistry registry;

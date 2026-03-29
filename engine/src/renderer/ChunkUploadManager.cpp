@@ -178,6 +178,11 @@ bool ChunkUploadManager::uploadSingle(const SectionKey& key, const ChunkMesh& me
                 mesh.translucentQuads.data(), transSize, transAllocResult->offset);
             if (!transUpload.has_value())
             {
+                VX_LOG_WARN(
+                    "Staging full for translucent — section ({},{}) y={} opaque only",
+                    key.chunkCoord.x,
+                    key.chunkCoord.y,
+                    key.sectionY);
                 m_gigabuffer.free(*transAllocResult);
             }
             else

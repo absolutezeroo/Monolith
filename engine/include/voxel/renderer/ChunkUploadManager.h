@@ -8,7 +8,6 @@
 #include <glm/vec3.hpp>
 
 #include <cstdint>
-#include <optional>
 #include <unordered_map>
 #include <vector>
 
@@ -53,17 +52,6 @@ class ChunkUploadManager
     [[nodiscard]] uint32_t residentCount() const;
     [[nodiscard]] uint32_t pendingUploadCount() const;
     [[nodiscard]] uint32_t deferredFreeCount() const;
-
-    /// Returns the GPU slot index for a section, if it has one.
-    [[nodiscard]] std::optional<uint32_t> getSlotIndex(const SectionKey& key) const
-    {
-        auto it = m_slotMap.find(key);
-        if (it != m_slotMap.end())
-        {
-            return it->second;
-        }
-        return std::nullopt;
-    }
 
   private:
     struct PendingUpload

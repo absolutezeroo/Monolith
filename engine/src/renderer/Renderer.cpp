@@ -1298,11 +1298,13 @@ void Renderer::renderChunksIndirect(
     // 9. Bind shared quad index buffer
     m_quadIndexBuffer->bind(cmd);
 
-    // 10. Push graphics constants: VP + time (no chunkWorldPos)
+    // 10. Push graphics constants: VP + time + lighting params (no chunkWorldPos)
     float currentTime = static_cast<float>(glfwGetTime());
     ChunkPushConstants pc{};
     pc.viewProjection = viewProjection;
     pc.time = currentTime;
+    pc.ambientStrength = 0.3f;
+    pc.sunDirection = glm::vec4(glm::normalize(glm::vec3(0.3f, 1.0f, 0.5f)), 0.0f);
 
     vkCmdPushConstants(
         cmd,
@@ -1472,10 +1474,11 @@ void Renderer::endFrame()
         cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout, 0, 1, &m_transDescriptorSet, 0, nullptr);
     m_quadIndexBuffer->bind(cmd);
 
-    float currentTime = static_cast<float>(glfwGetTime());
     ChunkPushConstants transPC{};
     transPC.viewProjection = m_lastViewProjection;
-    transPC.time = currentTime;
+    transPC.time = static_cast<float>(glfwGetTime());
+    transPC.ambientStrength = 0.3f;
+    transPC.sunDirection = glm::vec4(glm::normalize(glm::vec3(0.3f, 1.0f, 0.5f)), 0.0f);
     vkCmdPushConstants(
         cmd, m_pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
         0, sizeof(ChunkPushConstants), &transPC);

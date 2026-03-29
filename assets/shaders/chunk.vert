@@ -25,9 +25,10 @@ layout(std430, set = 0, binding = 1) readonly buffer ChunkInfoSSBO {
 layout(push_constant) uniform PushConstants {
     mat4 viewProjection;    // 64 bytes (offset 0)
     float time;             // 4 bytes  (offset 64)
-    float _pad0;            // 4 bytes  (offset 68)
-    float _pad1;            // 4 bytes  (offset 72)
-    float _pad2;            // 4 bytes  (offset 76)
+    float ambientStrength;  // 4 bytes  (offset 68) — used by translucent.frag
+    float _pad0;            // 4 bytes  (offset 72)
+    float _pad1;            // 4 bytes  (offset 76)
+    vec4 sunDirection;      // 16 bytes (offset 80) — used by translucent.frag
 } pc;
 
 // ── Outputs to fragment shader ──────────────────────────────────────────────

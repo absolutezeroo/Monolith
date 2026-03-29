@@ -34,15 +34,17 @@ class StagingBuffer;
 class TextureArray;
 class VulkanContext;
 
-/// Push constants for chunk rendering: VP matrix + animation time.
+/// Push constants for chunk rendering: VP matrix, animation time, and forward-lit lighting params.
 /// chunkWorldPos is now read from the ChunkRenderInfo SSBO via gl_InstanceIndex.
 struct ChunkPushConstants
 {
-    glm::mat4 viewProjection; // 64 bytes
-    float time;               // 4 bytes
-    float pad[3];             // 12 bytes padding to 80 bytes
+    glm::mat4 viewProjection; // 64 bytes, offset 0
+    float time;               // 4 bytes,  offset 64
+    float ambientStrength;    // 4 bytes,  offset 68
+    float pad[2];             // 8 bytes,  offset 72
+    glm::vec4 sunDirection;   // 16 bytes, offset 80 (w unused)
 };
-static_assert(sizeof(ChunkPushConstants) == 80);
+static_assert(sizeof(ChunkPushConstants) == 96);
 
 /// Push constants for the deferred lighting pass.
 struct LightingPushConstants

@@ -11,13 +11,14 @@ layout(location = 5) flat in uint fragTintIndex;
 // ── Block texture array (binding 4) ────────────────────────────────────────
 layout(set = 0, binding = 4) uniform sampler2DArray blockTextures;
 
-// ── Push constants (same as opaque pass) ───────────────────────────────────
+// ── Push constants (shared with chunk.vert) ─────────────────────────────────
 layout(push_constant) uniform PushConstants {
     mat4 viewProjection;    // 64 bytes (offset 0)
     float time;             // 4 bytes  (offset 64)
-    float _pad0;
-    float _pad1;
-    float _pad2;
+    float ambientStrength;  // 4 bytes  (offset 68)
+    float _pad0;            // 4 bytes  (offset 72)
+    float _pad1;            // 4 bytes  (offset 76)
+    vec4 sunDirection;      // 16 bytes (offset 80, w unused)
 } pc;
 
 // ── Output to swapchain (single color attachment, alpha-blended) ───────────
@@ -32,12 +33,10 @@ void main()
     if (texColor.a < 0.01)
         discard;
 
-    // Simple directional + ambient lighting (matches deferred lighting pass)
-    vec3 sunDirection = normalize(vec3(0.3, 1.0, 0.5));
-    float ambientStrength = 0.3;
+    // Directional + ambient lighting (matches deferred lighting pass via shared push constants)
     vec3 normal = normalize(fragNormal);
-    float NdotL = max(dot(normal, sunDirection), 0.0);
-    float lighting = ambientStrength + (1.0 - ambientStrength) * NdotL;
+    float NdotL = max(dot(normal, pc.sunDirection.xyz), 0.0);
+    float lighting = pc.ambientStrength + (1.0 - pc.ambientStrength) * NdotL;
 
     // Apply AO
     lighting *= fragAO;
