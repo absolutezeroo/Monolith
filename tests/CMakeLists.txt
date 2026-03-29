@@ -33,6 +33,7 @@ add_executable(VoxelTests
     world/TestCaveCarver.cpp
     world/TestSplineCurve.cpp
     world/TestStructureGenerator.cpp
+    world/TestBlockLightPropagator.cpp
     world/TestWorldGenerator.cpp
     game/TestCommandQueue.cpp
     game/TestEventBus.cpp

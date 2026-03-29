@@ -63,6 +63,7 @@ struct ChunkCoordHash
     }
 };
 
+class BlockRegistry;
 class WorldGenerator;
 
 /// Key identifying a specific section within the world (chunk coord + section Y index).
@@ -98,6 +99,9 @@ class ChunkManager
 
     /// Set the world generator used for creating new chunks. Non-owning pointer.
     void setWorldGenerator(WorldGenerator* worldGen) { m_worldGen = worldGen; }
+
+    /// Set the block registry for light propagation lookups. Non-owning pointer.
+    void setBlockRegistry(const BlockRegistry* registry) { m_blockRegistry = registry; }
 
     /// Set the job system for async meshing. Non-owning pointer.
     void setJobSystem(core::JobSystem* jobSystem) { m_jobSystem = jobSystem; }
@@ -171,6 +175,7 @@ class ChunkManager
 
     std::unordered_map<glm::ivec2, std::unique_ptr<ChunkColumn>, ChunkCoordHash> m_chunks;
     WorldGenerator* m_worldGen = nullptr;
+    const BlockRegistry* m_blockRegistry = nullptr;
     int m_renderDistance = DEFAULT_RENDER_DISTANCE;
 
     // Async meshing infrastructure

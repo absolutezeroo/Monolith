@@ -83,6 +83,26 @@ void ChunkColumn::clearDirty(int sectionY)
     m_dirty[sectionY] = false;
 }
 
+LightMap& ChunkColumn::getLightMap(int sectionY)
+{
+    VX_ASSERT(sectionY >= 0 && sectionY < SECTIONS_PER_COLUMN, "sectionY out of bounds");
+    return m_lightMaps[sectionY];
+}
+
+const LightMap& ChunkColumn::getLightMap(int sectionY) const
+{
+    VX_ASSERT(sectionY >= 0 && sectionY < SECTIONS_PER_COLUMN, "sectionY out of bounds");
+    return m_lightMaps[sectionY];
+}
+
+void ChunkColumn::clearAllLight()
+{
+    for (auto& lightMap : m_lightMaps)
+    {
+        lightMap.clear();
+    }
+}
+
 bool ChunkColumn::isAllEmpty() const
 {
     for (const auto& section : m_sections)

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "voxel/world/ChunkSection.h"
+#include "voxel/world/LightMap.h"
 
 #include <glm/vec2.hpp>
 
@@ -40,6 +41,11 @@ class ChunkColumn
     void markDirty(int sectionY);
     void clearDirty(int sectionY);
 
+    // Light map access (always present — value-type, 4KB per section)
+    [[nodiscard]] LightMap& getLightMap(int sectionY);
+    [[nodiscard]] const LightMap& getLightMap(int sectionY) const;
+    void clearAllLight();
+
     // Queries
     [[nodiscard]] bool isAllEmpty() const;
     [[nodiscard]] int getHighestNonEmptySection() const;
@@ -47,6 +53,7 @@ class ChunkColumn
   private:
     glm::ivec2 m_chunkCoord;
     std::array<std::unique_ptr<ChunkSection>, SECTIONS_PER_COLUMN> m_sections;
+    std::array<LightMap, SECTIONS_PER_COLUMN> m_lightMaps;
     std::array<bool, SECTIONS_PER_COLUMN> m_dirty;
 };
 

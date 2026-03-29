@@ -128,8 +128,9 @@ voxel::core::Result<void> GameApp::init(const std::string& shaderDir, std::optio
     m_worldGen =
         std::make_unique<voxel::world::WorldGenerator>(static_cast<uint64_t>(m_config.getSeed()), m_blockRegistry);
 
-    // Inject WorldGenerator into ChunkManager
+    // Inject WorldGenerator and BlockRegistry into ChunkManager
     m_chunkManager.setWorldGenerator(m_worldGen.get());
+    m_chunkManager.setBlockRegistry(&m_blockRegistry);
 
     // Initialize async meshing pipeline
     auto jobResult = m_jobSystem.init();

@@ -5,6 +5,8 @@
 #include "voxel/core/Log.h"
 #include "voxel/renderer/MeshBuilder.h"
 #include "voxel/world/Block.h"
+#include "voxel/world/BlockLightPropagator.h"
+#include "voxel/world/BlockRegistry.h"
 #include "voxel/world/WorldGenerator.h"
 
 #include <glm/geometric.hpp>
@@ -118,6 +120,13 @@ void ChunkManager::loadChunk(glm::ivec2 coord)
         else
         {
             it->second = std::make_unique<ChunkColumn>(coord);
+        }
+
+        // Propagate block light after generation
+        if (m_blockRegistry != nullptr)
+        {
+            BlockLightPropagator::propagateColumn(*it->second, *m_blockRegistry);
+            BlockLightPropagator::propagateBorders(*it->second, *this, *m_blockRegistry);
         }
     }
 }
@@ -426,6 +435,10 @@ renderer::MeshJobInput ChunkManager::createMeshSnapshot(glm::ivec2 coord, int se
         {{0, -1}, 0}, // NegZ
     };
 
+    // Copy light data from center section
+    input.lightData = col->getLightMap(sectionY);
+    input.hasLightData = true;
+
     for (int i = 0; i < 6; ++i)
     {
         glm::ivec2 nCoord = coord + offsets[i].dCoord;
@@ -439,10 +452,21 @@ renderer::MeshJobInput ChunkManager::createMeshSnapshot(glm::ivec2 coord, int se
             {
                 input.neighbors[i] = *nSec;
                 input.hasNeighbor[i] = true;
-                continue;
             }
+            else
+            {
+                input.hasNeighbor[i] = false;
+            }
+
+            // Copy neighbor light data (available even if section is null/empty)
+            input.neighborLightData[i] = nCol->getLightMap(nSectionY);
+            input.hasNeighborLight[i] = true;
         }
-        input.hasNeighbor[i] = false;
+        else
+        {
+            input.hasNeighbor[i] = false;
+            input.hasNeighborLight[i] = false;
+        }
     }
 
     return input;
