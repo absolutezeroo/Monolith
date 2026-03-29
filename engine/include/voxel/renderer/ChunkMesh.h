@@ -121,6 +121,36 @@ inline constexpr uint8_t unpackTintIndex(uint64_t quad) { return static_cast<uin
 /// Unpack waving type (0-3).
 inline constexpr uint8_t unpackWavingType(uint64_t quad) { return static_cast<uint8_t>((quad >> 62) & 0x3); }
 
+/// Pack 4 corner light values into a single uint32_t.
+/// Each corner byte is [sky:4 | block:4]: bits [7:4] = sky, [3:0] = block.
+/// Layout: [corner0:8 | corner1:8 | corner2:8 | corner3:8].
+inline constexpr uint32_t packCornerLight(
+    uint8_t sky0,
+    uint8_t blk0,
+    uint8_t sky1,
+    uint8_t blk1,
+    uint8_t sky2,
+    uint8_t blk2,
+    uint8_t sky3,
+    uint8_t blk3)
+{
+    uint32_t c0 = static_cast<uint32_t>(((sky0 & 0xF) << 4) | (blk0 & 0xF));
+    uint32_t c1 = static_cast<uint32_t>(((sky1 & 0xF) << 4) | (blk1 & 0xF));
+    uint32_t c2 = static_cast<uint32_t>(((sky2 & 0xF) << 4) | (blk2 & 0xF));
+    uint32_t c3 = static_cast<uint32_t>(((sky3 & 0xF) << 4) | (blk3 & 0xF));
+    return c0 | (c1 << 8) | (c2 << 16) | (c3 << 24);
+}
+
+/// Default light value: all corners sky=15, block=0 (full brightness, no block light).
+inline constexpr uint32_t DEFAULT_CORNER_LIGHT = packCornerLight(15, 0, 15, 0, 15, 0, 15, 0);
+
+/// Unpack a specific corner's light byte from a packed light uint32_t.
+/// Returns [sky:4 | block:4] byte for the given corner (0-3).
+inline constexpr uint8_t unpackCornerLightByte(uint32_t packed, uint8_t corner)
+{
+    return static_cast<uint8_t>((packed >> (corner * 8)) & 0xFF);
+}
+
 /// Vertex format for non-cubic block models (slabs, crosses, torches, etc.).
 /// Used alongside the packed quad buffer for FullCube blocks.
 struct ModelVertex
@@ -131,23 +161,28 @@ struct ModelVertex
     uint16_t blockStateId = 0;
     uint8_t ao = 3;     // Ambient occlusion (0-3, same scale as quad AO)
     uint8_t flags = 0;  // Bit 0: tint index LSB, Bits 1-2: waving type
+    uint8_t light = 0xF0; // Packed light [sky:4 | block:4] — default: sky=15, block=0
+    uint8_t pad[3] = {};  // Explicit padding to 40 bytes
 };
 
-static_assert(sizeof(ModelVertex) == 36, "ModelVertex must be 36 bytes for GPU upload");
+static_assert(sizeof(ModelVertex) == 40, "ModelVertex must be 40 bytes for GPU upload");
 
 /// Mesh data for a single chunk section.
 struct ChunkMesh
 {
     std::vector<uint64_t> quads;
+    std::vector<uint32_t> quadLightData; ///< Parallel to quads: packed per-corner light per quad.
     uint32_t quadCount = 0;
 
     std::vector<uint64_t> translucentQuads;
+    std::vector<uint32_t> translucentQuadLightData; ///< Parallel to translucentQuads.
     uint32_t translucentQuadCount = 0;
 
     std::vector<ModelVertex> modelVertices;
     uint32_t modelVertexCount = 0;
 
     /// Returns true when the mesh contains no geometry at all.
+    /// Light vectors don't affect emptiness — they are always parallel to quad vectors.
     [[nodiscard]] bool isEmpty() const
     {
         return quadCount == 0 && translucentQuadCount == 0 && modelVertexCount == 0;

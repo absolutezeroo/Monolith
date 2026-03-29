@@ -121,12 +121,15 @@ bool ChunkUploadManager::uploadSingle(const SectionKey& key, const ChunkMesh& me
         return false; // Staging budget exhausted — retry next frame
     }
 
-    // 1. Upload opaque quads (if any)
+    // 1. Upload opaque quads + light data (if any)
+    // Layout: [quad0_lo, quad0_hi, quad1_lo, ... | light0, light1, ...]
     GigabufferAllocation opaqueAlloc{};
     uint32_t opaqueCount = 0;
     if (mesh.quadCount > 0)
     {
-        VkDeviceSize uploadSize = mesh.quadCount * sizeof(uint64_t);
+        VkDeviceSize quadBytes = mesh.quadCount * sizeof(uint64_t);
+        VkDeviceSize lightBytes = mesh.quadCount * sizeof(uint32_t);
+        VkDeviceSize uploadSize = quadBytes + lightBytes;
         auto allocResult = m_gigabuffer.allocate(uploadSize);
         if (!allocResult.has_value())
         {
@@ -146,23 +149,37 @@ bool ChunkUploadManager::uploadSingle(const SectionKey& key, const ChunkMesh& me
             return true; // consumed
         }
 
+        // Upload quad data
         auto uploadResult = m_stagingBuffer.uploadToGigabuffer(
-            mesh.quads.data(), uploadSize, allocResult->offset);
+            mesh.quads.data(), quadBytes, allocResult->offset);
         if (!uploadResult.has_value())
         {
             m_gigabuffer.free(*allocResult);
             return false; // Retry next frame
         }
+
+        // Upload light data immediately after quads
+        auto lightResult = m_stagingBuffer.uploadToGigabuffer(
+            mesh.quadLightData.data(), lightBytes, allocResult->offset + quadBytes);
+        if (!lightResult.has_value())
+        {
+            // Light upload failed but quads succeeded — continue without light
+            // (shader will read garbage for light, but this is a transient staging issue)
+            VX_LOG_WARN("Staging full for opaque light data — section ({},{}) y={}", key.chunkCoord.x, key.chunkCoord.y, key.sectionY);
+        }
+
         opaqueAlloc = *allocResult;
         opaqueCount = mesh.quadCount;
     }
 
-    // 2. Upload translucent quads (if any)
+    // 2. Upload translucent quads + light data (if any)
     GigabufferAllocation transAlloc{};
     uint32_t transCount = 0;
     if (mesh.translucentQuadCount > 0)
     {
-        VkDeviceSize transSize = mesh.translucentQuadCount * sizeof(uint64_t);
+        VkDeviceSize transQuadBytes = mesh.translucentQuadCount * sizeof(uint64_t);
+        VkDeviceSize transLightBytes = mesh.translucentQuadCount * sizeof(uint32_t);
+        VkDeviceSize transSize = transQuadBytes + transLightBytes;
         auto transAllocResult = m_gigabuffer.allocate(transSize);
         if (!transAllocResult.has_value())
         {
@@ -175,7 +192,7 @@ bool ChunkUploadManager::uploadSingle(const SectionKey& key, const ChunkMesh& me
         else
         {
             auto transUpload = m_stagingBuffer.uploadToGigabuffer(
-                mesh.translucentQuads.data(), transSize, transAllocResult->offset);
+                mesh.translucentQuads.data(), transQuadBytes, transAllocResult->offset);
             if (!transUpload.has_value())
             {
                 VX_LOG_WARN(
@@ -187,6 +204,14 @@ bool ChunkUploadManager::uploadSingle(const SectionKey& key, const ChunkMesh& me
             }
             else
             {
+                // Upload translucent light data
+                auto transLightUpload = m_stagingBuffer.uploadToGigabuffer(
+                    mesh.translucentQuadLightData.data(), transLightBytes, transAllocResult->offset + transQuadBytes);
+                if (!transLightUpload.has_value())
+                {
+                    VX_LOG_WARN("Staging full for translucent light data — section ({},{}) y={}", key.chunkCoord.x, key.chunkCoord.y, key.sectionY);
+                }
+
                 transAlloc = *transAllocResult;
                 transCount = mesh.translucentQuadCount;
             }

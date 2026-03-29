@@ -6,6 +6,7 @@
 #include "voxel/world/Block.h"
 #include "voxel/world/BlockRegistry.h"
 #include "voxel/world/ChunkSection.h"
+#include "voxel/world/LightMap.h"
 
 #include <array>
 #include <bit>
@@ -21,7 +22,7 @@ constexpr int PAD = 18;
 constexpr int PAD_VOLUME = PAD * PAD * PAD;
 constexpr int S = world::ChunkSection::SIZE; // 16
 
-/// Pre-allocated workspace for greedy meshing to avoid per-call heap allocation (~44 KB total).
+/// Pre-allocated workspace for greedy meshing to avoid per-call heap allocation.
 struct MeshWorkspace
 {
     std::array<uint16_t, PAD_VOLUME> blockPad{};
@@ -29,7 +30,21 @@ struct MeshWorkspace
     std::array<bool, OPACITY_PAD_VOLUME> cubicOpacityPad{}; // FullCube-only opacity (for face masks)
     std::array<uint16_t, 6 * S * S> faceMasks{};
     std::array<uint8_t, 6 * S * S * S> aoKeys{};           // Packed AO per visible face (4 corners, 2 bits each)
+    std::array<uint8_t, PAD_VOLUME> lightPad{};             // 18^3 padded light [sky:4|block:4]
+    bool hasLight = false;                                   // Whether lightPad was populated
 };
+
+/// Face normal direction offsets for each BlockFace.
+// clang-format off
+constexpr int FACE_NORMAL_OFFSETS[6][3] = {
+    { +1,  0,  0 }, // PosX
+    { -1,  0,  0 }, // NegX
+    {  0, +1,  0 }, // PosY
+    {  0, -1,  0 }, // NegY
+    {  0,  0, +1 }, // PosZ
+    {  0,  0, -1 }, // NegZ
+};
+// clang-format on
 
 
 /// Stride-based pad access for eliminating per-element switch in inner loops.
@@ -158,6 +173,120 @@ void buildCubicOpacityPad(
             }
         }
     }
+}
+
+/// Build 18^3 padded light array from LightMap + 6 neighbor LightMaps.
+/// Center 16^3 from lightMap; borders from neighbors; default = 0xF0 (sky=15, block=0 = open air).
+void buildLightPad(
+    std::array<uint8_t, PAD_VOLUME>& lightPad,
+    const world::LightMap& lightMap,
+    const std::array<const world::LightMap*, 6>& neighborLightMaps)
+{
+    lightPad.fill(0xF0); // Default: open air (sky=15, block=0)
+
+    // Center 16^3
+    for (int y = 0; y < S; ++y)
+    {
+        for (int z = 0; z < S; ++z)
+        {
+            for (int x = 0; x < S; ++x)
+            {
+                lightPad[padIndex(x + 1, y + 1, z + 1)] = lightMap.getRaw(x, y, z);
+            }
+        }
+    }
+
+    // PosX neighbor (face=0): x=0 slice from neighbor -> padded x=17
+    if (neighborLightMaps[0] != nullptr)
+    {
+        for (int y = 0; y < S; ++y)
+            for (int z = 0; z < S; ++z)
+                lightPad[padIndex(17, y + 1, z + 1)] = neighborLightMaps[0]->getRaw(0, y, z);
+    }
+    // NegX neighbor (face=1): x=15 slice from neighbor -> padded x=0
+    if (neighborLightMaps[1] != nullptr)
+    {
+        for (int y = 0; y < S; ++y)
+            for (int z = 0; z < S; ++z)
+                lightPad[padIndex(0, y + 1, z + 1)] = neighborLightMaps[1]->getRaw(S - 1, y, z);
+    }
+    // PosY neighbor (face=2): y=0 slice from neighbor -> padded y=17
+    if (neighborLightMaps[2] != nullptr)
+    {
+        for (int z = 0; z < S; ++z)
+            for (int x = 0; x < S; ++x)
+                lightPad[padIndex(x + 1, 17, z + 1)] = neighborLightMaps[2]->getRaw(x, 0, z);
+    }
+    // NegY neighbor (face=3): y=15 slice from neighbor -> padded y=0
+    if (neighborLightMaps[3] != nullptr)
+    {
+        for (int z = 0; z < S; ++z)
+            for (int x = 0; x < S; ++x)
+                lightPad[padIndex(x + 1, 0, z + 1)] = neighborLightMaps[3]->getRaw(x, S - 1, z);
+    }
+    // PosZ neighbor (face=4): z=0 slice from neighbor -> padded z=17
+    if (neighborLightMaps[4] != nullptr)
+    {
+        for (int y = 0; y < S; ++y)
+            for (int x = 0; x < S; ++x)
+                lightPad[padIndex(x + 1, y + 1, 17)] = neighborLightMaps[4]->getRaw(x, y, 0);
+    }
+    // NegZ neighbor (face=5): z=15 slice from neighbor -> padded z=0
+    if (neighborLightMaps[5] != nullptr)
+    {
+        for (int y = 0; y < S; ++y)
+            for (int x = 0; x < S; ++x)
+                lightPad[padIndex(x + 1, y + 1, 0)] = neighborLightMaps[5]->getRaw(x, y, S - 1);
+    }
+}
+
+/// Compute per-corner light for a quad face using the same 4-neighbor sampling as AO.
+/// Samples: face-normal block + 2 edge-adjacent + 1 corner-diagonal.
+/// Opaque blocks contribute 0 light. Returns packed uint32_t (4 corner bytes).
+uint32_t computeFaceLight(
+    uint8_t face,
+    int x,
+    int y,
+    int z,
+    const std::array<uint8_t, PAD_VOLUME>& lightPad,
+    const std::array<bool, OPACITY_PAD_VOLUME>& opacity)
+{
+    int px = x + 1;
+    int py = y + 1;
+    int pz = z + 1;
+
+    // Face-normal block index (the block just outside the face)
+    int fnIdx = padIndex(
+        px + FACE_NORMAL_OFFSETS[face][0],
+        py + FACE_NORMAL_OFFSETS[face][1],
+        pz + FACE_NORMAL_OFFSETS[face][2]);
+
+    uint8_t corners[4];
+    for (int corner = 0; corner < 4; ++corner)
+    {
+        const auto& offsets = AO_OFFSETS[face][corner];
+
+        int s1Idx = padIndex(px + offsets[0][0], py + offsets[0][1], pz + offsets[0][2]);
+        int s2Idx = padIndex(px + offsets[1][0], py + offsets[1][1], pz + offsets[1][2]);
+        int dIdx = padIndex(px + offsets[2][0], py + offsets[2][1], pz + offsets[2][2]);
+
+        // Light from each position: 0 if opaque, else raw light value
+        uint8_t lFace = opacity[fnIdx] ? static_cast<uint8_t>(0) : lightPad[fnIdx];
+        uint8_t lS1 = opacity[s1Idx] ? static_cast<uint8_t>(0) : lightPad[s1Idx];
+        uint8_t lS2 = opacity[s2Idx] ? static_cast<uint8_t>(0) : lightPad[s2Idx];
+        uint8_t lD = opacity[dIdx] ? static_cast<uint8_t>(0) : lightPad[dIdx];
+
+        // Average sky and block channels separately
+        uint8_t avgSky = static_cast<uint8_t>(
+            ((lFace >> 4) + (lS1 >> 4) + (lS2 >> 4) + (lD >> 4)) / 4);
+        uint8_t avgBlk = static_cast<uint8_t>(
+            ((lFace & 0xF) + (lS1 & 0xF) + (lS2 & 0xF) + (lD & 0xF)) / 4);
+
+        corners[corner] = static_cast<uint8_t>((avgSky << 4) | avgBlk);
+    }
+
+    return static_cast<uint32_t>(corners[0]) | (static_cast<uint32_t>(corners[1]) << 8) |
+           (static_cast<uint32_t>(corners[2]) << 16) | (static_cast<uint32_t>(corners[3]) << 24);
 }
 
 /// Build face masks for one face direction using stride-based pad access (no per-element switch).
@@ -323,14 +452,17 @@ inline uint8_t effectiveTintForFace(uint8_t tintIndex, uint8_t faceIdx)
 }
 
 /// Greedy merge one face direction: extends quads in width then height, constrained by
-/// same block type AND same AO key. Emits packed quads into outQuads.
+/// same block type AND same AO key. Emits packed quads into outQuads and light data into outLightData.
 void greedyMergeFace(
     uint8_t faceIdx,
     uint16_t* sliceMasks,
     const uint8_t* aoKeys,
     const std::array<uint16_t, PAD_VOLUME>& blockPad,
     const world::BlockRegistry& registry,
-    std::vector<uint64_t>& outQuads)
+    std::vector<uint64_t>& outQuads,
+    std::vector<uint32_t>& outLightData,
+    const std::array<uint8_t, PAD_VOLUME>* lightPad,
+    const std::array<bool, OPACITY_PAD_VOLUME>* opacityPad)
 {
     for (int slice = 0; slice < S; ++slice)
     {
@@ -434,6 +566,16 @@ void greedyMergeFace(
                     effectiveTintForFace(blockDef.tintIndex, faceIdx),
                     blockDef.waving);
                 outQuads.push_back(quad);
+
+                // Parallel light data: compute from lightPad or use default
+                if (lightPad != nullptr && opacityPad != nullptr)
+                {
+                    outLightData.push_back(computeFaceLight(faceIdx, lx, ly, lz, *lightPad, *opacityPad));
+                }
+                else
+                {
+                    outLightData.push_back(DEFAULT_CORNER_LIGHT);
+                }
             }
         }
     }
@@ -468,7 +610,9 @@ MeshBuilder::MeshBuilder(const world::BlockRegistry& registry)
 
 ChunkMesh MeshBuilder::buildNaive(
     const world::ChunkSection& section,
-    const std::array<const world::ChunkSection*, 6>& neighbors) const
+    const std::array<const world::ChunkSection*, 6>& neighbors,
+    const world::LightMap* lightMap,
+    const std::array<const world::LightMap*, 6>& neighborLightMaps) const
 {
     ChunkMesh mesh;
 
@@ -482,12 +626,21 @@ ChunkMesh MeshBuilder::buildNaive(
     // Typical terrain is ~30-50% of that. Reserve a reasonable estimate.
     constexpr int ESTIMATED_QUADS = 8192;
     mesh.quads.reserve(ESTIMATED_QUADS);
+    mesh.quadLightData.reserve(ESTIMATED_QUADS);
 
     constexpr int SIZE = world::ChunkSection::SIZE;
 
     // Build padded 18^3 opacity array for AO sampling across section boundaries.
     std::array<bool, OPACITY_PAD_VOLUME> opacity{};
     buildOpacityPad(opacity, section, neighbors, m_registry);
+
+    // Build padded light array if LightMap is provided.
+    std::array<uint8_t, PAD_VOLUME> lightPad{};
+    bool hasLight = (lightMap != nullptr);
+    if (hasLight)
+    {
+        buildLightPad(lightPad, *lightMap, neighborLightMaps);
+    }
 
     // Opposite face direction lookup: PosX↔NegX, PosY↔NegY, PosZ↔NegZ.
     constexpr uint8_t OPPOSITE_FACE[6] = {1, 0, 3, 2, 5, 4};
@@ -569,13 +722,20 @@ ChunkMesh MeshBuilder::buildNaive(
                             effectiveTintForFace(blockDef.tintIndex, f),
                             blockDef.waving);
 
+                        // Compute per-corner light for this quad
+                        uint32_t light = hasLight
+                                             ? computeFaceLight(f, x, y, z, lightPad, opacity)
+                                             : DEFAULT_CORNER_LIGHT;
+
                         if (blockDef.renderType == world::RenderType::Translucent)
                         {
                             mesh.translucentQuads.push_back(quad);
+                            mesh.translucentQuadLightData.push_back(light);
                         }
                         else
                         {
                             mesh.quads.push_back(quad);
+                            mesh.quadLightData.push_back(light);
                         }
                     }
                 }
@@ -587,7 +747,7 @@ ChunkMesh MeshBuilder::buildNaive(
     mesh.translucentQuadCount = static_cast<uint32_t>(mesh.translucentQuads.size());
 
     // Second pass: generate model vertices for non-cubic blocks.
-    buildNonCubicPass(section, neighbors, mesh);
+    buildNonCubicPass(section, neighbors, lightMap, mesh);
 
     return mesh;
 }
@@ -653,7 +813,9 @@ uint16_t MeshBuilder::getAdjacentBlock(
 
 ChunkMesh MeshBuilder::buildGreedy(
     const world::ChunkSection& section,
-    const std::array<const world::ChunkSection*, 6>& neighbors) const
+    const std::array<const world::ChunkSection*, 6>& neighbors,
+    const world::LightMap* lightMap,
+    const std::array<const world::LightMap*, 6>& neighborLightMaps) const
 {
     ChunkMesh mesh;
 
@@ -664,12 +826,23 @@ ChunkMesh MeshBuilder::buildGreedy(
 
     constexpr int ESTIMATED_QUADS = 2048;
     mesh.quads.reserve(ESTIMATED_QUADS);
+    mesh.quadLightData.reserve(ESTIMATED_QUADS);
 
-    // Phase 0: Build padded data (block IDs + opacity).
+    // Phase 0: Build padded data (block IDs + opacity + light).
     MeshWorkspace ws;
     buildBlockPad(ws.blockPad, section, neighbors);
     buildOpacityPad(ws.opacityPad, section, neighbors, m_registry);
     buildCubicOpacityPad(ws.cubicOpacityPad, ws.blockPad, m_registry);
+
+    if (lightMap != nullptr)
+    {
+        buildLightPad(ws.lightPad, *lightMap, neighborLightMaps);
+        ws.hasLight = true;
+    }
+
+    // Light pad pointers for greedyMergeFace (null when no light data)
+    const std::array<uint8_t, PAD_VOLUME>* lightPadPtr = ws.hasLight ? &ws.lightPad : nullptr;
+    const std::array<bool, OPACITY_PAD_VOLUME>* opacityPadPtr = ws.hasLight ? &ws.opacityPad : nullptr;
 
     // Pass 1 — Opaque FullCube blocks: face masks from cubicOpacityPad, AO-aware greedy merge.
     for (uint8_t faceIdx = 0; faceIdx < BLOCK_FACE_COUNT; ++faceIdx)
@@ -679,7 +852,8 @@ ChunkMesh MeshBuilder::buildGreedy(
 
         buildFaceMasks(faceIdx, ws.cubicOpacityPad, masks);
         buildAOKeys(faceIdx, masks, ws.opacityPad, aoKeys);
-        greedyMergeFace(faceIdx, masks, aoKeys, ws.blockPad, m_registry, mesh.quads);
+        greedyMergeFace(
+            faceIdx, masks, aoKeys, ws.blockPad, m_registry, mesh.quads, mesh.quadLightData, lightPadPtr, opacityPadPtr);
     }
 
     // Pass 2a — Cutout FullCube blocks: face masks filtered by RenderType::Cutout → opaque quads.
@@ -690,7 +864,8 @@ ChunkMesh MeshBuilder::buildGreedy(
 
         buildTransparentFaceMasks(faceIdx, ws.blockPad, ws.opacityPad, m_registry, world::RenderType::Cutout, masks);
         buildAOKeys(faceIdx, masks, ws.opacityPad, aoKeys);
-        greedyMergeFace(faceIdx, masks, aoKeys, ws.blockPad, m_registry, mesh.quads);
+        greedyMergeFace(
+            faceIdx, masks, aoKeys, ws.blockPad, m_registry, mesh.quads, mesh.quadLightData, lightPadPtr, opacityPadPtr);
     }
 
     // Pass 2b — Translucent FullCube blocks: face masks filtered by RenderType::Translucent → translucent quads.
@@ -702,14 +877,23 @@ ChunkMesh MeshBuilder::buildGreedy(
         buildTransparentFaceMasks(
             faceIdx, ws.blockPad, ws.opacityPad, m_registry, world::RenderType::Translucent, masks);
         buildAOKeys(faceIdx, masks, ws.opacityPad, aoKeys);
-        greedyMergeFace(faceIdx, masks, aoKeys, ws.blockPad, m_registry, mesh.translucentQuads);
+        greedyMergeFace(
+            faceIdx,
+            masks,
+            aoKeys,
+            ws.blockPad,
+            m_registry,
+            mesh.translucentQuads,
+            mesh.translucentQuadLightData,
+            lightPadPtr,
+            opacityPadPtr);
     }
 
     mesh.quadCount = static_cast<uint32_t>(mesh.quads.size());
     mesh.translucentQuadCount = static_cast<uint32_t>(mesh.translucentQuads.size());
 
     // Non-cubic pass for greedy mesher too.
-    buildNonCubicPass(section, neighbors, mesh);
+    buildNonCubicPass(section, neighbors, lightMap, mesh);
 
     return mesh;
 }
@@ -717,6 +901,7 @@ ChunkMesh MeshBuilder::buildGreedy(
 void MeshBuilder::buildNonCubicPass(
     const world::ChunkSection& section,
     const std::array<const world::ChunkSection*, 6>& neighbors,
+    const world::LightMap* lightMap,
     ChunkMesh& mesh) const
 {
     constexpr int SIZE = world::ChunkSection::SIZE;
@@ -757,8 +942,22 @@ void MeshBuilder::buildNonCubicPass(
                     }
                 }
 
+                // Determine light value for this block position
+                uint8_t blockLight = 0xF0; // Default: sky=15, block=0
+                if (lightMap != nullptr)
+                {
+                    blockLight = lightMap->getRaw(x, y, z);
+                }
+
+                size_t prevCount = mesh.modelVertices.size();
                 world::StateMap state = m_registry.getStateValues(blockId);
                 m_modelRegistry.getModelVertices(x, y, z, blockDef, state, blockId, faceMask, mesh.modelVertices);
+
+                // Set light on all newly added vertices
+                for (size_t v = prevCount; v < mesh.modelVertices.size(); ++v)
+                {
+                    mesh.modelVertices[v].light = blockLight;
+                }
             }
         }
     }

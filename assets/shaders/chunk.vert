@@ -38,6 +38,8 @@ layout(location = 2) out vec2 fragUV;
 layout(location = 3) out float fragAO;
 layout(location = 4) flat out uint fragTextureLayer;
 layout(location = 5) flat out uint fragTintIndex;
+layout(location = 6) out float fragSkyLight;
+layout(location = 7) out float fragBlockLight;
 
 // ── Face normals ────────────────────────────────────────────────────────────
 const vec3 FACE_NORMALS[6] = vec3[6](
@@ -246,11 +248,39 @@ void main()
         worldPos.y += sin(phase) * 0.03;
     }
 
+    // ── Read per-corner light data ─────────────────────────────────────────
+    // Light is stored after all quad data in each gigabuffer allocation:
+    // Layout: [quad0_lo, quad0_hi, quad1_lo, ... | light0, light1, ...]
+    // Each light uint32 packs 4 corner bytes: [c0:8 | c1:8 | c2:8 | c3:8]
+    // Each corner byte: [sky:4 | block:4]
+    //
+    // Determine opaque vs translucent draw by checking if quadIndex falls
+    // within the opaque allocation range.
+    uint opaqueBase = chunkInfo.infos[gl_InstanceIndex].gigabufferOffset / 4u;
+    uint opaqueCount = chunkInfo.infos[gl_InstanceIndex].quadCount;
+    uint quadStart = quadIndex * 2u;
+    bool isOpaque = (quadStart >= opaqueBase) && (quadStart < opaqueBase + opaqueCount * 2u);
+
+    uint baseU32 = isOpaque ? opaqueBase
+                            : chunkInfo.infos[gl_InstanceIndex].transGigabufferOffset / 4u;
+    uint qCount = isOpaque ? opaqueCount
+                           : chunkInfo.infos[gl_InstanceIndex].transQuadCount;
+    uint localQuad = (quadStart - baseU32) / 2u;
+    uint lightPacked = gigabuffer.data[baseU32 + qCount * 2u + localQuad];
+
+    // Extract per-corner light byte (account for flip rotation)
+    uint effectiveCorner = (flip == 1u) ? ((cornerIndex + 1u) % 4u) : cornerIndex;
+    uint cornerByte = (lightPacked >> (effectiveCorner * 8u)) & 0xFFu;
+    float skyLight = float((cornerByte >> 4u) & 0xFu) / 15.0;
+    float blockLight = float(cornerByte & 0xFu) / 15.0;
+
     // ── Output ──────────────────────────────────────────────────────────────
     fragWorldPos = worldPos;
     fragNormal = FACE_NORMALS[face];
     fragTextureLayer = textureLayer;
     fragTintIndex = tintIndex;
+    fragSkyLight = skyLight;
+    fragBlockLight = blockLight;
 
     gl_Position = pc.viewProjection * vec4(worldPos, 1.0);
 }

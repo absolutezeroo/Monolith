@@ -21,9 +21,11 @@ add_executable(VoxelTests
     renderer/TestAsyncMeshing.cpp
     renderer/TestChunkUpload.cpp
     renderer/TestQuadIndexBuffer.cpp
+    renderer/TestMeshingLight.cpp
     world/TestChunkSection.cpp
     world/TestChunkColumn.cpp
     world/TestBlockRegistry.cpp
+    world/TestLightMap.cpp
     world/TestChunkManager.cpp
     world/TestPaletteCompression.cpp
     world/TestChunkSerializer.cpp

@@ -4,6 +4,7 @@
 #include "voxel/renderer/ChunkMesh.h"
 #include "voxel/renderer/MeshBuilder.h"
 #include "voxel/world/ChunkSection.h"
+#include "voxel/world/LightMap.h"
 
 #include <enkiTS/TaskScheduler.h>
 #include <glm/vec2.hpp>
@@ -23,6 +24,12 @@ struct MeshJobInput
     std::array<bool, 6> hasNeighbor = {};          // Which neighbors were present
     glm::ivec2 chunkCoord{0, 0};                  // Chunk XZ coordinate
     int sectionY = 0;                              // Section index within column (0-15)
+
+    // Light data snapshot (4KB each × 7 = 28KB when present)
+    world::LightMap lightData;                         // Center section light (zero = default sky=15)
+    std::array<world::LightMap, 6> neighborLightData;  // Neighbor light data (copied)
+    std::array<bool, 6> hasNeighborLight = {};          // Which neighbor light maps were present
+    bool hasLightData = false;                          // When false, mesher skips light averaging
 };
 
 /// Result produced by an async mesh task.
@@ -62,8 +69,19 @@ struct MeshChunkTask : enki::ITaskSet
             neighbors[i] = input.hasNeighbor[i] ? &input.neighbors[i] : nullptr;
         }
 
+        // Reconstruct light map pointer arrays from snapshot
+        const world::LightMap* lightMap = input.hasLightData ? &input.lightData : nullptr;
+        std::array<const world::LightMap*, 6> neighborLightMaps{};
+        if (input.hasLightData)
+        {
+            for (int i = 0; i < 6; ++i)
+            {
+                neighborLightMaps[i] = input.hasNeighborLight[i] ? &input.neighborLightData[i] : nullptr;
+            }
+        }
+
         MeshResult result;
-        result.mesh = meshBuilder->buildGreedy(input.section, neighbors);
+        result.mesh = meshBuilder->buildGreedy(input.section, neighbors, lightMap, neighborLightMaps);
         result.chunkCoord = input.chunkCoord;
         result.sectionY = input.sectionY;
 

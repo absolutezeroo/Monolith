@@ -8,6 +8,7 @@
 namespace voxel::world
 {
 class BlockRegistry;
+class LightMap;
 struct ChunkSection;
 } // namespace voxel::world
 
@@ -29,10 +30,14 @@ class MeshBuilder
     /// @param neighbors The 6 neighbor sections for boundary face culling.
     ///        Uses BlockFace ordering: [PosX, NegX, PosY, NegY, PosZ, NegZ].
     ///        nullptr = treat boundary as air (emit face).
+    /// @param lightMap Optional light data for this section. nullptr = default light (sky=15, block=0).
+    /// @param neighborLightMaps Optional light data for 6 neighbors. nullptr entries = open air (sky=15).
     /// @return The generated mesh data.
     [[nodiscard]] ChunkMesh buildNaive(
         const world::ChunkSection& section,
-        const std::array<const world::ChunkSection*, 6>& neighbors) const;
+        const std::array<const world::ChunkSection*, 6>& neighbors,
+        const world::LightMap* lightMap = nullptr,
+        const std::array<const world::LightMap*, 6>& neighborLightMaps = {}) const;
 
     /// Build a mesh for a chunk section using binary greedy meshing.
     /// Merges coplanar adjacent faces of the same block type into larger quads.
@@ -43,10 +48,14 @@ class MeshBuilder
     /// @param neighbors The 6 neighbor sections for boundary face culling.
     ///        Uses BlockFace ordering: [PosX, NegX, PosY, NegY, PosZ, NegZ].
     ///        nullptr = treat boundary as air (emit face).
+    /// @param lightMap Optional light data for this section. nullptr = default light (sky=15, block=0).
+    /// @param neighborLightMaps Optional light data for 6 neighbors. nullptr entries = open air (sky=15).
     /// @return The generated mesh data with merged quads.
     [[nodiscard]] ChunkMesh buildGreedy(
         const world::ChunkSection& section,
-        const std::array<const world::ChunkSection*, 6>& neighbors) const;
+        const std::array<const world::ChunkSection*, 6>& neighbors,
+        const world::LightMap* lightMap = nullptr,
+        const std::array<const world::LightMap*, 6>& neighborLightMaps = {}) const;
 
   private:
     const world::BlockRegistry& m_registry;
@@ -66,6 +75,7 @@ class MeshBuilder
     void buildNonCubicPass(
         const world::ChunkSection& section,
         const std::array<const world::ChunkSection*, 6>& neighbors,
+        const world::LightMap* lightMap,
         ChunkMesh& mesh) const;
 };
 

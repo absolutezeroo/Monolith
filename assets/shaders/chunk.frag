@@ -7,6 +7,8 @@ layout(location = 2) in vec2 fragUV;
 layout(location = 3) in float fragAO;
 layout(location = 4) flat in uint fragTextureLayer;
 layout(location = 5) flat in uint fragTintIndex;
+layout(location = 6) in float fragSkyLight;   // Wired but unused until 8.2
+layout(location = 7) in float fragBlockLight;  // Wired but unused until 8.2
 
 // ── Block texture array (binding 4) ────────────────────────────────────────
 layout(set = 0, binding = 4) uniform sampler2DArray blockTextures;

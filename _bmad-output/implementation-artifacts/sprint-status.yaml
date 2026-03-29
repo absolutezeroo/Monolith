@@ -273,7 +273,7 @@ epics:
     stories:
       - id: "8.0"
         title: "Wire Light Data into Meshing Pipeline"
-        status: ready-for-dev
+        status: review
         assigned_to: dev-agent
       - id: "8.1"
         title: "Light Data Storage + BFS Block Light"

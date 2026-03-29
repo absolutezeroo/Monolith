@@ -1,6 +1,6 @@
 # Story 8.0: Wire Light Data into Meshing Pipeline
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -259,6 +259,52 @@ Expected commit for this story: `feat(world): add LightMap and wire light data i
 - [Source: assets/shaders/chunk.vert] — Current vertex pulling + output layout
 - [Source: assets/shaders/gbuffer.frag] — Current G-Buffer MRT outputs
 - [Source: assets/shaders/lighting.frag] — Current deferred lighting (sun+ambient only)
+
+---
+
+## Senior Developer Review (AI)
+
+### Implementation Summary
+
+All 9 tasks completed. Story 8.0 wires light data through the full meshing pipeline — from CPU-side LightMap storage through the async meshing job system, GPU upload, and vertex shader output — without changing any rendering output.
+
+### Files Created
+| File | Purpose |
+|------|---------|
+| `engine/include/voxel/world/LightMap.h` | Header-only LightMap class: 4096-byte packed [sky:4\|block:4] per block |
+| `tests/world/TestLightMap.cpp` | Unit tests for LightMap (set/get, clear, boundary, raw access) |
+| `tests/renderer/TestMeshingLight.cpp` | Light data tests for naive and greedy meshing paths |
+
+### Files Modified
+| File | Changes |
+|------|---------|
+| `engine/include/voxel/renderer/ChunkMesh.h` | Added `quadLightData`, `translucentQuadLightData`, `packCornerLight`, `unpackCornerLightByte`, `DEFAULT_CORNER_LIGHT`. Extended `ModelVertex` with `light` field (36→40 bytes). |
+| `engine/include/voxel/renderer/MeshBuilder.h` | Added optional `LightMap*` + neighbor array params to `buildGreedy`/`buildNaive`. Updated `buildNonCubicPass` to accept `LightMap*`. |
+| `engine/src/renderer/MeshBuilder.cpp` | Added `buildLightPad`, `computeFaceLight`, `FACE_NORMAL_OFFSETS`. Extended `MeshWorkspace` with lightPad. All mesh paths emit parallel light data. |
+| `engine/include/voxel/renderer/MeshJobTypes.h` | Added `LightMap` data/flags to `MeshJobInput`. `MeshChunkTask` passes light to `buildGreedy`. |
+| `engine/src/renderer/ChunkUploadManager.cpp` | Allocation size: `quadCount * 12` (8 quad + 4 light). Two-stage upload per allocation. |
+| `assets/shaders/chunk.vert` | Reads light from gigabuffer at `baseU32 + quadCount*2 + localQuad`. Outputs `fragSkyLight`/`fragBlockLight`. Handles opaque/translucent detection via range check. |
+| `assets/shaders/gbuffer.frag` | Accepts `fragSkyLight`/`fragBlockLight` inputs (unused). |
+| `assets/shaders/chunk.frag` | Accepts `fragSkyLight`/`fragBlockLight` inputs (unused). |
+| `assets/shaders/translucent.frag` | Accepts `fragSkyLight`/`fragBlockLight` inputs (unused). |
+| `tests/CMakeLists.txt` | Added `TestLightMap.cpp` and `TestMeshingLight.cpp`. |
+
+### Design Decisions
+1. **Parallel buffer over embedded bits**: All 64 quad bits are occupied. Parallel `uint32_t` vector adds 50% memory but avoids format changes.
+2. **Light averaging reuses AO_OFFSETS**: Same 4-neighbor corner sampling pattern (face block + 2 edges + 1 diagonal).
+3. **Opaque/translucent detection in vertex shader**: Range-checked `quadIndex*2` against `gigabufferOffset/4` to distinguish draw paths — avoids needing `gl_BaseVertex` extension.
+4. **Two-stage GPU upload**: Quads and light uploaded as separate staging operations to avoid a temporary buffer copy.
+5. **Default light = sky 15, block 0**: When no LightMap is provided, all corners get full sky brightness — matches pre-lighting visual output.
+
+### Test Results
+- **Light tests**: 10 test cases, 63 assertions — all pass
+- **Meshing tests**: 25 test cases, 634 assertions — all pass (zero regression)
+- **Full suite**: 236 test cases, 489,737 assertions — all pass
+
+### Known Limitations
+- Greedy-merged quads use light from the origin block's corners (not per-corner-block position). Acceptable since light data is all-default until Story 8.1.
+- SPIR-V shaders need recompilation before running the game (Task 7.6 not automated).
+- `MeshJobInput` size grows by ~28KB per job when `hasLightData=true` (currently always false).
 
 ## Dev Agent Record
 
