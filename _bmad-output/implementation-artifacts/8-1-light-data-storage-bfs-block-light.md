@@ -1,6 +1,6 @@
 # Story 8.1: Light Data Storage + BFS Block Light
 
-Status: review
+Status: done
 
 ## Story
 
@@ -54,6 +54,8 @@ so that torches and light-emitting blocks illuminate their surroundings.
   - [x] 5.5 Test: transparent block (glass, lightFilter=0) passes light with -1 attenuation only
   - [x] 5.6 Test: cross-section Y boundary propagation (torch near y=15 lights up y=0 in section above)
   - [x] 5.7 Test: ChunkColumn getLightMap() round-trip
+  - [x] 5.8 Test: cross-chunk border propagation pushes light to neighbor (torch near X=15 → neighbor X=0)
+  - [x] 5.9 Test: cross-chunk border propagation pulls light from neighbor (bidirectional verification)
 
 - [x] Task 6: CMakeLists + build (AC: all)
   - [x] 6.1 Add BlockLightPropagator.cpp to `engine/CMakeLists.txt`
@@ -384,8 +386,8 @@ Claude Opus 4.6
 
 ### Debug Log References
 - Build: zero errors, zero warnings
-- Tests: 489,828 assertions in 239 test cases — all passed, zero regressions
-- Light-specific tests: 154 assertions in 13 test cases (7 new + 6 existing LightMap tests)
+- Tests: 489,849 assertions in 239 test cases — all passed, zero regressions
+- Light-specific tests: 175 assertions in 13 test cases (9 new + 6 existing LightMap tests, includes 2 cross-chunk border tests)
 
 ### Completion Notes List
 - Added `std::array<LightMap, 16> m_lightMaps` value-type storage to ChunkColumn (64KB per column)
@@ -397,10 +399,12 @@ Claude Opus 4.6
 - Extended `ChunkManager::createMeshSnapshot()` — copies center LightMap + 6 neighbor LightMaps, sets `hasLightData = true` and `hasNeighborLight` flags within existing neighbor iteration loop
 - Added `setBlockRegistry()` to ChunkManager for BlockRegistry access during light propagation
 - Wired BlockRegistry injection in `GameApp.cpp`
-- 7 unit tests covering all AC8 scenarios: single torch falloff, two-torch max, opaque occlusion, transparent pass-through, cross-section Y, glowstone emission, getLightMap round-trip
+- 9 unit tests covering all AC8 scenarios: single torch falloff, two-torch max, opaque occlusion, transparent pass-through, cross-section Y, glowstone emission, getLightMap round-trip, cross-chunk push, cross-chunk pull
+- Refactored test fixture: replaced static mutable globals with a returned TestFixture struct for safer, more idiomatic test setup
 
 ### Change Log
 - 2026-03-29: Implemented Story 8.1 — BFS block light propagation with ChunkColumn storage
+- 2026-03-29: Code review fixes — added cross-chunk border propagation tests (push + pull), refactored test globals to struct
 
 ### File List
 - engine/include/voxel/world/ChunkColumn.h (MODIFIED — added LightMap include, m_lightMaps, getLightMap, clearAllLight)

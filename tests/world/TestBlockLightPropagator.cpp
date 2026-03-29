@@ -9,62 +9,70 @@
 
 using namespace voxel::world;
 
-// Block IDs assigned by test registry (air=0, then in registration order)
-static uint16_t STONE_ID = 0;
-static uint16_t TORCH_ID = 0;
-static uint16_t GLASS_ID = 0;
-static uint16_t GLOWSTONE_ID = 0;
-
-static BlockRegistry createTestRegistry()
+struct TestIds
 {
-    BlockRegistry reg;
+    uint16_t stone = 0;
+    uint16_t torch = 0;
+    uint16_t glass = 0;
+    uint16_t glowstone = 0;
+};
 
-    // Air is auto-registered as ID 0
+struct TestFixture
+{
+    BlockRegistry registry;
+    TestIds ids;
+};
+
+static TestFixture createTestFixture()
+{
+    TestFixture f;
 
     BlockDefinition stone;
     stone.stringId = "base:stone";
     stone.isSolid = true;
     stone.lightFilter = 15;
-    auto stoneResult = reg.registerBlock(std::move(stone));
+    auto stoneResult = f.registry.registerBlock(std::move(stone));
     REQUIRE(stoneResult.has_value());
-    STONE_ID = stoneResult.value();
+    f.ids.stone = stoneResult.value();
 
     BlockDefinition torch;
     torch.stringId = "base:torch";
     torch.lightEmission = 14;
     torch.lightFilter = 0;
     torch.isSolid = false;
-    auto torchResult = reg.registerBlock(std::move(torch));
+    auto torchResult = f.registry.registerBlock(std::move(torch));
     REQUIRE(torchResult.has_value());
-    TORCH_ID = torchResult.value();
+    f.ids.torch = torchResult.value();
 
     BlockDefinition glass;
     glass.stringId = "base:glass";
     glass.lightFilter = 0;
-    auto glassResult = reg.registerBlock(std::move(glass));
+    auto glassResult = f.registry.registerBlock(std::move(glass));
     REQUIRE(glassResult.has_value());
-    GLASS_ID = glassResult.value();
+    f.ids.glass = glassResult.value();
 
     BlockDefinition glowstone;
     glowstone.stringId = "base:glowstone";
     glowstone.lightEmission = 15;
     glowstone.lightFilter = 15;
-    auto glowstoneResult = reg.registerBlock(std::move(glowstone));
+    auto glowstoneResult = f.registry.registerBlock(std::move(glowstone));
     REQUIRE(glowstoneResult.has_value());
-    GLOWSTONE_ID = glowstoneResult.value();
+    f.ids.glowstone = glowstoneResult.value();
 
-    return reg;
+    return f;
 }
 
 TEST_CASE("BlockLightPropagator", "[world][light]")
 {
-    auto registry = createTestRegistry();
+    auto fixture = createTestFixture();
+    auto& registry = fixture.registry;
+    auto& ids = fixture.ids;
 
     SECTION("single torch falloff")
     {
         // Place a torch at the center of section 0 (local 8,8,8)
         ChunkColumn column({0, 0});
-        column.setBlock(8, 8, 8, TORCH_ID);
+        column.setBlock(8, 8, 8, ids.torch);
 
         BlockLightPropagator::propagateColumn(column, registry);
 
@@ -86,19 +94,19 @@ TEST_CASE("BlockLightPropagator", "[world][light]")
         REQUIRE(lm.getBlockLight(6, 8, 8) == 12);
 
         // At distance 13 along +X (block 8+13=21, but section is 0..15, so check X=15)
-        // Distance from torch (8,8,8) to (15,8,8) = 7 blocks → light = 14 - 7 = 7
+        // Distance from torch (8,8,8) to (15,8,8) = 7 blocks -> light = 14 - 7 = 7
         REQUIRE(lm.getBlockLight(15, 8, 8) == 7);
 
         // At distance 14, light should be 0 (beyond section in this direction)
-        // Within the section at max cardinal distance: (0,8,8) = distance 8 → light = 14 - 8 = 6
+        // Within the section at max cardinal distance: (0,8,8) = distance 8 -> light = 14 - 8 = 6
         REQUIRE(lm.getBlockLight(0, 8, 8) == 6);
     }
 
     SECTION("two torches take max")
     {
         ChunkColumn column({0, 0});
-        column.setBlock(4, 8, 8, TORCH_ID);
-        column.setBlock(12, 8, 8, TORCH_ID);
+        column.setBlock(4, 8, 8, ids.torch);
+        column.setBlock(12, 8, 8, ids.torch);
 
         BlockLightPropagator::propagateColumn(column, registry);
 
@@ -108,7 +116,7 @@ TEST_CASE("BlockLightPropagator", "[world][light]")
         REQUIRE(lm.getBlockLight(4, 8, 8) == 14);
         REQUIRE(lm.getBlockLight(12, 8, 8) == 14);
 
-        // Midpoint (8,8,8) is distance 4 from each torch → max(14-4, 14-4) = 10
+        // Midpoint (8,8,8) is distance 4 from each torch -> max(14-4, 14-4) = 10
         REQUIRE(lm.getBlockLight(8, 8, 8) == 10);
 
         // Position (5,8,8) is distance 1 from torch at 4, distance 7 from torch at 12
@@ -120,8 +128,8 @@ TEST_CASE("BlockLightPropagator", "[world][light]")
     {
         ChunkColumn column({0, 0});
         // Torch at (4,8,8), stone wall at (6,8,8)
-        column.setBlock(4, 8, 8, TORCH_ID);
-        column.setBlock(6, 8, 8, STONE_ID);
+        column.setBlock(4, 8, 8, ids.torch);
+        column.setBlock(6, 8, 8, ids.stone);
 
         BlockLightPropagator::propagateColumn(column, registry);
 
@@ -134,9 +142,7 @@ TEST_CASE("BlockLightPropagator", "[world][light]")
         REQUIRE(lm.getBlockLight(6, 8, 8) == 0);
 
         // Block behind stone (along X) can only get light via paths around the stone
-        // (7,8,8) can't receive light directly from (5,8,8) → must go around via Y or Z
-        // Shortest alternate path: (4,8,8)→(4,9,8)→(5,9,8)→(6,9,8)→(7,9,8)→(7,8,8) = 5 steps → 14-5 = 9
-        // Actually shortest: (5,8,8) at 13 → (5,9,8) at 12 → (6,9,8) at 11 → (7,9,8) at 10 → (7,8,8) at 9
+        // Shortest alternate path: (5,8,8) at 13 -> (5,9,8) at 12 -> (6,9,8) at 11 -> (7,9,8) at 10 -> (7,8,8) at 9
         REQUIRE(lm.getBlockLight(7, 8, 8) == 9);
     }
 
@@ -144,9 +150,9 @@ TEST_CASE("BlockLightPropagator", "[world][light]")
     {
         ChunkColumn column({0, 0});
         // Torch at (4,8,8), glass at (5,8,8) and (6,8,8)
-        column.setBlock(4, 8, 8, TORCH_ID);
-        column.setBlock(5, 8, 8, GLASS_ID);
-        column.setBlock(6, 8, 8, GLASS_ID);
+        column.setBlock(4, 8, 8, ids.torch);
+        column.setBlock(5, 8, 8, ids.glass);
+        column.setBlock(6, 8, 8, ids.glass);
 
         BlockLightPropagator::propagateColumn(column, registry);
 
@@ -163,13 +169,7 @@ TEST_CASE("BlockLightPropagator", "[world][light]")
     {
         // Place torch near top of section 0 (local y=14, world y=14)
         ChunkColumn column({0, 0});
-        column.setBlock(8, 14, 8, TORCH_ID);
-
-        // Need section 1 to exist for light to propagate into it
-        // Just reading it won't create it — light propagates into LightMap regardless
-        // Section 1 starts at world Y=16. Torch is at world Y=14.
-        // Distance from torch to (8, world_y=16, 8) = 2 → light = 14-2 = 12
-        // Distance from torch to (8, world_y=17, 8) = 3 → light = 14-3 = 11
+        column.setBlock(8, 14, 8, ids.torch);
 
         BlockLightPropagator::propagateColumn(column, registry);
 
@@ -187,7 +187,7 @@ TEST_CASE("BlockLightPropagator", "[world][light]")
     SECTION("glowstone emission at max level")
     {
         ChunkColumn column({0, 0});
-        column.setBlock(8, 8, 8, GLOWSTONE_ID);
+        column.setBlock(8, 8, 8, ids.glowstone);
 
         BlockLightPropagator::propagateColumn(column, registry);
 
@@ -223,5 +223,68 @@ TEST_CASE("BlockLightPropagator", "[world][light]")
         column.clearAllLight();
         REQUIRE(column.getLightMap(0).isClear());
         REQUIRE(column.getLightMap(5).isClear());
+    }
+
+    SECTION("cross-chunk border propagation pushes light to neighbor")
+    {
+        // Two adjacent chunks: torch near +X border of chunk (0,0)
+        ChunkManager manager;
+        manager.loadChunk({0, 0});
+        manager.loadChunk({1, 0});
+
+        ChunkColumn* col0 = manager.getChunk({0, 0});
+        ChunkColumn* col1 = manager.getChunk({1, 0});
+        REQUIRE(col0 != nullptr);
+        REQUIRE(col1 != nullptr);
+
+        // Place torch at X=14, near the +X border
+        col0->setBlock(14, 8, 8, ids.torch);
+
+        // Propagate within column first
+        BlockLightPropagator::propagateColumn(*col0, registry);
+
+        // Verify light reaches the border
+        REQUIRE(col0->getLightMap(0).getBlockLight(15, 8, 8) == 13);
+
+        // Propagate borders — should push light into chunk (1,0)
+        BlockLightPropagator::propagateBorders(*col0, manager, registry);
+
+        // Verify light crossed into neighbor chunk
+        REQUIRE(col1->getLightMap(0).getBlockLight(0, 8, 8) == 12); // 14 - 2
+        REQUIRE(col1->getLightMap(0).getBlockLight(1, 8, 8) == 11); // 14 - 3
+        REQUIRE(col1->getLightMap(0).getBlockLight(2, 8, 8) == 10); // 14 - 4
+
+        // Verify neighbor section was marked dirty for remeshing
+        REQUIRE(col1->isSectionDirty(0));
+    }
+
+    SECTION("cross-chunk border propagation pulls light from neighbor")
+    {
+        // Two adjacent chunks: torch near -X border of chunk (1,0)
+        ChunkManager manager;
+        manager.loadChunk({0, 0});
+        manager.loadChunk({1, 0});
+
+        ChunkColumn* col0 = manager.getChunk({0, 0});
+        ChunkColumn* col1 = manager.getChunk({1, 0});
+        REQUIRE(col0 != nullptr);
+        REQUIRE(col1 != nullptr);
+
+        // Place torch at X=1 in chunk (1,0), near the -X border
+        col1->setBlock(1, 8, 8, ids.torch);
+        BlockLightPropagator::propagateColumn(*col1, registry);
+
+        // Verify light reaches neighbor's -X border
+        REQUIRE(col1->getLightMap(0).getBlockLight(0, 8, 8) == 13);
+
+        // Propagate borders for chunk (0,0) — should PULL light from chunk (1,0)
+        BlockLightPropagator::propagateBorders(*col0, manager, registry);
+
+        // Verify light was pulled into chunk (0,0) at X=15
+        REQUIRE(col0->getLightMap(0).getBlockLight(15, 8, 8) == 12); // 14 - 2
+        REQUIRE(col0->getLightMap(0).getBlockLight(14, 8, 8) == 11); // 14 - 3
+
+        // Verify our section was marked dirty
+        REQUIRE(col0->isSectionDirty(0));
     }
 }
