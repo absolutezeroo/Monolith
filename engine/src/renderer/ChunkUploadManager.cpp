@@ -9,6 +9,8 @@
 #include "voxel/world/ChunkSection.h"
 
 #include <algorithm>
+#include <cstring>
+#include <vector>
 
 namespace voxel::renderer
 {
@@ -149,23 +151,18 @@ bool ChunkUploadManager::uploadSingle(const SectionKey& key, const ChunkMesh& me
             return true; // consumed
         }
 
-        // Upload quad data
+        // Combine quad + light data into a single staging upload to ensure atomicity.
+        // Prevents garbage light data if staging is exhausted between separate uploads.
+        std::vector<uint8_t> combined(static_cast<size_t>(uploadSize));
+        std::memcpy(combined.data(), mesh.quads.data(), static_cast<size_t>(quadBytes));
+        std::memcpy(combined.data() + quadBytes, mesh.quadLightData.data(), static_cast<size_t>(lightBytes));
+
         auto uploadResult = m_stagingBuffer.uploadToGigabuffer(
-            mesh.quads.data(), quadBytes, allocResult->offset);
+            combined.data(), uploadSize, allocResult->offset);
         if (!uploadResult.has_value())
         {
             m_gigabuffer.free(*allocResult);
             return false; // Retry next frame
-        }
-
-        // Upload light data immediately after quads
-        auto lightResult = m_stagingBuffer.uploadToGigabuffer(
-            mesh.quadLightData.data(), lightBytes, allocResult->offset + quadBytes);
-        if (!lightResult.has_value())
-        {
-            // Light upload failed but quads succeeded — continue without light
-            // (shader will read garbage for light, but this is a transient staging issue)
-            VX_LOG_WARN("Staging full for opaque light data — section ({},{}) y={}", key.chunkCoord.x, key.chunkCoord.y, key.sectionY);
         }
 
         opaqueAlloc = *allocResult;
@@ -191,8 +188,16 @@ bool ChunkUploadManager::uploadSingle(const SectionKey& key, const ChunkMesh& me
         }
         else
         {
+            // Combine quad + light data into a single staging upload
+            std::vector<uint8_t> transCombined(static_cast<size_t>(transSize));
+            std::memcpy(transCombined.data(), mesh.translucentQuads.data(), static_cast<size_t>(transQuadBytes));
+            std::memcpy(
+                transCombined.data() + transQuadBytes,
+                mesh.translucentQuadLightData.data(),
+                static_cast<size_t>(transLightBytes));
+
             auto transUpload = m_stagingBuffer.uploadToGigabuffer(
-                mesh.translucentQuads.data(), transQuadBytes, transAllocResult->offset);
+                transCombined.data(), transSize, transAllocResult->offset);
             if (!transUpload.has_value())
             {
                 VX_LOG_WARN(
@@ -204,14 +209,6 @@ bool ChunkUploadManager::uploadSingle(const SectionKey& key, const ChunkMesh& me
             }
             else
             {
-                // Upload translucent light data
-                auto transLightUpload = m_stagingBuffer.uploadToGigabuffer(
-                    mesh.translucentQuadLightData.data(), transLightBytes, transAllocResult->offset + transQuadBytes);
-                if (!transLightUpload.has_value())
-                {
-                    VX_LOG_WARN("Staging full for translucent light data — section ({},{}) y={}", key.chunkCoord.x, key.chunkCoord.y, key.sectionY);
-                }
-
                 transAlloc = *transAllocResult;
                 transCount = mesh.translucentQuadCount;
             }

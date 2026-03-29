@@ -142,3 +142,72 @@ TEST_CASE("DEFAULT_CORNER_LIGHT is sky=15, block=0 for all corners", "[renderer]
         REQUIRE((byte & 0xF) == 0);          // block
     }
 }
+
+TEST_CASE("Light averaging: uniform light produces uniform corner values", "[renderer][meshing][light]")
+{
+    BlockRegistry registry;
+    uint16_t stoneId = registerStone(registry);
+    MeshBuilder builder(registry);
+
+    ChunkSection section;
+    section.setBlock(5, 5, 5, stoneId);
+
+    // Fill entire lightmap with sky=8, block=4
+    LightMap lightMap;
+    for (int y = 0; y < 16; ++y)
+        for (int z = 0; z < 16; ++z)
+            for (int x = 0; x < 16; ++x)
+                lightMap.setRaw(x, y, z, 0x84);
+
+    ChunkMesh mesh = builder.buildNaive(section, NO_NEIGHBORS, &lightMap, NO_LIGHT_NEIGHBORS);
+
+    REQUIRE(mesh.quadCount == 6);
+    REQUIRE(mesh.quadLightData.size() == 6);
+
+    // All sample positions are non-opaque air with light 0x84.
+    // Average per corner: sky=(8+8+8+8)/4=8, block=(4+4+4+4)/4=4 → byte=0x84
+    uint32_t expected = packCornerLight(8, 4, 8, 4, 8, 4, 8, 4);
+    for (uint32_t light : mesh.quadLightData)
+    {
+        REQUIRE(light == expected);
+    }
+}
+
+TEST_CASE("Light averaging: non-uniform light shows corner falloff", "[renderer][meshing][light]")
+{
+    BlockRegistry registry;
+    uint16_t stoneId = registerStone(registry);
+    MeshBuilder builder(registry);
+
+    ChunkSection section;
+    section.setBlock(5, 5, 5, stoneId);
+
+    LightMap lightMap;
+    // Place sky=12 at the PosY face-normal position (block above)
+    lightMap.setSkyLight(5, 6, 5, 12);
+    // Place sky=8 at one side-neighbor (-X,+Y,0)
+    lightMap.setSkyLight(4, 6, 5, 8);
+
+    ChunkMesh mesh = builder.buildNaive(section, NO_NEIGHBORS, &lightMap, NO_LIGHT_NEIGHBORS);
+    REQUIRE(mesh.quadCount == 6);
+
+    // Find the PosY face and verify corner-specific light averaging.
+    // PosY AO_OFFSETS[2] corner samples (all relative to block 5,5,5):
+    //   Face-normal: (5,6,5) sky=12
+    //   c0: s1(4,6,5)=8  s2(5,6,4)=0  diag(4,6,4)=0  → avgSky=(12+8+0+0)/4=5
+    //   c1: s1(6,6,5)=0  s2(5,6,4)=0  diag(6,6,4)=0  → avgSky=(12+0+0+0)/4=3
+    //   c2: s1(6,6,5)=0  s2(5,6,6)=0  diag(6,6,6)=0  → avgSky=(12+0+0+0)/4=3
+    //   c3: s1(4,6,5)=8  s2(5,6,6)=0  diag(4,6,6)=0  → avgSky=(12+8+0+0)/4=5
+    bool foundPosY = false;
+    for (size_t i = 0; i < mesh.quads.size(); ++i)
+    {
+        if (unpackFace(mesh.quads[i]) == BlockFace::PosY)
+        {
+            uint32_t expected = packCornerLight(5, 0, 3, 0, 3, 0, 5, 0);
+            REQUIRE(mesh.quadLightData[i] == expected);
+            foundPosY = true;
+            break;
+        }
+    }
+    REQUIRE(foundPosY);
+}

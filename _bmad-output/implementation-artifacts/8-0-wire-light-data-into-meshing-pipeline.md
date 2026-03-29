@@ -1,6 +1,6 @@
 # Story 8.0: Wire Light Data into Meshing Pipeline
 
-Status: review
+Status: done
 
 ## Story
 
@@ -25,60 +25,60 @@ so that Stories 8.1–8.4 can propagate light and see results rendered.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Create LightMap class (AC: #1)
-  - [ ] 1.1 — Create `engine/include/voxel/world/LightMap.h` with `uint8_t m_data[4096]` storage
-  - [ ] 1.2 — Implement accessors: `getSkyLight`, `getBlockLight`, `setSkyLight`, `setBlockLight`, `isClear`, `clear`, `getRaw`, `setRaw`
-  - [ ] 1.3 — Use Y-major indexing: `index = y*256 + z*16 + x` (matching ChunkSection)
-  - [ ] 1.4 — Header-only or thin .cpp — keep it simple since it's all inline bit manipulation
+- [x] Task 1: Create LightMap class (AC: #1)
+  - [x] 1.1 — Create `engine/include/voxel/world/LightMap.h` with `uint8_t m_data[4096]` storage
+  - [x] 1.2 — Implement accessors: `getSkyLight`, `getBlockLight`, `setSkyLight`, `setBlockLight`, `isClear`, `clear`, `getRaw`, `setRaw`
+  - [x] 1.3 — Use Y-major indexing: `index = y*256 + z*16 + x` (matching ChunkSection)
+  - [x] 1.4 — Header-only or thin .cpp — keep it simple since it's all inline bit manipulation
 
-- [ ] Task 2: Extend ChunkMesh with parallel light data (AC: #3)
-  - [ ] 2.1 — Add `std::vector<uint32_t> quadLightData` to ChunkMesh (parallel to `quads`)
-  - [ ] 2.2 — Add `std::vector<uint32_t> translucentQuadLightData` (parallel to `translucentQuads`)
-  - [ ] 2.3 — Add light pack/unpack helpers: `packCornerLight(sky0,blk0, sky1,blk1, sky2,blk2, sky3,blk3) → uint32_t`
-  - [ ] 2.4 — Ensure `isEmpty()` still works (light vectors don't affect emptiness check)
+- [x] Task 2: Extend ChunkMesh with parallel light data (AC: #3)
+  - [x] 2.1 — Add `std::vector<uint32_t> quadLightData` to ChunkMesh (parallel to `quads`)
+  - [x] 2.2 — Add `std::vector<uint32_t> translucentQuadLightData` (parallel to `translucentQuads`)
+  - [x] 2.3 — Add light pack/unpack helpers: `packCornerLight(sky0,blk0, sky1,blk1, sky2,blk2, sky3,blk3) → uint32_t`
+  - [x] 2.4 — Ensure `isEmpty()` still works (light vectors don't affect emptiness check)
 
-- [ ] Task 3: Extend MeshBuilder interface (AC: #2, #4)
-  - [ ] 3.1 — Add optional `const LightMap*` and `std::array<const LightMap*, 6>` parameters to `buildGreedy()` and `buildNaive()` — default both to null
-  - [ ] 3.2 — When LightMap is null, emit default light: `packCornerLight(15,0, 15,0, 15,0, 15,0)` per quad
-  - [ ] 3.3 — When LightMap is non-null, average 4 adjacent light values per corner using the same neighbor-sampling offsets as AO (reuse `AO_OFFSETS[face][corner]`)
-  - [ ] 3.4 — Push one uint32 to `quadLightData` for each quad pushed to `quads` (maintain parallel invariant)
-  - [ ] 3.5 — Same for translucent quads
+- [x] Task 3: Extend MeshBuilder interface (AC: #2, #4)
+  - [x] 3.1 — Add optional `const LightMap*` and `std::array<const LightMap*, 6>` parameters to `buildGreedy()` and `buildNaive()` — default both to null
+  - [x] 3.2 — When LightMap is null, emit default light: `packCornerLight(15,0, 15,0, 15,0, 15,0)` per quad
+  - [x] 3.3 — When LightMap is non-null, average 4 adjacent light values per corner using the same neighbor-sampling offsets as AO (reuse `AO_OFFSETS[face][corner]`)
+  - [x] 3.4 — Push one uint32 to `quadLightData` for each quad pushed to `quads` (maintain parallel invariant)
+  - [x] 3.5 — Same for translucent quads
 
-- [ ] Task 4: Extend ModelVertex (AC: #6)
-  - [ ] 4.1 — Add `uint8_t light = 0xF0;` field to ModelVertex (after `flags`)
-  - [ ] 4.2 — Update `static_assert(sizeof(ModelVertex) == 40, ...)`
-  - [ ] 4.3 — Update all GPU upload code referencing ModelVertex size/stride
-  - [ ] 4.4 — In `buildNonCubicPass()`, set `light` from LightMap if available, else 0xF0
+- [x] Task 4: Extend ModelVertex (AC: #6)
+  - [x] 4.1 — Add `uint8_t light = 0xF0;` field to ModelVertex (after `flags`)
+  - [x] 4.2 — Update `static_assert(sizeof(ModelVertex) == 40, ...)`
+  - [x] 4.3 — Update all GPU upload code referencing ModelVertex size/stride
+  - [x] 4.4 — In `buildNonCubicPass()`, set `light` from LightMap if available, else 0xF0
 
-- [ ] Task 5: Extend MeshJobInput for light snapshots (AC: #5)
-  - [ ] 5.1 — Add light data arrays to MeshJobInput (or a LightMap copy per section + 6 neighbors)
-  - [ ] 5.2 — Add `hasNeighborLight` flags
-  - [ ] 5.3 — MeshChunkTask::ExecuteRange passes light data to buildGreedy()
-  - [ ] 5.4 — Snapshot code in chunk pipeline copies light data (currently all zeros = default)
+- [x] Task 5: Extend MeshJobInput for light snapshots (AC: #5)
+  - [x] 5.1 — Add light data arrays to MeshJobInput (or a LightMap copy per section + 6 neighbors)
+  - [x] 5.2 — Add `hasNeighborLight` flags
+  - [x] 5.3 — MeshChunkTask::ExecuteRange passes light data to buildGreedy()
+  - [x] 5.4 — Snapshot code in chunk pipeline copies light data (currently all zeros = default)
 
-- [ ] Task 6: GPU upload — append light data in Gigabuffer (AC: #7)
-  - [ ] 6.1 — Modify allocation size: `quadCount * 12` bytes instead of `quadCount * 8`
-  - [ ] 6.2 — Upload layout: `[quad0_lo, quad0_hi, quad1_lo, quad1_hi, ... | light0, light1, ...]`
-  - [ ] 6.3 — Same for translucent: `transQuadCount * 12` bytes total
-  - [ ] 6.4 — No changes to ChunkRenderInfo/GpuChunkRenderInfo — shader computes light offset from quadCount
+- [x] Task 6: GPU upload — append light data in Gigabuffer (AC: #7)
+  - [x] 6.1 — Modify allocation size: `quadCount * 12` bytes instead of `quadCount * 8`
+  - [x] 6.2 — Upload layout: `[quad0_lo, quad0_hi, quad1_lo, quad1_hi, ... | light0, light1, ...]`
+  - [x] 6.3 — Same for translucent: `transQuadCount * 12` bytes total
+  - [x] 6.4 — No changes to ChunkRenderInfo/GpuChunkRenderInfo — shader computes light offset from quadCount
 
-- [ ] Task 7: Shader changes (AC: #8, #9, #10)
-  - [ ] 7.1 — chunk.vert: Read light uint32 at `gigabuffer.data[quadCount * 2 + quadIndex]` using quadCount from ChunkRenderInfo
-  - [ ] 7.2 — chunk.vert: Unpack per-corner light, select by cornerIndex, output `fragSkyLight` and `fragBlockLight` as floats
-  - [ ] 7.3 — gbuffer.frag: Accept fragSkyLight/fragBlockLight as inputs but do not use (no RT change)
-  - [ ] 7.4 — chunk.frag (forward): Accept fragSkyLight/fragBlockLight but do not modify output
-  - [ ] 7.5 — lighting.frag: No changes
-  - [ ] 7.6 — Recompile all SPIR-V shaders
+- [x] Task 7: Shader changes (AC: #8, #9, #10)
+  - [x] 7.1 — chunk.vert: Read light uint32 at `gigabuffer.data[quadCount * 2 + quadIndex]` using quadCount from ChunkRenderInfo
+  - [x] 7.2 — chunk.vert: Unpack per-corner light, select by cornerIndex, output `fragSkyLight` and `fragBlockLight` as floats
+  - [x] 7.3 — gbuffer.frag: Accept fragSkyLight/fragBlockLight as inputs but do not use (no RT change)
+  - [x] 7.4 — chunk.frag (forward): Accept fragSkyLight/fragBlockLight but do not modify output
+  - [x] 7.5 — lighting.frag: No changes
+  - [x] 7.6 — Recompile all SPIR-V shaders
 
-- [ ] Task 8: Unit tests (AC: #12)
-  - [ ] 8.1 — TestLightMap.cpp: set/get round-trip, boundary values, isClear
-  - [ ] 8.2 — TestMeshing.cpp (extend): null LightMap → identical quads as before
-  - [ ] 8.3 — TestMeshing.cpp (extend): non-null LightMap → quadLightData populated with correct values
-  - [ ] 8.4 — TestMeshing.cpp (extend): light averaging matches AO sampling pattern
+- [x] Task 8: Unit tests (AC: #12)
+  - [x] 8.1 — TestLightMap.cpp: set/get round-trip, boundary values, isClear
+  - [x] 8.2 — TestMeshing.cpp (extend): null LightMap → identical quads as before
+  - [x] 8.3 — TestMeshing.cpp (extend): non-null LightMap → quadLightData populated with correct values
+  - [x] 8.4 — TestMeshing.cpp (extend): light averaging matches AO sampling pattern
 
-- [ ] Task 9: CMakeLists updates (AC: implicit)
-  - [ ] 9.1 — Add LightMap source (if .cpp needed) to `engine/CMakeLists.txt`
-  - [ ] 9.2 — Add TestLightMap.cpp to `tests/CMakeLists.txt`
+- [x] Task 9: CMakeLists updates (AC: implicit)
+  - [x] 9.1 — Add LightMap source (if .cpp needed) to `engine/CMakeLists.txt`
+  - [x] 9.2 — Add TestLightMap.cpp to `tests/CMakeLists.txt`
 
 ## Dev Notes
 
@@ -309,9 +309,30 @@ All 9 tasks completed. Story 8.0 wires light data through the full meshing pipel
 ## Dev Agent Record
 
 ### Agent Model Used
+Claude Opus 4.6
 
 ### Debug Log References
+N/A
 
 ### Completion Notes List
+- All 9 tasks implemented and verified
+- Code review fix: ChunkUploadManager atomic combined upload (quad+light in single staging op)
+- Code review fix: Added value-verification tests for light averaging (uniform + non-uniform falloff)
+- Full test suite: 238 cases, 489,750 assertions — all pass
 
 ### File List
+| File | Action | Purpose |
+|------|--------|---------|
+| `engine/include/voxel/world/LightMap.h` | Created | Header-only LightMap class: 4096-byte packed [sky:4\|block:4] per block |
+| `engine/include/voxel/renderer/ChunkMesh.h` | Modified | Added `quadLightData`, `translucentQuadLightData`, `packCornerLight`, `unpackCornerLightByte`, `DEFAULT_CORNER_LIGHT`. Extended `ModelVertex` with `light` field (36→40 bytes). |
+| `engine/include/voxel/renderer/MeshBuilder.h` | Modified | Added optional `LightMap*` + neighbor array params to `buildGreedy`/`buildNaive`/`buildNonCubicPass`. |
+| `engine/src/renderer/MeshBuilder.cpp` | Modified | Added `buildLightPad`, `computeFaceLight`, `FACE_NORMAL_OFFSETS`. Extended `MeshWorkspace` with lightPad. All mesh paths emit parallel light data. |
+| `engine/include/voxel/renderer/MeshJobTypes.h` | Modified | Added `LightMap` data/flags to `MeshJobInput`. `MeshChunkTask` passes light to `buildGreedy`. |
+| `engine/src/renderer/ChunkUploadManager.cpp` | Modified | Atomic combined upload (quad+light in single staging op). Allocation size: `quadCount * 12`. |
+| `assets/shaders/chunk.vert` | Modified | Reads light from gigabuffer at computed offset. Outputs `fragSkyLight`/`fragBlockLight`. |
+| `assets/shaders/gbuffer.frag` | Modified | Accepts `fragSkyLight`/`fragBlockLight` inputs (unused). |
+| `assets/shaders/chunk.frag` | Modified | Accepts `fragSkyLight`/`fragBlockLight` inputs (unused). |
+| `assets/shaders/translucent.frag` | Modified | Accepts `fragSkyLight`/`fragBlockLight` inputs (unused). |
+| `tests/CMakeLists.txt` | Modified | Added `TestLightMap.cpp` and `TestMeshingLight.cpp`. |
+| `tests/world/TestLightMap.cpp` | Created | Unit tests for LightMap (set/get, clear, boundary, raw access). |
+| `tests/renderer/TestMeshingLight.cpp` | Created | Light data tests for meshing: parallel vectors, pack/unpack, uniform averaging, corner falloff. |
