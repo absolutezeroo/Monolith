@@ -1,6 +1,6 @@
 # Story 7.1: Command Queue + Event Bus
 
-Status: review
+Status: done
 
 ## Story
 
@@ -373,3 +373,4 @@ None — clean implementation, all tests passed on first run.
 ### Change Log
 
 - 2026-03-29: Implemented Story 7.1 — Command Queue + Event Bus infrastructure. All 5 tasks completed, 13 new test cases passing, zero regressions across 180 total tests.
+- 2026-03-29: Code review (Claude Opus 4.6). 3 findings fixed: (1) MEDIUM — EventBus refactored to use `EventTypeTraits` compile-time mapping, preventing EventType/TEvent mismatches; (2) LOW — `std::erase_if` replaces pre-C++20 erase-remove idiom in `unsubscribe()`; (3) LOW — `VX_ASSERT` guards SubscriptionId overflow. All 180 tests pass, 489138 assertions, zero regressions.
