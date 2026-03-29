@@ -7,6 +7,7 @@
 #include "voxel/world/Block.h"
 #include "voxel/world/BlockLightPropagator.h"
 #include "voxel/world/BlockRegistry.h"
+#include "voxel/world/DynamicLightUpdater.h"
 #include "voxel/world/SkyLightPropagator.h"
 #include "voxel/world/WorldGenerator.h"
 
@@ -106,6 +107,30 @@ void ChunkManager::setBlock(const glm::ivec3& worldPos, uint16_t id)
     if (localY == ChunkSection::SIZE - 1 && sectionY < ChunkColumn::SECTIONS_PER_COLUMN - 1)
     {
         column->markDirty(sectionY + 1);
+    }
+}
+
+void ChunkManager::updateLightAfterBlockChange(
+    const glm::ivec3& worldPos,
+    const BlockDefinition* oldBlock,
+    const BlockDefinition* newBlock)
+{
+    glm::ivec2 chunkCoord = worldToChunkCoord(worldPos);
+    ChunkColumn* column = getChunk(chunkCoord);
+    if (column == nullptr || m_blockRegistry == nullptr)
+    {
+        return;
+    }
+
+    glm::ivec3 local = worldToLocalPos(worldPos);
+
+    if (oldBlock != nullptr)
+    {
+        DynamicLightUpdater::onBlockBroken(*column, local.x, worldPos.y, local.z, *oldBlock, *this, *m_blockRegistry);
+    }
+    if (newBlock != nullptr)
+    {
+        DynamicLightUpdater::onBlockPlaced(*column, local.x, worldPos.y, local.z, *newBlock, *this, *m_blockRegistry);
     }
 }
 

@@ -169,6 +169,21 @@ voxel::core::Result<void> GameApp::init(const std::string& shaderDir, std::optio
         *m_renderer.getMutableStagingBuffer(),
         *m_renderer.getMutableChunkRenderInfoBuffer());
 
+    // Subscribe to block events for dynamic light updates
+    m_eventBus.subscribe<voxel::game::EventType::BlockBroken>(
+        [this](const voxel::game::BlockBrokenEvent& e) {
+            glm::ivec3 pos{e.position.x, e.position.y, e.position.z};
+            const auto& oldDef = m_blockRegistry.getBlockType(e.previousBlockId);
+            m_chunkManager.updateLightAfterBlockChange(pos, &oldDef, nullptr);
+        });
+
+    m_eventBus.subscribe<voxel::game::EventType::BlockPlaced>(
+        [this](const voxel::game::BlockPlacedEvent& e) {
+            glm::ivec3 pos{e.position.x, e.position.y, e.position.z};
+            const auto& newDef = m_blockRegistry.getBlockType(e.blockId);
+            m_chunkManager.updateLightAfterBlockChange(pos, nullptr, &newDef);
+        });
+
     // Start with cursor captured for FPS camera
     m_input->setCursorCaptured(true);
     if (glfwRawMouseMotionSupported())

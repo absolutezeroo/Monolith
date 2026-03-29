@@ -34,6 +34,7 @@ add_executable(VoxelTests
     world/TestSplineCurve.cpp
     world/TestStructureGenerator.cpp
     world/TestBlockLightPropagator.cpp
+    world/TestDynamicLightUpdater.cpp
     world/TestSkyLightPropagator.cpp
     world/TestWorldGenerator.cpp
     game/TestCommandQueue.cpp

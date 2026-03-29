@@ -123,6 +123,15 @@ class ChunkManager
     /// Also marks affected neighbor sections dirty for remeshing.
     void setBlock(const glm::ivec3& worldPos, uint16_t id);
 
+    /// Update lighting after a block change. Called by event handlers.
+    /// @param worldPos  World position of the changed block.
+    /// @param oldBlock  Previous block definition (nullptr if none, e.g., air→solid).
+    /// @param newBlock  New block definition (nullptr if none, e.g., solid→air).
+    void updateLightAfterBlockChange(
+        const glm::ivec3& worldPos,
+        const BlockDefinition* oldBlock,
+        const BlockDefinition* newBlock);
+
     /// Insert a new empty ChunkColumn. No-op if already loaded.
     void loadChunk(glm::ivec2 coord);
 
