@@ -43,6 +43,7 @@ add_library(VoxelEngine STATIC
         src/renderer/ModelRegistry.cpp
         src/renderer/TintPalette.cpp
         src/world/BlockLightPropagator.cpp
+        src/world/SkyLightPropagator.cpp
         src/world/WorldGenerator.cpp
         src/input/InputManager.cpp
         src/physics/Raycast.cpp

@@ -11,6 +11,11 @@
 
 namespace voxel::world
 {
+class BlockRegistry;
+} // namespace voxel::world
+
+namespace voxel::world
+{
 
 class ChunkColumn
 {
@@ -46,15 +51,23 @@ class ChunkColumn
     [[nodiscard]] const LightMap& getLightMap(int sectionY) const;
     void clearAllLight();
 
+    // Heightmap (tracks highest opaque block Y per x,z column)
+    [[nodiscard]] uint8_t getHeight(int x, int z) const;
+    void setHeight(int x, int z, uint8_t y);
+    void buildHeightMap(const BlockRegistry& registry);
+
     // Queries
     [[nodiscard]] bool isAllEmpty() const;
     [[nodiscard]] int getHighestNonEmptySection() const;
 
   private:
+    static constexpr int HEIGHTMAP_SIZE = ChunkSection::SIZE * ChunkSection::SIZE; // 256
+
     glm::ivec2 m_chunkCoord;
     std::array<std::unique_ptr<ChunkSection>, SECTIONS_PER_COLUMN> m_sections;
     std::array<LightMap, SECTIONS_PER_COLUMN> m_lightMaps;
     std::array<bool, SECTIONS_PER_COLUMN> m_dirty;
+    std::array<uint8_t, HEIGHTMAP_SIZE> m_heightMap;
 };
 
 } // namespace voxel::world

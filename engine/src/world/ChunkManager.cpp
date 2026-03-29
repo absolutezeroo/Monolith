@@ -7,6 +7,7 @@
 #include "voxel/world/Block.h"
 #include "voxel/world/BlockLightPropagator.h"
 #include "voxel/world/BlockRegistry.h"
+#include "voxel/world/SkyLightPropagator.h"
 #include "voxel/world/WorldGenerator.h"
 
 #include <glm/geometric.hpp>
@@ -122,11 +123,15 @@ void ChunkManager::loadChunk(glm::ivec2 coord)
             it->second = std::make_unique<ChunkColumn>(coord);
         }
 
-        // Propagate block light after generation
+        // Propagate light after generation
         if (m_blockRegistry != nullptr)
         {
             BlockLightPropagator::propagateColumn(*it->second, *m_blockRegistry);
             BlockLightPropagator::propagateBorders(*it->second, *this, *m_blockRegistry);
+
+            it->second->buildHeightMap(*m_blockRegistry);
+            SkyLightPropagator::propagateColumn(*it->second, *m_blockRegistry);
+            SkyLightPropagator::propagateBorders(*it->second, *this, *m_blockRegistry);
         }
     }
 }

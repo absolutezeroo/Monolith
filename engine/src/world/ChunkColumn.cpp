@@ -1,11 +1,13 @@
 #include "voxel/world/ChunkColumn.h"
 
 #include "voxel/core/Assert.h"
+#include "voxel/world/Block.h"
+#include "voxel/world/BlockRegistry.h"
 
 namespace voxel::world
 {
 
-ChunkColumn::ChunkColumn(glm::ivec2 chunkCoord) : m_chunkCoord(chunkCoord), m_sections{}, m_dirty{} {}
+ChunkColumn::ChunkColumn(glm::ivec2 chunkCoord) : m_chunkCoord(chunkCoord), m_sections{}, m_dirty{}, m_heightMap{} {}
 
 glm::ivec2 ChunkColumn::getChunkCoord() const
 {
@@ -100,6 +102,42 @@ void ChunkColumn::clearAllLight()
     for (auto& lightMap : m_lightMaps)
     {
         lightMap.clear();
+    }
+}
+
+uint8_t ChunkColumn::getHeight(int x, int z) const
+{
+    VX_ASSERT(x >= 0 && x < ChunkSection::SIZE, "x out of bounds");
+    VX_ASSERT(z >= 0 && z < ChunkSection::SIZE, "z out of bounds");
+    return m_heightMap[z * ChunkSection::SIZE + x];
+}
+
+void ChunkColumn::setHeight(int x, int z, uint8_t y)
+{
+    VX_ASSERT(x >= 0 && x < ChunkSection::SIZE, "x out of bounds");
+    VX_ASSERT(z >= 0 && z < ChunkSection::SIZE, "z out of bounds");
+    m_heightMap[z * ChunkSection::SIZE + x] = y;
+}
+
+void ChunkColumn::buildHeightMap(const BlockRegistry& registry)
+{
+    for (int z = 0; z < ChunkSection::SIZE; ++z)
+    {
+        for (int x = 0; x < ChunkSection::SIZE; ++x)
+        {
+            uint8_t height = 0;
+            for (int y = COLUMN_HEIGHT - 1; y >= 0; --y)
+            {
+                uint16_t blockId = getBlock(x, y, z);
+                const BlockDefinition& def = registry.getBlockType(blockId);
+                if (def.lightFilter == 15)
+                {
+                    height = static_cast<uint8_t>(y);
+                    break;
+                }
+            }
+            m_heightMap[z * ChunkSection::SIZE + x] = height;
+        }
     }
 }
 
