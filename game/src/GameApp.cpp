@@ -271,7 +271,8 @@ void GameApp::handleBlockInteraction(float dt)
     }
 
     // Placement: RMB press (one-shot)
-    if (m_input->wasMouseButtonPressed(GLFW_MOUSE_BUTTON_RIGHT) && m_raycastResult.hit)
+    bool placementAttempted = m_input->wasMouseButtonPressed(GLFW_MOUSE_BUTTON_RIGHT) && m_raycastResult.hit;
+    if (placementAttempted)
     {
         uint16_t blockId = resolveHotbarBlockId(m_hotbarSlot);
         if (blockId != voxel::world::BLOCK_AIR)
@@ -341,37 +342,33 @@ void GameApp::handleBlockInteraction(float dt)
         }
     });
 
-    // Wield animation triggers
+    // Wield animation: advance timer, then resolve next state by priority.
+    // Priority: SlotSwitch > Mining > Place > Idle.
     m_wieldAnim.update(dt);
 
     if (m_hotbarSlot != m_prevHotbarSlot)
     {
+        // Highest priority: slot changed — always interrupt with Switch.
         m_wieldAnim.startAnim(voxel::renderer::WieldAnimType::Switch);
         m_prevHotbarSlot = m_hotbarSlot;
     }
     else if (m_player.getMiningState().isMining)
     {
+        // Mining active — start Mining anim if not already playing.
         if (m_wieldAnim.animType != voxel::renderer::WieldAnimType::Mining)
         {
             m_wieldAnim.startAnim(voxel::renderer::WieldAnimType::Mining);
         }
     }
-    else if (m_input->wasMouseButtonPressed(GLFW_MOUSE_BUTTON_RIGHT) && m_raycastResult.hit)
+    else if (miningCompleted || placementAttempted)
     {
+        // Block just broke or placed — kick a thrust animation as feedback.
         m_wieldAnim.startAnim(voxel::renderer::WieldAnimType::Place);
     }
-    else if (m_wieldAnim.animType != voxel::renderer::WieldAnimType::Switch ||
-             m_wieldAnim.update(0.0f)) // Check if switch is done
+    else if (m_wieldAnim.isComplete())
     {
-        if (m_wieldAnim.animType != voxel::renderer::WieldAnimType::Idle &&
-            m_wieldAnim.animType != voxel::renderer::WieldAnimType::Place)
-        {
-            m_wieldAnim.startAnim(voxel::renderer::WieldAnimType::Idle);
-        }
-        else if (m_wieldAnim.animType == voxel::renderer::WieldAnimType::Place && m_wieldAnim.timer >= 0.2f)
-        {
-            m_wieldAnim.startAnim(voxel::renderer::WieldAnimType::Idle);
-        }
+        // One-shot animation finished (Place or Switch) — return to Idle.
+        m_wieldAnim.startAnim(voxel::renderer::WieldAnimType::Idle);
     }
 }
 

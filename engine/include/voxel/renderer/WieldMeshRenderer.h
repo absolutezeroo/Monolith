@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cmath>
 #include <cstdint>
 
 namespace voxel::renderer
@@ -44,6 +45,22 @@ struct WieldAnimState
     {
         animType = type;
         timer = 0.0f;
+    }
+
+    /// Check if the current one-shot animation has finished (without advancing time).
+    [[nodiscard]] bool isComplete() const
+    {
+        switch (animType)
+        {
+        case WieldAnimType::Idle:
+        case WieldAnimType::Mining:
+            return false; // Looping animations never "complete"
+        case WieldAnimType::Place:
+            return timer >= 0.2f;
+        case WieldAnimType::Switch:
+            return timer >= 0.3f;
+        }
+        return true;
     }
 
     /// Get Y offset for idle bob animation.
