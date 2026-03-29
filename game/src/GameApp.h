@@ -3,6 +3,7 @@
 #include "voxel/core/ConfigManager.h"
 #include "voxel/core/JobSystem.h"
 #include "voxel/core/Result.h"
+#include "voxel/game/CommandQueue.h"
 #include "voxel/game/GameLoop.h"
 #include "voxel/game/PlayerController.h"
 #include "voxel/input/InputManager.h"
@@ -71,7 +72,9 @@ class GameApp : public voxel::game::GameLoop
 
     // Player physics controller
     voxel::game::PlayerController m_player;
+    voxel::game::CommandQueue m_commandQueue;
     bool m_flyMode = true; // Start in fly mode — toggled with F7
+    bool m_isSprinting = false; // Persistent sprint toggle state
 
     // HUD state
     int m_hotbarSlot = 0;

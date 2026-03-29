@@ -1,14 +1,11 @@
 #include "voxel/game/PlayerController.h"
 
 #include "voxel/core/Log.h"
-#include "voxel/input/InputManager.h"
-#include "voxel/renderer/Camera.h"
 #include "voxel/world/Block.h"
 #include "voxel/world/BlockRegistry.h"
 #include "voxel/world/ChunkColumn.h"
 #include "voxel/world/ChunkManager.h"
 
-#include <GLFW/glfw3.h>
 #include <glm/geometric.hpp>
 
 #include <algorithm>
@@ -18,76 +15,183 @@
 namespace voxel::game
 {
 
+static constexpr int WORLD_MIN_Y = 0;
+static constexpr int WORLD_MAX_Y = 255;
+
 void PlayerController::init(
     const glm::dvec3& spawnPos, world::ChunkManager& world, const world::BlockRegistry& registry)
 {
     m_position = spawnPos;
     m_velocity = glm::vec3{0.0f};
     m_isOnGround = false;
+    m_isSprinting = false;
+    m_isSneaking = false;
+    m_isInClimbable = false;
+    m_maxResistance = 0;
+    m_damageAccumulator = 0.0f;
     ensureNotInsideBlock(world, registry);
 }
 
-void PlayerController::update(
-    float dt,
-    const input::InputManager& input,
-    const renderer::Camera& camera,
-    world::ChunkManager& world,
-    const world::BlockRegistry& registry)
+void PlayerController::scanOverlappingBlocks(
+    float dt, world::ChunkManager& world, const world::BlockRegistry& registry)
 {
-    // Horizontal movement from WASD input
-    glm::vec3 forward = camera.getForward();
-    glm::vec3 right = camera.getRight();
+    m_isInClimbable = false;
+    m_maxResistance = 0;
+    uint32_t frameDamage = 0;
 
-    // Project onto XZ plane for ground movement
-    forward.y = 0.0f;
-    right.y = 0.0f;
-    if (glm::length(forward) > 0.0f)
-    {
-        forward = glm::normalize(forward);
-    }
-    if (glm::length(right) > 0.0f)
-    {
-        right = glm::normalize(right);
-    }
+    math::AABB playerBox = getAABB();
+    glm::ivec3 minBlock = glm::ivec3(glm::floor(glm::vec3(playerBox.min)));
+    glm::ivec3 maxBlock = glm::ivec3(glm::floor(glm::vec3(
+        playerBox.max.x - 0.001f, playerBox.max.y - 0.001f, playerBox.max.z - 0.001f)));
 
-    glm::vec3 moveDir{0.0f};
-    if (input.isKeyDown(GLFW_KEY_W))
-    {
-        moveDir += forward;
-    }
-    if (input.isKeyDown(GLFW_KEY_S))
-    {
-        moveDir -= forward;
-    }
-    if (input.isKeyDown(GLFW_KEY_D))
-    {
-        moveDir += right;
-    }
-    if (input.isKeyDown(GLFW_KEY_A))
-    {
-        moveDir -= right;
-    }
+    // Clamp to world Y bounds to avoid out-of-bounds getBlock calls
+    minBlock.y = std::max(minBlock.y, WORLD_MIN_Y);
+    maxBlock.y = std::min(maxBlock.y, WORLD_MAX_Y);
 
-    if (glm::length(moveDir) > 0.0f)
+    for (int y = minBlock.y; y <= maxBlock.y; ++y)
     {
-        moveDir = glm::normalize(moveDir);
+        for (int x = minBlock.x; x <= maxBlock.x; ++x)
+        {
+            for (int z = minBlock.z; z <= maxBlock.z; ++z)
+            {
+                uint16_t stateId = world.getBlock({x, y, z});
+                if (stateId == world::BLOCK_AIR)
+                {
+                    continue;
+                }
+                const auto& def = registry.getBlockType(stateId);
+
+                if (def.isClimbable)
+                {
+                    m_isInClimbable = true;
+                }
+                m_maxResistance = std::max(m_maxResistance, def.moveResistance);
+                frameDamage += def.damagePerSecond;
+            }
+        }
     }
 
-    tickPhysics(dt, moveDir, world, registry);
+    // Accumulate damage over ticks (20 ticks = 1 second)
+    if (frameDamage > 0)
+    {
+        m_damageAccumulator += dt;
+        if (m_damageAccumulator >= 1.0f)
+        {
+            if (core::Log::getLogger())
+            {
+                VX_LOG_INFO("Player takes {} damage", frameDamage);
+            }
+            m_damageAccumulator -= 1.0f;
+        }
+    }
+    else
+    {
+        m_damageAccumulator = 0.0f;
+    }
 }
 
 void PlayerController::tickPhysics(
     float dt,
-    const glm::vec3& wishDir,
+    const MovementInput& input,
     world::ChunkManager& world,
     const world::BlockRegistry& registry)
 {
-    // Set horizontal velocity from wish direction
-    m_velocity.x = wishDir.x * WALK_SPEED;
-    m_velocity.z = wishDir.z * WALK_SPEED;
+    // 1. Scan overlapping blocks for physics properties
+    scanOverlappingBlocks(dt, world, registry);
 
-    // Apply gravity
-    applyGravity(dt);
+    // 2. Update sprint/sneak state (mutually exclusive)
+    m_isSneaking = input.sneak;
+    m_isSprinting = input.sprint;
+    if (m_isSneaking)
+    {
+        m_isSprinting = false;
+    }
+
+    // 3. Resistance multiplier
+    float resistanceMul = 1.0f / (1.0f + static_cast<float>(m_maxResistance));
+
+    if (m_isInClimbable)
+    {
+        // Climbable block behavior: disable gravity, controlled vertical movement
+        float horizSpeed = WALK_SPEED * resistanceMul;
+        float vertSpeed = SNEAK_SPEED * resistanceMul;
+
+        bool hasHorizInput = glm::length(input.wishDir) > 0.001f;
+        bool wantsUp = input.jump;
+        bool wantsDown = input.sneak;
+
+        if (hasHorizInput)
+        {
+            m_velocity.x = input.wishDir.x * horizSpeed;
+            m_velocity.z = input.wishDir.z * horizSpeed;
+        }
+        else
+        {
+            m_velocity.x = 0.0f;
+            m_velocity.z = 0.0f;
+        }
+
+        if (wantsUp)
+        {
+            m_velocity.y = vertSpeed;
+        }
+        else if (wantsDown)
+        {
+            m_velocity.y = -vertSpeed;
+        }
+        else
+        {
+            m_velocity.y = 0.0f;
+        }
+    }
+    else
+    {
+        // Normal movement
+        // Determine effective speed
+        float effectiveSpeed = WALK_SPEED;
+        if (m_isSprinting)
+        {
+            effectiveSpeed = SPRINT_SPEED;
+        }
+        else if (m_isSneaking)
+        {
+            effectiveSpeed = SNEAK_SPEED;
+        }
+
+        effectiveSpeed *= resistanceMul;
+
+        // Air control: reduce horizontal acceleration while airborne
+        if (m_isOnGround)
+        {
+            m_velocity.x = input.wishDir.x * effectiveSpeed;
+            m_velocity.z = input.wishDir.z * effectiveSpeed;
+        }
+        else
+        {
+            // Blend toward wish velocity with AIR_CONTROL factor
+            float wishX = input.wishDir.x * effectiveSpeed;
+            float wishZ = input.wishDir.z * effectiveSpeed;
+            m_velocity.x += (wishX - m_velocity.x) * AIR_CONTROL;
+            m_velocity.z += (wishZ - m_velocity.z) * AIR_CONTROL;
+        }
+
+        // Jump: only when on ground
+        if (input.jump && m_isOnGround)
+        {
+            m_velocity.y = JUMP_VELOCITY;
+            m_isOnGround = false;
+        }
+
+        // Apply gravity (with resistance reduction)
+        applyGravity(dt * resistanceMul);
+    }
+
+    // Sneak edge detection: before collision resolution, clamp horizontal movement
+    if (m_isSneaking && m_isOnGround && !m_isInClimbable)
+    {
+        glm::vec3 proposedDelta{m_velocity.x * dt, 0.0f, m_velocity.z * dt};
+        clampToEdge(proposedDelta, world, registry);
+    }
 
     // Resolve collisions axis by axis: Y first, then X, then Z
     resolveCollisions(dt, world, registry);
@@ -115,8 +219,68 @@ void PlayerController::applyGravity(float dt)
     }
 }
 
-static constexpr int WORLD_MIN_Y = 0;
-static constexpr int WORLD_MAX_Y = 255;
+void PlayerController::clampToEdge(
+    const glm::vec3& proposedDelta,
+    world::ChunkManager& world,
+    const world::BlockRegistry& registry)
+{
+    float halfW = HALF_EXTENTS.x; // 0.3
+
+    // Helper: check if a foot corner position has solid ground below it
+    auto hasGroundBelow = [&](double cx, double cy, double cz) -> bool {
+        glm::ivec3 belowBlock = glm::ivec3(
+            static_cast<int>(std::floor(cx)),
+            static_cast<int>(std::floor(cy - 1.0)),
+            static_cast<int>(std::floor(cz)));
+        if (belowBlock.y < WORLD_MIN_Y || belowBlock.y > WORLD_MAX_Y)
+        {
+            return false;
+        }
+        uint16_t stateId = world.getBlock(belowBlock);
+        if (stateId == world::BLOCK_AIR)
+        {
+            return false;
+        }
+        const auto& def = registry.getBlockType(stateId);
+        return def.hasCollision;
+    };
+
+    // Minecraft-style: block movement on an axis only if at the new position
+    // ZERO corners have ground below. As long as at least one corner is still
+    // over solid ground, the player can overhang the edge.
+    for (int axis : {0, 2})
+    {
+        if (std::abs(proposedDelta[axis]) < 1e-8f)
+        {
+            continue;
+        }
+
+        glm::dvec3 newPos = m_position;
+        newPos[axis] += static_cast<double>(proposedDelta[axis]);
+
+        double corners[4][2] = {
+            {newPos.x - halfW, newPos.z - halfW},
+            {newPos.x + halfW, newPos.z - halfW},
+            {newPos.x - halfW, newPos.z + halfW},
+            {newPos.x + halfW, newPos.z + halfW},
+        };
+
+        bool anyCornerHasGround = false;
+        for (const auto& corner : corners)
+        {
+            if (hasGroundBelow(corner[0], newPos.y, corner[1]))
+            {
+                anyCornerHasGround = true;
+                break;
+            }
+        }
+
+        if (!anyCornerHasGround)
+        {
+            m_velocity[axis] = 0.0f;
+        }
+    }
+}
 
 /// Collect all solid block AABBs that overlap the given volume.
 static std::vector<math::AABB> collectSolidBlocks(

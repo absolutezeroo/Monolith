@@ -5,6 +5,7 @@
 #include "voxel/renderer/VulkanContext.h"
 
 #include <GLFW/glfw3.h>
+#include <glm/geometric.hpp>
 #include <imgui.h>
 
 #include <algorithm>
@@ -263,8 +264,96 @@ void GameApp::tick(double dt)
         }
         else
         {
-            // Physics mode: PlayerController handles collision
-            m_player.update(fdt, *m_input, m_camera, m_chunkManager, m_blockRegistry);
+            // Physics mode: build movement commands from input, then run physics
+            glm::vec3 forward = m_camera.getForward();
+            glm::vec3 right = m_camera.getRight();
+            forward.y = 0.0f;
+            right.y = 0.0f;
+            if (glm::length(forward) > 0.0f)
+            {
+                forward = glm::normalize(forward);
+            }
+            if (glm::length(right) > 0.0f)
+            {
+                right = glm::normalize(right);
+            }
+
+            glm::vec3 dir{0.0f};
+            if (m_input->isKeyDown(GLFW_KEY_W))
+            {
+                dir += forward;
+            }
+            if (m_input->isKeyDown(GLFW_KEY_S))
+            {
+                dir -= forward;
+            }
+            if (m_input->isKeyDown(GLFW_KEY_D))
+            {
+                dir += right;
+            }
+            if (m_input->isKeyDown(GLFW_KEY_A))
+            {
+                dir -= right;
+            }
+            if (glm::length(dir) > 0.001f)
+            {
+                dir = glm::normalize(dir);
+            }
+
+            bool sneak = m_input->isKeyDown(GLFW_KEY_LEFT_SHIFT);
+            if (m_input->wasKeyPressed(GLFW_KEY_LEFT_CONTROL))
+            {
+                m_isSprinting = !m_isSprinting;
+            }
+            if (sneak)
+            {
+                m_isSprinting = false;
+            }
+
+            bool jump = m_input->isKeyDown(GLFW_KEY_SPACE);
+
+            // Push commands to queue
+            m_commandQueue.push(voxel::game::GameCommand{
+                voxel::game::CommandType::MovePlayer,
+                0,
+                0,
+                voxel::game::MovePlayerPayload{
+                    voxel::math::Vec3{dir.x, dir.y, dir.z}, m_isSprinting, sneak}});
+
+            if (jump)
+            {
+                m_commandQueue.push(voxel::game::GameCommand{
+                    voxel::game::CommandType::Jump, 0, 0, voxel::game::JumpPayload{}});
+            }
+
+            // Drain command queue into movement state
+            voxel::game::MovementInput moveInput;
+            m_commandQueue.drain([&](voxel::game::GameCommand cmd) {
+                switch (cmd.type)
+                {
+                case voxel::game::CommandType::MovePlayer:
+                {
+                    auto& payload = std::get<voxel::game::MovePlayerPayload>(cmd.payload);
+                    moveInput.wishDir = glm::vec3{payload.direction.x, payload.direction.y, payload.direction.z};
+                    moveInput.sprint = payload.isSprinting;
+                    moveInput.sneak = payload.isSneaking;
+                    break;
+                }
+                case voxel::game::CommandType::Jump:
+                    moveInput.jump = true;
+                    break;
+                case voxel::game::CommandType::ToggleSprint:
+                {
+                    auto& payload = std::get<voxel::game::ToggleSprintPayload>(cmd.payload);
+                    moveInput.sprint = payload.enabled;
+                    break;
+                }
+                default:
+                    break;
+                }
+            });
+
+            m_player.tickPhysics(fdt, moveInput, m_chunkManager, m_blockRegistry);
             m_camera.setPosition(m_player.getEyePosition());
         }
     }
@@ -371,6 +460,16 @@ void GameApp::buildDebugOverlay()
             ImGui::Text("OnGround: %s", m_player.isOnGround() ? "YES" : "NO");
             auto vel = m_player.getVelocity();
             ImGui::Text("Velocity: %.2f, %.2f, %.2f", vel.x, vel.y, vel.z);
+            ImGui::Text("Sprint: %s", m_player.isSprinting() ? "YES" : "NO");
+            ImGui::Text("Sneak: %s", m_player.isSneaking() ? "YES" : "NO");
+            if (m_player.isInClimbable())
+            {
+                ImGui::Text("Climbing: YES");
+            }
+            if (m_player.getMaxResistance() > 0)
+            {
+                ImGui::Text("Resistance: %u", m_player.getMaxResistance());
+            }
         }
 
         ImGui::Separator();

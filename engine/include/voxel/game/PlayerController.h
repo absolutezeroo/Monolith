@@ -5,6 +5,8 @@
 
 #include <glm/vec3.hpp>
 
+#include <cstdint>
+
 namespace voxel::input
 {
 class InputManager;
@@ -24,14 +26,21 @@ class BlockRegistry;
 namespace voxel::game
 {
 
+/// Movement state passed to tickPhysics() — decouples physics from InputManager.
+struct MovementInput
+{
+    glm::vec3 wishDir{0.0f}; ///< Normalized horizontal movement direction.
+    bool jump = false;
+    bool sprint = false;
+    bool sneak = false;
+};
+
 /**
- * @brief Handles player physics: gravity, swept AABB collision, step-up, and ground detection.
+ * @brief Handles player physics: gravity, swept AABB collision, step-up, ground detection,
+ *        jumping, sprinting, sneaking, climbable blocks, move resistance, and damage blocks.
  *
  * Owns player position (dvec3 for world-scale precision), velocity (vec3 for per-tick deltas),
  * and AABB half-extents. The position represents the center-bottom (feet) of the player AABB.
- *
- * This class reads input directly for basic WASD movement. Story 7.3 will layer
- * the command pipeline on top.
  */
 class PlayerController
 {
@@ -41,6 +50,10 @@ public:
     static constexpr float GRAVITY = 28.0f;
     static constexpr float TERMINAL_VELOCITY = 78.4f;
     static constexpr float WALK_SPEED = 4.317f;
+    static constexpr float SPRINT_SPEED = 5.612f;
+    static constexpr float SNEAK_SPEED = 1.295f;
+    static constexpr float JUMP_VELOCITY = 8.0f;
+    static constexpr float AIR_CONTROL = 0.02f;
     static constexpr float COLLISION_EPSILON = 0.001f;
 
     /**
@@ -49,23 +62,13 @@ public:
     void init(const glm::dvec3& spawnPos, world::ChunkManager& world, const world::BlockRegistry& registry);
 
     /**
-     * @brief Per-tick update: reads WASD input, applies gravity, resolves collisions.
-     */
-    void update(
-        float dt,
-        const input::InputManager& input,
-        const renderer::Camera& camera,
-        world::ChunkManager& world,
-        const world::BlockRegistry& registry);
-
-    /**
-     * @brief Per-tick physics update without input dependency (testable).
+     * @brief Per-tick physics update (testable, no input dependency).
      * @param dt Time delta in seconds.
-     * @param wishDir Normalized horizontal movement direction (XZ plane). Zero = no movement.
+     * @param input Movement state for this tick.
      */
     void tickPhysics(
         float dt,
-        const glm::vec3& wishDir,
+        const MovementInput& input,
         world::ChunkManager& world,
         const world::BlockRegistry& registry);
 
@@ -73,6 +76,10 @@ public:
     [[nodiscard]] glm::dvec3 getEyePosition() const;
     [[nodiscard]] glm::vec3 getVelocity() const { return m_velocity; }
     [[nodiscard]] bool isOnGround() const { return m_isOnGround; }
+    [[nodiscard]] bool isSprinting() const { return m_isSprinting; }
+    [[nodiscard]] bool isSneaking() const { return m_isSneaking; }
+    [[nodiscard]] bool isInClimbable() const { return m_isInClimbable; }
+    [[nodiscard]] uint8_t getMaxResistance() const { return m_maxResistance; }
     void setPosition(const glm::dvec3& pos) { m_position = pos; }
 
     [[nodiscard]] math::AABB getAABB() const;
@@ -81,8 +88,18 @@ private:
     glm::dvec3 m_position{0.0, 80.0, 0.0};
     glm::vec3 m_velocity{0.0f};
     bool m_isOnGround = false;
+    bool m_isSprinting = false;
+    bool m_isSneaking = false;
+    bool m_isInClimbable = false;
+    uint8_t m_maxResistance = 0;
+    float m_damageAccumulator = 0.0f;
 
+    void scanOverlappingBlocks(float dt, world::ChunkManager& world, const world::BlockRegistry& registry);
     void applyGravity(float dt);
+    void clampToEdge(
+        const glm::vec3& proposedDelta,
+        world::ChunkManager& world,
+        const world::BlockRegistry& registry);
     void resolveCollisions(float dt, world::ChunkManager& world, const world::BlockRegistry& registry);
     void resolveAxis(int axis, float delta, world::ChunkManager& world, const world::BlockRegistry& registry);
     bool tryStepUp(int axis, float delta, world::ChunkManager& world, const world::BlockRegistry& registry);
