@@ -35,6 +35,8 @@ add_executable(VoxelTests
     game/TestCommandQueue.cpp
     game/TestEventBus.cpp
     game/TestPlayerController.cpp
+    game/TestMiningState.cpp
+    game/TestBlockPlacement.cpp
     physics/TestRaycast.cpp
 )
 

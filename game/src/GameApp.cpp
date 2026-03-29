@@ -28,6 +28,18 @@ static constexpr float HOTBAR_PADDING = 4.0f;
 static constexpr const char* HOTBAR_BLOCK_NAMES[HOTBAR_SLOTS] = {
     "Stone", "Dirt", "Grass", "Sand", "Wood", "Leaves", "Glass", "Torch", "Cobble"};
 
+/// Registry string IDs corresponding to HOTBAR_BLOCK_NAMES.
+static constexpr const char* HOTBAR_BLOCK_IDS[HOTBAR_SLOTS] = {
+    "base:stone",
+    "base:dirt",
+    "base:grass_block",
+    "base:sand",
+    "base:oak_log",
+    "base:oak_leaves",
+    "base:glass",
+    "base:torch",
+    "base:cobblestone"};
+
 GameApp::GameApp(voxel::game::Window& window, voxel::renderer::VulkanContext& vulkanContext)
     : GameLoop(window), m_window(window), m_renderer(vulkanContext)
 {
@@ -225,6 +237,144 @@ void GameApp::handleInputToggles()
     }
 }
 
+uint16_t GameApp::resolveHotbarBlockId(int slot) const
+{
+    if (slot < 0 || slot >= HOTBAR_SLOTS)
+    {
+        return voxel::world::BLOCK_AIR;
+    }
+    uint16_t id = m_blockRegistry.getIdByName(HOTBAR_BLOCK_IDS[slot]);
+    return id; // Returns BLOCK_AIR (0) if name not found
+}
+
+void GameApp::handleBlockInteraction(float dt)
+{
+    if (!m_input->isCursorCaptured())
+    {
+        m_player.resetMining();
+        return;
+    }
+
+    // Mining: LMB hold
+    bool lmbDown = m_input->isMouseButtonDown(GLFW_MOUSE_BUTTON_LEFT);
+    bool miningCompleted = m_player.updateMining(dt, m_raycastResult, lmbDown, m_chunkManager, m_blockRegistry);
+
+    if (miningCompleted)
+    {
+        m_commandQueue.push(voxel::game::GameCommand{
+            voxel::game::CommandType::BreakBlock,
+            0,
+            0,
+            voxel::game::BreakBlockPayload{
+                voxel::math::IVec3{
+                    m_raycastResult.blockPos.x, m_raycastResult.blockPos.y, m_raycastResult.blockPos.z}}});
+    }
+
+    // Placement: RMB press (one-shot)
+    if (m_input->wasMouseButtonPressed(GLFW_MOUSE_BUTTON_RIGHT) && m_raycastResult.hit)
+    {
+        uint16_t blockId = resolveHotbarBlockId(m_hotbarSlot);
+        if (blockId != voxel::world::BLOCK_AIR)
+        {
+            auto& prev = m_raycastResult.previousPos;
+            m_commandQueue.push(voxel::game::GameCommand{
+                voxel::game::CommandType::PlaceBlock,
+                0,
+                0,
+                voxel::game::PlaceBlockPayload{voxel::math::IVec3{prev.x, prev.y, prev.z}, blockId}});
+        }
+    }
+
+    // Drain block commands
+    m_commandQueue.drain([&](voxel::game::GameCommand cmd) {
+        switch (cmd.type)
+        {
+        case voxel::game::CommandType::BreakBlock:
+        {
+            auto& payload = std::get<voxel::game::BreakBlockPayload>(cmd.payload);
+            glm::ivec3 pos{payload.position.x, payload.position.y, payload.position.z};
+            uint16_t previousId = m_chunkManager.getBlock(pos);
+            if (previousId == voxel::world::BLOCK_AIR)
+            {
+                break; // Nothing to break
+            }
+            m_chunkManager.setBlock(pos, voxel::world::BLOCK_AIR);
+            m_eventBus.publish<voxel::game::EventType::BlockBroken>(
+                voxel::game::BlockBrokenEvent{payload.position, previousId});
+            VX_LOG_DEBUG("Block broken at ({},{},{}): id={}", pos.x, pos.y, pos.z, previousId);
+            break;
+        }
+        case voxel::game::CommandType::PlaceBlock:
+        {
+            auto& payload = std::get<voxel::game::PlaceBlockPayload>(cmd.payload);
+            glm::ivec3 pos{payload.position.x, payload.position.y, payload.position.z};
+
+            // Validate: target must be air or isBuildableTo
+            uint16_t targetBlock = m_chunkManager.getBlock(pos);
+            if (targetBlock != voxel::world::BLOCK_AIR)
+            {
+                const auto& targetDef = m_blockRegistry.getBlockType(targetBlock);
+                if (!targetDef.isBuildableTo)
+                {
+                    break; // Silently reject
+                }
+            }
+
+            // Validate: block AABB must not overlap player AABB
+            voxel::math::AABB blockBox{
+                voxel::math::Vec3{static_cast<float>(pos.x), static_cast<float>(pos.y), static_cast<float>(pos.z)},
+                voxel::math::Vec3{
+                    static_cast<float>(pos.x + 1), static_cast<float>(pos.y + 1), static_cast<float>(pos.z + 1)}};
+            if (!m_flyMode && blockBox.intersects(m_player.getAABB()))
+            {
+                break; // Can't place inside yourself
+            }
+
+            m_chunkManager.setBlock(pos, payload.blockId);
+            m_eventBus.publish<voxel::game::EventType::BlockPlaced>(
+                voxel::game::BlockPlacedEvent{payload.position, payload.blockId});
+            VX_LOG_DEBUG("Block placed at ({},{},{}): id={}", pos.x, pos.y, pos.z, payload.blockId);
+            break;
+        }
+        default:
+            break;
+        }
+    });
+
+    // Wield animation triggers
+    m_wieldAnim.update(dt);
+
+    if (m_hotbarSlot != m_prevHotbarSlot)
+    {
+        m_wieldAnim.startAnim(voxel::renderer::WieldAnimType::Switch);
+        m_prevHotbarSlot = m_hotbarSlot;
+    }
+    else if (m_player.getMiningState().isMining)
+    {
+        if (m_wieldAnim.animType != voxel::renderer::WieldAnimType::Mining)
+        {
+            m_wieldAnim.startAnim(voxel::renderer::WieldAnimType::Mining);
+        }
+    }
+    else if (m_input->wasMouseButtonPressed(GLFW_MOUSE_BUTTON_RIGHT) && m_raycastResult.hit)
+    {
+        m_wieldAnim.startAnim(voxel::renderer::WieldAnimType::Place);
+    }
+    else if (m_wieldAnim.animType != voxel::renderer::WieldAnimType::Switch ||
+             m_wieldAnim.update(0.0f)) // Check if switch is done
+    {
+        if (m_wieldAnim.animType != voxel::renderer::WieldAnimType::Idle &&
+            m_wieldAnim.animType != voxel::renderer::WieldAnimType::Place)
+        {
+            m_wieldAnim.startAnim(voxel::renderer::WieldAnimType::Idle);
+        }
+        else if (m_wieldAnim.animType == voxel::renderer::WieldAnimType::Place && m_wieldAnim.timer >= 0.2f)
+        {
+            m_wieldAnim.startAnim(voxel::renderer::WieldAnimType::Idle);
+        }
+    }
+}
+
 void GameApp::tick(double dt)
 {
     auto fdt = static_cast<float>(dt);
@@ -352,6 +502,18 @@ void GameApp::tick(double dt)
         }
     }
 
+    // Block interaction: mining (LMB hold) and placement (RMB press).
+    // Called after physics so player position is current for distance checks.
+    // Works in both fly and physics mode; guarded by cursor capture internally.
+    if (!io.WantCaptureMouse)
+    {
+        handleBlockInteraction(fdt);
+    }
+    else
+    {
+        m_player.resetMining();
+    }
+
     // Sync overlay sliders back to camera
     m_camera.setFov(m_overlayState.fov);
     m_camera.setSensitivity(m_overlayState.sensitivity);
@@ -424,13 +586,14 @@ void GameApp::buildDebugOverlay()
             const auto& def = m_blockRegistry.getBlockType(blockId);
             static constexpr const char* FACE_NAMES[] = {"+X", "-X", "+Y", "-Y", "+Z", "-Z"};
             int faceIdx = static_cast<int>(m_raycastResult.face);
+            const char* faceName = (faceIdx >= 0 && faceIdx < 6) ? FACE_NAMES[faceIdx] : "?";
             ImGui::Text(
                 "Target: %d, %d, %d (%s) face=%s d=%.1f",
                 bp.x,
                 bp.y,
                 bp.z,
                 def.stringId.c_str(),
-                FACE_NAMES[faceIdx],
+                faceName,
                 m_raycastResult.distance);
         }
 
@@ -611,6 +774,248 @@ void GameApp::drawHotbar()
     }
 }
 
+void GameApp::drawCrackOverlay()
+{
+    const auto& miningState = m_player.getMiningState();
+    if (miningState.crackStage < 0 || !m_raycastResult.hit)
+    {
+        return;
+    }
+
+    ImDrawList* draw = ImGui::GetForegroundDrawList();
+    ImVec2 vpSize = ImGui::GetMainViewport()->Size;
+    glm::mat4 vp = m_camera.getProjectionMatrix() * m_camera.getViewMatrix();
+
+    // Get the face normal to compute the 4 corners of the crack quad
+    glm::vec3 bpos = glm::vec3(m_raycastResult.blockPos);
+    constexpr float OFFSET = 0.001f; // Slight offset to prevent z-fighting
+
+    // Face quad corners based on hit face
+    glm::vec3 corners[4];
+    switch (m_raycastResult.face)
+    {
+    case voxel::renderer::BlockFace::PosX: // +X face
+        corners[0] = bpos + glm::vec3(1.0f + OFFSET, 0.0f, 0.0f);
+        corners[1] = bpos + glm::vec3(1.0f + OFFSET, 0.0f, 1.0f);
+        corners[2] = bpos + glm::vec3(1.0f + OFFSET, 1.0f, 1.0f);
+        corners[3] = bpos + glm::vec3(1.0f + OFFSET, 1.0f, 0.0f);
+        break;
+    case voxel::renderer::BlockFace::NegX: // -X face
+        corners[0] = bpos + glm::vec3(-OFFSET, 0.0f, 1.0f);
+        corners[1] = bpos + glm::vec3(-OFFSET, 0.0f, 0.0f);
+        corners[2] = bpos + glm::vec3(-OFFSET, 1.0f, 0.0f);
+        corners[3] = bpos + glm::vec3(-OFFSET, 1.0f, 1.0f);
+        break;
+    case voxel::renderer::BlockFace::PosY: // +Y face (top)
+        corners[0] = bpos + glm::vec3(0.0f, 1.0f + OFFSET, 0.0f);
+        corners[1] = bpos + glm::vec3(1.0f, 1.0f + OFFSET, 0.0f);
+        corners[2] = bpos + glm::vec3(1.0f, 1.0f + OFFSET, 1.0f);
+        corners[3] = bpos + glm::vec3(0.0f, 1.0f + OFFSET, 1.0f);
+        break;
+    case voxel::renderer::BlockFace::NegY: // -Y face (bottom)
+        corners[0] = bpos + glm::vec3(0.0f, -OFFSET, 1.0f);
+        corners[1] = bpos + glm::vec3(1.0f, -OFFSET, 1.0f);
+        corners[2] = bpos + glm::vec3(1.0f, -OFFSET, 0.0f);
+        corners[3] = bpos + glm::vec3(0.0f, -OFFSET, 0.0f);
+        break;
+    case voxel::renderer::BlockFace::PosZ: // +Z face
+        corners[0] = bpos + glm::vec3(1.0f, 0.0f, 1.0f + OFFSET);
+        corners[1] = bpos + glm::vec3(0.0f, 0.0f, 1.0f + OFFSET);
+        corners[2] = bpos + glm::vec3(0.0f, 1.0f, 1.0f + OFFSET);
+        corners[3] = bpos + glm::vec3(1.0f, 1.0f, 1.0f + OFFSET);
+        break;
+    case voxel::renderer::BlockFace::NegZ: // -Z face
+        corners[0] = bpos + glm::vec3(0.0f, 0.0f, -OFFSET);
+        corners[1] = bpos + glm::vec3(1.0f, 0.0f, -OFFSET);
+        corners[2] = bpos + glm::vec3(1.0f, 1.0f, -OFFSET);
+        corners[3] = bpos + glm::vec3(0.0f, 1.0f, -OFFSET);
+        break;
+    }
+
+    // Project to screen space
+    ImVec2 screenPts[4];
+    for (int i = 0; i < 4; ++i)
+    {
+        glm::vec4 clip = vp * glm::vec4(corners[i], 1.0f);
+        if (clip.w <= 0.0f)
+        {
+            return; // Face is behind camera
+        }
+        float invW = 1.0f / clip.w;
+        float ndcX = clip.x * invW;
+        float ndcY = clip.y * invW;
+        screenPts[i].x = (ndcX * 0.5f + 0.5f) * vpSize.x;
+        screenPts[i].y = (ndcY * 0.5f + 0.5f) * vpSize.y;
+    }
+
+    // Crack alpha increases with stage: stage 0 = light, stage 9 = almost opaque
+    int stage = miningState.crackStage;
+    uint8_t alpha = static_cast<uint8_t>(40 + stage * 20); // 40..220
+    auto crackCol = IM_COL32(0, 0, 0, alpha);
+
+    // Draw filled quad using two triangles
+    draw->AddQuadFilled(screenPts[0], screenPts[1], screenPts[2], screenPts[3], crackCol);
+
+    // Draw crack pattern lines (cross pattern that gets denser with higher stages)
+    auto lineCol = IM_COL32(30, 30, 30, alpha);
+    if (stage >= 2)
+    {
+        // Diagonal crack
+        draw->AddLine(screenPts[0], screenPts[2], lineCol, 1.5f);
+    }
+    if (stage >= 4)
+    {
+        // Counter-diagonal
+        draw->AddLine(screenPts[1], screenPts[3], lineCol, 1.5f);
+    }
+    if (stage >= 6)
+    {
+        // Horizontal midline
+        ImVec2 mid01{(screenPts[0].x + screenPts[1].x) * 0.5f, (screenPts[0].y + screenPts[1].y) * 0.5f};
+        ImVec2 mid23{(screenPts[2].x + screenPts[3].x) * 0.5f, (screenPts[2].y + screenPts[3].y) * 0.5f};
+        draw->AddLine(mid01, mid23, lineCol, 1.5f);
+    }
+    if (stage >= 8)
+    {
+        // Vertical midline
+        ImVec2 mid03{(screenPts[0].x + screenPts[3].x) * 0.5f, (screenPts[0].y + screenPts[3].y) * 0.5f};
+        ImVec2 mid12{(screenPts[1].x + screenPts[2].x) * 0.5f, (screenPts[1].y + screenPts[2].y) * 0.5f};
+        draw->AddLine(mid03, mid12, lineCol, 1.5f);
+    }
+}
+
+void GameApp::drawPostEffectTint()
+{
+    // Check block at camera eye position
+    glm::dvec3 eyePos = m_flyMode ? glm::dvec3(m_camera.getPosition()) : m_player.getEyePosition();
+    glm::ivec3 blockPos = glm::ivec3(
+        static_cast<int>(std::floor(eyePos.x)),
+        static_cast<int>(std::floor(eyePos.y)),
+        static_cast<int>(std::floor(eyePos.z)));
+
+    uint16_t blockId = m_chunkManager.getBlock(blockPos);
+    if (blockId == voxel::world::BLOCK_AIR)
+    {
+        return;
+    }
+
+    const auto& def = m_blockRegistry.getBlockType(blockId);
+    if (def.postEffectColor == 0)
+    {
+        return;
+    }
+
+    // Extract RGBA from packed uint32_t (RRGGBBAA)
+    uint8_t r = static_cast<uint8_t>((def.postEffectColor >> 24) & 0xFF);
+    uint8_t g = static_cast<uint8_t>((def.postEffectColor >> 16) & 0xFF);
+    uint8_t b = static_cast<uint8_t>((def.postEffectColor >> 8) & 0xFF);
+    uint8_t a = static_cast<uint8_t>(def.postEffectColor & 0xFF);
+
+    // If alpha is 0, use a default semi-transparent value
+    if (a == 0)
+    {
+        a = 100;
+    }
+
+    ImDrawList* draw = ImGui::GetForegroundDrawList();
+    ImVec2 vpSize = ImGui::GetMainViewport()->Size;
+    draw->AddRectFilled(ImVec2(0.0f, 0.0f), vpSize, IM_COL32(r, g, b, a));
+}
+
+void GameApp::drawWieldMesh()
+{
+    ImDrawList* draw = ImGui::GetForegroundDrawList();
+    ImVec2 vpSize = ImGui::GetMainViewport()->Size;
+
+    // Wield position: bottom-right of screen
+    constexpr float WIELD_SIZE = 64.0f;
+    constexpr float WIELD_MARGIN = 30.0f;
+    float baseX = vpSize.x - WIELD_SIZE - WIELD_MARGIN;
+    float baseY = vpSize.y - WIELD_SIZE - 80.0f; // Above hotbar
+
+    // Apply animation offsets
+    float totalTime = static_cast<float>(glfwGetTime());
+    float offsetX = 0.0f;
+    float offsetY = 0.0f;
+
+    switch (m_wieldAnim.animType)
+    {
+    case voxel::renderer::WieldAnimType::Idle:
+        offsetY = m_wieldAnim.getIdleBobY(totalTime);
+        break;
+    case voxel::renderer::WieldAnimType::Mining:
+    {
+        // Swing rotation synced with mining progress
+        const auto& ms = m_player.getMiningState();
+        float swing = std::sin(ms.progress * 3.14159f * 6.0f) * 8.0f;
+        offsetX = swing;
+        offsetY = std::abs(swing) * 0.5f;
+        break;
+    }
+    case voxel::renderer::WieldAnimType::Place:
+    {
+        // Forward thrust: move up and slightly forward
+        float progress = m_wieldAnim.getProgress();
+        float thrust = std::sin(progress * 3.14159f) * 15.0f;
+        offsetY = -thrust;
+        break;
+    }
+    case voxel::renderer::WieldAnimType::Switch:
+    {
+        // Drop-down then rise-up
+        float progress = m_wieldAnim.getProgress();
+        if (progress < 0.5f)
+        {
+            offsetY = progress * 2.0f * WIELD_SIZE; // Drop down
+        }
+        else
+        {
+            offsetY = (1.0f - progress) * 2.0f * WIELD_SIZE; // Rise up
+        }
+        break;
+    }
+    }
+
+    float x = baseX + offsetX;
+    float y = baseY + offsetY;
+
+    // Draw a 3D-ish block representation
+    ImVec2 p0(x, y);
+    ImVec2 p1(x + WIELD_SIZE, y + WIELD_SIZE);
+
+    // Block face (front)
+    draw->AddRectFilled(p0, p1, IM_COL32(140, 140, 140, 220), 2.0f);
+
+    // Top face (lighter, perspective illusion)
+    float topH = WIELD_SIZE * 0.3f;
+    ImVec2 topPts[4] = {
+        ImVec2(x, y),
+        ImVec2(x + WIELD_SIZE * 0.2f, y - topH),
+        ImVec2(x + WIELD_SIZE + WIELD_SIZE * 0.2f, y - topH),
+        ImVec2(x + WIELD_SIZE, y),
+    };
+    draw->AddQuadFilled(topPts[0], topPts[1], topPts[2], topPts[3], IM_COL32(180, 180, 180, 220));
+
+    // Right face (darker)
+    ImVec2 rightPts[4] = {
+        ImVec2(x + WIELD_SIZE, y),
+        ImVec2(x + WIELD_SIZE + WIELD_SIZE * 0.2f, y - topH),
+        ImVec2(x + WIELD_SIZE + WIELD_SIZE * 0.2f, y + WIELD_SIZE - topH),
+        ImVec2(x + WIELD_SIZE, y + WIELD_SIZE),
+    };
+    draw->AddQuadFilled(rightPts[0], rightPts[1], rightPts[2], rightPts[3], IM_COL32(100, 100, 100, 220));
+
+    // Block name label
+    const char* blockName = HOTBAR_BLOCK_NAMES[m_hotbarSlot];
+    ImVec2 textSize = ImGui::CalcTextSize(blockName);
+    float textX = x + (WIELD_SIZE - textSize.x) * 0.5f;
+    float textY = y + (WIELD_SIZE - textSize.y) * 0.5f;
+    draw->AddText(ImVec2(textX, textY), IM_COL32(255, 255, 255, 200), blockName);
+
+    // Outline
+    draw->AddRect(p0, p1, IM_COL32(60, 60, 60, 200), 2.0f, 0, 1.0f);
+}
+
 void GameApp::toggleFullscreen()
 {
     GLFWwindow* handle = m_window.getHandle();
@@ -708,13 +1113,18 @@ void GameApp::render(double /*alpha*/)
             m_renderer.renderChunksIndirect(vp, frustumPlanes);
         }
 
+        // Post-effect tint (head inside water/lava)
+        drawPostEffectTint();
+
         buildDebugOverlay();
         if (m_input->isCursorCaptured())
         {
             drawCrosshair();
             drawBlockHighlight();
+            drawCrackOverlay();
         }
         drawHotbar();
+        drawWieldMesh();
         m_renderer.endFrame();
     }
 }

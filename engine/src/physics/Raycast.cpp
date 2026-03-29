@@ -23,6 +23,9 @@ RaycastResult raycast(
     using renderer::BlockFace;
 
     // 1. Starting voxel = floor(origin)
+    // NOTE: prevPos starts equal to blockPos. If origin is inside a solid block,
+    // the result will have previousPos == blockPos (distance ≈ 0). Story 7.5
+    // must handle this edge case when using previousPos for block placement.
     glm::ivec3 blockPos = glm::ivec3(glm::floor(origin));
     glm::ivec3 prevPos = blockPos;
 

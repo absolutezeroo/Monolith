@@ -29,7 +29,83 @@ void PlayerController::init(
     m_isInClimbable = false;
     m_maxResistance = 0;
     m_damageAccumulator = 0.0f;
+    m_miningState.reset();
     ensureNotInsideBlock(world, registry);
+}
+
+bool PlayerController::updateMining(
+    float dt,
+    const physics::RaycastResult& result,
+    bool lmbDown,
+    const world::ChunkManager& world,
+    const world::BlockRegistry& registry)
+{
+    // Reset conditions: LMB released or no hit
+    if (!lmbDown || !result.hit)
+    {
+        m_miningState.reset();
+        return false;
+    }
+
+    // Check distance from player to target (> 6 blocks cancels mining)
+    auto eyePos = glm::vec3(getEyePosition());
+    auto targetCenter = glm::vec3(result.blockPos) + glm::vec3(0.5f);
+    float dist = glm::length(targetCenter - eyePos);
+    if (dist > physics::MAX_REACH)
+    {
+        m_miningState.reset();
+        return false;
+    }
+
+    // Target block changed — reset progress
+    if (m_miningState.isMining && m_miningState.targetBlock != result.blockPos)
+    {
+        m_miningState.reset();
+    }
+
+    // Get block definition at target
+    uint16_t blockId = world.getBlock(result.blockPos);
+    if (blockId == world::BLOCK_AIR)
+    {
+        m_miningState.reset();
+        return false;
+    }
+    const auto& def = registry.getBlockType(blockId);
+
+    // Start mining a new block
+    if (!m_miningState.isMining)
+    {
+        m_miningState.targetBlock = result.blockPos;
+        m_miningState.isMining = true;
+        m_miningState.progress = 0.0f;
+        m_miningState.breakTime = calculateBreakTime(def);
+    }
+
+    // Accumulate progress
+    if (m_miningState.breakTime > 0.0f)
+    {
+        m_miningState.progress += dt / m_miningState.breakTime;
+        m_miningState.progress = std::min(m_miningState.progress, 1.0f);
+    }
+    else
+    {
+        m_miningState.progress = 1.0f;
+    }
+
+    // Update crack stage: floor(progress * 10), clamped 0-9
+    m_miningState.crackStage = std::clamp(
+        static_cast<int>(std::floor(m_miningState.progress * static_cast<float>(MAX_CRACK_STAGES))),
+        0,
+        MAX_CRACK_STAGES - 1);
+
+    // Check if mining completed
+    if (m_miningState.progress >= 1.0f)
+    {
+        m_miningState.reset();
+        return true;
+    }
+
+    return false;
 }
 
 void PlayerController::scanOverlappingBlocks(

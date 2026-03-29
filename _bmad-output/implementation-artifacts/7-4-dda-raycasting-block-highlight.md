@@ -1,6 +1,6 @@
 # Story 7.4: DDA Raycasting + Block Highlight
 
-Status: review
+Status: done
 
 ## Story
 
@@ -385,3 +385,4 @@ None — clean implementation with zero build errors and all tests passing on fi
 ## Change Log
 
 - 2026-03-29: Implemented Story 7.4 — DDA Raycasting + Block Highlight (all tasks complete)
+- 2026-03-29: Code review passed — 2 LOW fixes applied (defensive FACE_NAMES bounds check, edge-case comment for Story 7.5)

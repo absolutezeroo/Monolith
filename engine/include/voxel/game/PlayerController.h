@@ -1,7 +1,9 @@
 #pragma once
 
+#include "voxel/game/MiningState.h"
 #include "voxel/math/AABB.h"
 #include "voxel/math/MathTypes.h"
+#include "voxel/physics/Raycast.h"
 
 #include <glm/vec3.hpp>
 
@@ -62,6 +64,27 @@ public:
         world::ChunkManager& world,
         const world::BlockRegistry& registry);
 
+    /**
+     * @brief Update mining progress for one simulation tick.
+     * @param dt Time delta in seconds.
+     * @param result Current frame's raycast result.
+     * @param lmbDown Whether the left mouse button is held.
+     * @param world ChunkManager for block lookups.
+     * @param registry BlockRegistry for hardness lookups.
+     * @return true if mining just completed (progress >= 1.0) this tick.
+     */
+    bool updateMining(
+        float dt,
+        const physics::RaycastResult& result,
+        bool lmbDown,
+        const world::ChunkManager& world,
+        const world::BlockRegistry& registry);
+
+    /// Reset mining state to idle.
+    void resetMining() { m_miningState.reset(); }
+
+    [[nodiscard]] const MiningState& getMiningState() const { return m_miningState; }
+
     [[nodiscard]] glm::dvec3 getPosition() const { return m_position; }
     [[nodiscard]] glm::dvec3 getEyePosition() const;
     [[nodiscard]] glm::vec3 getVelocity() const { return m_velocity; }
@@ -83,6 +106,7 @@ private:
     bool m_isInClimbable = false;
     uint8_t m_maxResistance = 0;
     float m_damageAccumulator = 0.0f;
+    MiningState m_miningState;
 
     void scanOverlappingBlocks(float dt, world::ChunkManager& world, const world::BlockRegistry& registry);
     void applyGravity(float dt);

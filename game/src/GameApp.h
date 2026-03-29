@@ -4,6 +4,7 @@
 #include "voxel/core/JobSystem.h"
 #include "voxel/core/Result.h"
 #include "voxel/game/CommandQueue.h"
+#include "voxel/game/EventBus.h"
 #include "voxel/game/GameLoop.h"
 #include "voxel/game/PlayerController.h"
 #include "voxel/input/InputManager.h"
@@ -12,6 +13,7 @@
 #include "voxel/renderer/ChunkUploadManager.h"
 #include "voxel/renderer/MeshBuilder.h"
 #include "voxel/renderer/Renderer.h"
+#include "voxel/renderer/WieldMeshRenderer.h"
 #include "voxel/world/BlockRegistry.h"
 #include "voxel/world/ChunkManager.h"
 #include "voxel/world/WorldGenerator.h"
@@ -47,9 +49,14 @@ class GameApp : public voxel::game::GameLoop
 
   private:
     void handleInputToggles();
+    void handleBlockInteraction(float dt);
+    uint16_t resolveHotbarBlockId(int slot) const;
     void buildDebugOverlay();
     void drawCrosshair();
     void drawBlockHighlight();
+    void drawCrackOverlay();
+    void drawPostEffectTint();
+    void drawWieldMesh();
     void drawHotbar();
     void toggleFullscreen();
     void captureScreenshot();
@@ -78,11 +85,14 @@ class GameApp : public voxel::game::GameLoop
     // Player physics controller
     voxel::game::PlayerController m_player;
     voxel::game::CommandQueue m_commandQueue;
+    voxel::game::EventBus m_eventBus;
     bool m_flyMode = true; // Start in fly mode — toggled with F7
     bool m_isSprinting = false; // Persistent sprint toggle state
 
     // HUD state
     int m_hotbarSlot = 0;
+    int m_prevHotbarSlot = 0; // For wield slot-switch animation
+    voxel::renderer::WieldAnimState m_wieldAnim;
 
     // Config file path
     std::string m_configPath;

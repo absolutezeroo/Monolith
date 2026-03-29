@@ -5,7 +5,7 @@
 project: VoxelForge
 methodology: BMAD v6 + Game Dev Studio
 created: 2026-03-24
-last_updated: 2026-03-29  # Story 7.4 → review
+last_updated: 2026-03-29  # Story 7.5 → review
 
 # Status values: backlog | ready | in-progress | review | done | blocked
 
@@ -258,12 +258,12 @@ epics:
         assigned_to: dev-agent
       - id: "7.4"
         title: "DDA Raycasting + Block Highlight"
-        status: review
+        status: done
         assigned_to: dev-agent
       - id: "7.5"
         title: "Block Place and Break"
-        status: backlog
-        assigned_to: null
+        status: review
+        assigned_to: dev-agent
 
   - id: 8
     name: "Lighting"
