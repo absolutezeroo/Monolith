@@ -59,7 +59,7 @@ void main()
 
     // Directional sun as subtle bonus
     vec3 normal = normalize(fragNormal);
-    float NdotL = max(dot(normal, pc.sunDirection.xyz), 0.0);
+    float NdotL = max(dot(normal, normalize(pc.sunDirection.xyz)), 0.0);
     vec3 sunBonus = tintedColor * NdotL * 0.15 * pc.dayNightFactor;
 
     // Apply AO

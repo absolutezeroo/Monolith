@@ -1,6 +1,6 @@
 # Story 8.4: Deferred Lighting Pass + Day/Night Cycle
 
-Status: review
+Status: done
 
 ## Story
 
@@ -453,3 +453,4 @@ Claude Opus 4.6
 
 ### Change Log
 - 2026-03-30: Implemented Story 8.4 — Deferred Lighting Pass + Day/Night Cycle. Added G-Buffer RT2 for light data, voxel-aware lighting in deferred and forward passes, sinusoidal day/night cycle with sun direction rotation, sky color gradient, and debug overlay controls.
+- 2026-03-30: Code review fixes — renamed model.vert `_pad0` to `dayNightFactor` (offset 72) for consistency with CPU struct; added `normalize()` to sunDirection in translucent.frag to match lighting.frag.
