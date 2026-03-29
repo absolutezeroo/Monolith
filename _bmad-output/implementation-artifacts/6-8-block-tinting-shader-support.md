@@ -1,6 +1,6 @@
 # Story 6.8: Block Tinting Shader Support
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -223,7 +223,7 @@ In the SSBO declaration, use `vec4 colors[8]` (not `vec3`). In std430, a `vec3` 
 
 ### V1 Limitations (Acceptable)
 
-- **Per-block tinting, not per-face**: `grass_block` bottom face (dirt texture) gets grass tint too. Minor visual artifact — Minecraft uses per-face tint via block model JSON. Per-face tint requires a mesher change (different tintIndex per face) which is out of scope.
+- **Grass top-face only tinting**: `effectiveTintForFace()` in MeshBuilder ensures only the PosY face of `grass_block` receives biome tint. Side/bottom faces (dirt texture) remain un-tinted. Leaves and water tint all faces.
 - **Global palette, not per-chunk**: All chunks use the same tint palette. At biome boundaries, chunks snap to the dominant biome's colors. Smooth blending requires per-chunk palette upload (Future: per-chunk tint via ChunkRenderInfo extension).
 - **Static at init**: `updateTintPalette()` is called once. Dynamic biome-driven updates (as player moves across biomes) require integration with ChunkManager's biome tracking, planned for future.
 
@@ -246,12 +246,9 @@ Insert tint palette buffer destruction into existing sequence in `Renderer::shut
 
 ### What This Story Does NOT Do
 
-- Does NOT add per-face tinting (all faces of a block get the same tint)
 - Does NOT add per-chunk palettes (global palette only, V1)
 - Does NOT add dynamic biome tracking (palette set once at init)
-- Does NOT modify chunk.vert (tintIndex already extracted and output)
 - Does NOT modify cull.comp or cull_translucent.comp (no tint in culling)
-- Does NOT modify MeshBuilder (tintIndex already packed into quads)
 - Does NOT modify TintPalette class (already complete from Story 5.5)
 - Does NOT add sky/block light integration (Epic 8)
 
@@ -337,14 +334,23 @@ Claude Opus 4.6
 - Task 7: translucent.frag — added TintPaletteSSBO, applies tint before lighting calculation.
 - Task 8: chunk.frag — added TintPaletteSSBO, applies tint before AO multiplication.
 - Task 9: All 3 shaders recompiled successfully, C++ build clean with /W4 /WX, all tests pass.
+- Post-implementation fix: Added `effectiveTintForFace()` in MeshBuilder.cpp — grass blocks (TINT_GRASS) now only tint the top face (PosY), side/bottom faces get TINT_NONE. Applied in both buildNaive and buildGreedy paths.
+- Post-implementation fix: chunk.vert UV mapping — extended PosY UV dimension swap to also cover NegY, added V-flip for side faces so texture-top aligns with world-top.
+- Post-implementation fix: Updated TestTintWaving.cpp — tests now verify grass block tintIndex=1 only on PosY face, 0 on all other faces. Both naive and greedy mesher sections updated.
+- Code review fix: Added missing `m_tintPaletteAllocation = VK_NULL_HANDLE` reset in Renderer::shutdown() for consistency.
 
 ### Change Log
 - 2026-03-29: Implemented block tinting shader support — wired biome tint palette to all 3 fragment shaders via SSBO binding 5
+- 2026-03-29: Post-impl fix — grass blocks tint top face only via effectiveTintForFace(), chunk.vert UV fix, tests updated
+- 2026-03-29: Code review fix — m_tintPaletteAllocation reset in shutdown(), story documentation updated
 
 ### File List
 - assets/scripts/base/blocks.json (modified — added tintIndex to 7 block types)
 - engine/include/voxel/renderer/Renderer.h (modified — added tint palette members + updateTintPalette method)
-- engine/src/renderer/Renderer.cpp (modified — buffer creation, descriptor layout/writes, updateTintPalette impl, shutdown cleanup, init palette call)
+- engine/src/renderer/Renderer.cpp (modified — buffer creation, descriptor layout/writes, updateTintPalette impl, shutdown cleanup, init palette call, allocation handle reset)
 - assets/shaders/gbuffer.frag (modified — added TintPaletteSSBO binding 5, tint multiplication)
 - assets/shaders/translucent.frag (modified — added TintPaletteSSBO binding 5, tint multiplication before lighting)
 - assets/shaders/chunk.frag (modified — added TintPaletteSSBO binding 5, tint multiplication)
+- engine/src/renderer/MeshBuilder.cpp (modified — added effectiveTintForFace() for grass top-only tinting in both naive and greedy paths)
+- assets/shaders/chunk.vert (modified — extended NegY UV dimension swap, added V-flip for side face textures)
+- tests/renderer/TestTintWaving.cpp (modified — updated grass block tests to verify per-face tintIndex)

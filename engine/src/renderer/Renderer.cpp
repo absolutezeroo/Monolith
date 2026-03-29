@@ -1694,6 +1694,7 @@ void Renderer::shutdown()
     {
         vmaDestroyBuffer(m_vulkanContext.getAllocator(), m_tintPaletteBuffer, m_tintPaletteAllocation);
         m_tintPaletteBuffer = VK_NULL_HANDLE;
+        m_tintPaletteAllocation = VK_NULL_HANDLE;
         m_tintPaletteMapped = nullptr;
     }
 

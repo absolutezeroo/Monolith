@@ -172,9 +172,12 @@ void main()
     }
 
     // ── UV coordinates per corner ───────────────────────────────────────────
-    // PosY and NegY: mesher maps width=Z, height=X; swap UV dimensions.
-    float uvW = (face == 2u || face == 3u) ? height : width;
-    float uvH = (face == 2u || face == 3u) ? width  : height;
+    // PosY only: mesher maps width=Z, height=X but corner winding goes
+    // c0→c1 along Z then c0→c3 along X, so swap UV dimensions.
+    // NegY does NOT need swap: its winding goes c0→c1 along X, c0→c3 along Z,
+    // matching the default (uvW=width=Z, uvH=height=X) naturally.
+    float uvW = (face == 2u) ? height : width;
+    float uvH = (face == 2u) ? width  : height;
 
     // Side faces: flip V so texture-top maps to world-top (high Y).
     // Horizontal faces (PosY/NegY): keep standard mapping.
