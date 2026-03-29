@@ -7,16 +7,6 @@
 
 #include <cstdint>
 
-namespace voxel::input
-{
-class InputManager;
-}
-
-namespace voxel::renderer
-{
-class Camera;
-}
-
 namespace voxel::world
 {
 class ChunkManager;

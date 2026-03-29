@@ -342,12 +342,6 @@ void GameApp::tick(double dt)
                 case voxel::game::CommandType::Jump:
                     moveInput.jump = true;
                     break;
-                case voxel::game::CommandType::ToggleSprint:
-                {
-                    auto& payload = std::get<voxel::game::ToggleSprintPayload>(cmd.payload);
-                    moveInput.sprint = payload.enabled;
-                    break;
-                }
                 default:
                     break;
                 }

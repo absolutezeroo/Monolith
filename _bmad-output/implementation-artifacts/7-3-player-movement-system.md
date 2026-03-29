@@ -1,6 +1,6 @@
 # Story 7.3: Player Movement System
 
-Status: review
+Status: done
 
 ## Story
 
@@ -493,25 +493,30 @@ Claude Opus 4.6
 
 - Added `MovementInput` struct to decouple physics from InputManager (replaces old `update()` method entirely)
 - Implemented `scanOverlappingBlocks()` at start of each tick to detect climbable, resistance, and damage blocks
-- Implemented `clampToEdge()` for sneak edge detection — checks all 4 foot corners per axis independently
+- Implemented `clampToEdge()` for Minecraft-style sneak edge detection (3 iterations based on playtesting)
 - Extended `tickPhysics()` with full movement physics flow: scan blocks → compute speed → apply resistance → handle climbable/normal → sneak edge clamp → resolve collisions
 - Command queue integration in GameApp: input → push commands → drain → build MovementInput → tickPhysics
 - Added Y bounds clamping in `scanOverlappingBlocks()` and `clampToEdge()` to prevent assertion failures when player is above COLUMN_HEIGHT
 - Extended `makeTestRegistry()` with ladder, cobweb, and cactus block types for physics tests
 - All 9 existing Story 7.2 tests updated to use `MovementInput` API
-- 9 new tests added covering all AC #13 requirements
+- 13 new tests added covering all AC #13 requirements + sneak edge scenarios
 
 ### Debug Log References
 
 - Fixed Y out-of-bounds assertion: `scanOverlappingBlocks()` called `world.getBlock()` with y > COLUMN_HEIGHT when player was at high altitude. Added `std::max/min` clamping to WORLD_MIN_Y/WORLD_MAX_Y.
 - Fixed move resistance test: player wasn't settled on ground before walking through cobweb, causing air control factor (0.02x) to reduce speed. Fixed by calling `settleOnGround()` first.
+- Sneak edge detection — 3 iterations based on playtesting:
+  1. **V1**: Block if ANY corner has no ground → too restrictive, player completely stuck at edges
+  2. **V2**: Block only if a corner that HAD ground would LOSE it → invisible walls between adjacent blocks
+  3. **V3 (final)**: Block only when ZERO corners at new position have ground below → correct Minecraft behavior (overhang allowed, stops only at actual edge)
 
 ### Completion Notes List
 
 - All 11 tasks and 42 subtasks completed
-- 200 tests pass (489,468 assertions) — zero regressions
-- 9 new test cases added for Story 7.3 mechanics
+- 204 tests pass (489,497 assertions) — zero regressions
+- 13 new test cases added for Story 7.3 mechanics (9 original + 4 sneak edge scenarios)
 - All 13 acceptance criteria satisfied
+- Sneak edge detection playtested and confirmed matching Minecraft behavior
 - `update()` method removed from PlayerController (replaced by `MovementInput` struct + `tickPhysics()`)
 - Command queue integration working: GameApp pushes MovePlayer/Jump commands, drains before physics tick
 - Debug overlay shows sprint/sneak/climbable/resistance status
@@ -526,4 +531,5 @@ Claude Opus 4.6
 
 ### Change Log
 
-- 2026-03-29: Implemented Story 7.3 — Player Movement System with jump, sprint, sneak, climbable blocks, move resistance, damage blocks, sneak edge detection, air control, and command queue integration. 9 new tests added, all 200 tests pass.
+- 2026-03-29: Implemented Story 7.3 — Player Movement System with jump, sprint, sneak, climbable blocks, move resistance, damage blocks, sneak edge detection, air control, and command queue integration. 13 new tests added, all 204 tests pass.
+- 2026-03-29: Iterated sneak edge detection 3 times based on user playtesting. Final algorithm: block movement only when zero foot corners have ground below (Minecraft-style overhang). Confirmed working in-game.

@@ -913,12 +913,7 @@ TEST_CASE("PlayerController: leaving climbable block resumes gravity", "[game][p
         player.tickPhysics(dt, walkRight, cm, registry);
     }
 
-    // After leaving the climbable block, gravity should be active
-    // Player should either be on ground (walked onto ground) or falling
-    // Check that climbable state is cleared
-    // If player is past the ladder (x > 8.3 + 0.3), they shouldn't be in climbable
-    if (player.getPosition().x > 8.7)
-    {
-        CHECK_FALSE(player.isInClimbable());
-    }
+    // After walking 20 ticks at WALK_SPEED (~4.3 blocks), player is well past the ladder
+    REQUIRE(player.getPosition().x > 9.3);
+    CHECK_FALSE(player.isInClimbable());
 }
