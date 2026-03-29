@@ -89,6 +89,7 @@ void bfsSkyWithinColumn(ChunkColumn& column, const BlockRegistry& registry, std:
             if (newLight > existing)
             {
                 nLightMap.setSkyLight(nx, nLocalY, nz, newLight);
+                column.markDirty(nSectionY);
                 queue.push(
                     {static_cast<int16_t>(nx), static_cast<int16_t>(ny), static_cast<int16_t>(nz), newLight});
             }
@@ -102,35 +103,51 @@ void SkyLightPropagator::propagateColumn(ChunkColumn& column, const BlockRegistr
 {
     std::queue<LightNode> queue;
 
-    // Phase 1 — Seed: for each (x,z) column, scan top-down and set sky=15 for all transparent blocks
-    // above (and including) the highest opaque block's position + 1.
+    // Phase 1 — Seed: for each (x,z) column, use the pre-built heightmap to set sky=15
+    // for all blocks above the highest opaque block (no per-block opacity checks needed).
     for (int z = 0; z < ChunkSection::SIZE; ++z)
     {
         for (int x = 0; x < ChunkSection::SIZE; ++x)
         {
-            for (int y = ChunkColumn::COLUMN_HEIGHT - 1; y >= 0; --y)
+            int heightY = static_cast<int>(column.getHeight(x, z));
+            for (int y = ChunkColumn::COLUMN_HEIGHT - 1; y > heightY; --y)
             {
                 int sectionY = y / ChunkSection::SIZE;
                 int localY = y % ChunkSection::SIZE;
-
-                if (isOpaque(column, registry, sectionY, x, localY, z))
-                {
-                    break; // Hit opaque block — stop seeding this column
-                }
-
-                LightMap& lightMap = column.getLightMap(sectionY);
-                lightMap.setSkyLight(x, localY, z, 15);
+                column.getLightMap(sectionY).setSkyLight(x, localY, z, 15);
+            }
+            // heightY=0 is ambiguous: opaque block at Y=0 or empty column.
+            // Check the block at heightY to handle the empty-column case.
+            if (!isOpaque(column, registry, heightY / ChunkSection::SIZE, x,
+                          heightY % ChunkSection::SIZE, z))
+            {
+                column.getLightMap(heightY / ChunkSection::SIZE)
+                    .setSkyLight(x, heightY % ChunkSection::SIZE, z, 15);
             }
         }
     }
 
-    // Phase 2 — BFS: queue all sky-lit blocks at level 15 that have a non-sky-lit neighbor.
-    // This propagates sky light horizontally and downward under overhangs.
+    // Phase 2 — BFS: queue sky-lit blocks at level 15 that have a non-sky-lit neighbor.
+    // Optimization: blocks above the tallest opaque block in the column have only
+    // sky=15 or opaque neighbors within the chunk, so skip scanning them.
+    int maxHeight = 0;
+    for (int iz = 0; iz < ChunkSection::SIZE; ++iz)
+    {
+        for (int ix = 0; ix < ChunkSection::SIZE; ++ix)
+        {
+            int h = static_cast<int>(column.getHeight(ix, iz));
+            if (h > maxHeight)
+            {
+                maxHeight = h;
+            }
+        }
+    }
+
     for (int z = 0; z < ChunkSection::SIZE; ++z)
     {
         for (int x = 0; x < ChunkSection::SIZE; ++x)
         {
-            for (int y = ChunkColumn::COLUMN_HEIGHT - 1; y >= 0; --y)
+            for (int y = maxHeight; y >= 0; --y)
             {
                 int sectionY = y / ChunkSection::SIZE;
                 int localY = y % ChunkSection::SIZE;

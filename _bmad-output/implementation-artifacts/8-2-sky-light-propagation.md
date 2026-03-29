@@ -1,6 +1,6 @@
 # Story 8.2: Sky Light Propagation
 
-Status: review
+Status: done
 
 ## Story
 
