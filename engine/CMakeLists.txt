@@ -49,6 +49,7 @@ add_library(VoxelEngine STATIC
         src/world/WorldGenerator.cpp
         src/input/InputManager.cpp
         src/physics/Raycast.cpp
+        src/scripting/ScriptEngine.cpp
 )
 
 target_include_directories(VoxelEngine
@@ -74,6 +75,9 @@ find_package(nlohmann_json CONFIG REQUIRED)
 find_package(lz4 CONFIG REQUIRED)
 find_package(Stb REQUIRED)
 find_package(enkiTS CONFIG REQUIRED)
+find_package(sol2 CONFIG REQUIRED)
+find_path(LUAJIT_INCLUDE_DIR luajit.h PATH_SUFFIXES luajit)
+find_library(LUAJIT_LIBRARY NAMES luajit-5.1 lua51)
 
 target_link_libraries(VoxelEngine
         PUBLIC glm::glm
@@ -88,8 +92,11 @@ target_link_libraries(VoxelEngine
         PRIVATE nlohmann_json::nlohmann_json
         PRIVATE lz4::lz4
         PUBLIC enkiTS::enkiTS
+        PUBLIC sol2::sol2
+        PRIVATE ${LUAJIT_LIBRARY}
 )
 target_include_directories(VoxelEngine PRIVATE ${Stb_INCLUDE_DIR})
+target_include_directories(VoxelEngine PUBLIC ${LUAJIT_INCLUDE_DIR})
 
 # spdlog: disable exceptions (project uses -fno-exceptions)
 target_compile_definitions(VoxelEngine PUBLIC SPDLOG_NO_EXCEPTIONS)
@@ -110,6 +117,14 @@ target_compile_definitions(VoxelEngine PRIVATE
 target_compile_definitions(VoxelEngine PUBLIC
         GLM_FORCE_DEPTH_ZERO_TO_ONE
         GLM_FORCE_LEFT_HANDED
+)
+
+# sol2 + LuaJIT: safety checks, no-exceptions mode, LuaJIT as C runtime
+target_compile_definitions(VoxelEngine PUBLIC
+        SOL_ALL_SAFETIES_ON=1
+        SOL_LUAJIT=1
+        SOL_NO_EXCEPTIONS=1
+        SOL_USING_CXX_LUA=0
 )
 
 # Windows: prevent <windows.h> from defining min/max macros
@@ -174,6 +189,14 @@ if (MSVC)
 else ()
     set_property(SOURCE src/renderer/ImGuiImpl.cpp src/renderer/ImGuiImplGlfw.cpp
             APPEND_STRING PROPERTY COMPILE_FLAGS " -w")
+endif ()
+
+# ScriptEngine.cpp — sol2 is a massive header (~50K lines); skip PCH to avoid conflicts
+# and suppress third-party warnings from sol2/LuaJIT headers.
+set_source_files_properties(src/scripting/ScriptEngine.cpp PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
+if (MSVC)
+    set_property(SOURCE src/scripting/ScriptEngine.cpp
+            APPEND_STRING PROPERTY COMPILE_FLAGS " /wd4702")
 endif ()
 
 # StbImage*.cpp — single-header implementations; skip PCH and suppress warnings.

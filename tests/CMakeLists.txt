@@ -43,6 +43,7 @@ add_executable(VoxelTests
     game/TestMiningState.cpp
     game/TestBlockPlacement.cpp
     physics/TestRaycast.cpp
+    scripting/TestScriptEngine.cpp
 )
 
 target_link_libraries(VoxelTests
