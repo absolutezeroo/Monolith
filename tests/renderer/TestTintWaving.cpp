@@ -134,7 +134,7 @@ TEST_CASE("Meshing integration with tint and waving", "[renderer][meshing][tint]
     registerBlock(registry, "base:oak_leaves", 2, 1, true);
     MeshBuilder builder(registry);
 
-    SECTION("grass block quads carry tintIndex=1, wavingType=2")
+    SECTION("grass block: only top face carries tintIndex=1, others get 0")
     {
         ChunkSection section;
         section.setBlock(8, 8, 8, grassId);
@@ -144,7 +144,14 @@ TEST_CASE("Meshing integration with tint and waving", "[renderer][meshing][tint]
         REQUIRE(mesh.quadCount == 6);
         for (const uint64_t quad : mesh.quads)
         {
-            REQUIRE(unpackTintIndex(quad) == 1);
+            if (unpackFace(quad) == BlockFace::PosY)
+            {
+                REQUIRE(unpackTintIndex(quad) == 1);
+            }
+            else
+            {
+                REQUIRE(unpackTintIndex(quad) == 0);
+            }
             REQUIRE(unpackWavingType(quad) == 2);
         }
     }
@@ -182,7 +189,14 @@ TEST_CASE("Meshing integration with tint and waving", "[renderer][meshing][tint]
             }
             else if (texLayer == 3) // grass texture index
             {
-                REQUIRE(unpackTintIndex(quad) == 1);
+                if (unpackFace(quad) == BlockFace::PosY)
+                {
+                    REQUIRE(unpackTintIndex(quad) == 1);
+                }
+                else
+                {
+                    REQUIRE(unpackTintIndex(quad) == 0);
+                }
                 REQUIRE(unpackWavingType(quad) == 2);
             }
         }
@@ -224,7 +238,7 @@ TEST_CASE("Greedy mesher propagates tint and waving", "[renderer][meshing][tint]
     uint16_t grassId = registerBlock(registry, "base:grass_block", 1, 2, false, 3);
     MeshBuilder builder(registry);
 
-    SECTION("grass block quads carry tintIndex=1, wavingType=2 via greedy")
+    SECTION("grass block: only top face carries tintIndex=1 via greedy")
     {
         ChunkSection section;
         section.setBlock(8, 8, 8, grassId);
@@ -234,7 +248,14 @@ TEST_CASE("Greedy mesher propagates tint and waving", "[renderer][meshing][tint]
         REQUIRE(mesh.quadCount == 6);
         for (const uint64_t quad : mesh.quads)
         {
-            REQUIRE(unpackTintIndex(quad) == 1);
+            if (unpackFace(quad) == BlockFace::PosY)
+            {
+                REQUIRE(unpackTintIndex(quad) == 1);
+            }
+            else
+            {
+                REQUIRE(unpackTintIndex(quad) == 0);
+            }
             REQUIRE(unpackWavingType(quad) == 2);
         }
     }
@@ -272,7 +293,14 @@ TEST_CASE("Greedy mesher propagates tint and waving", "[renderer][meshing][tint]
             }
             else if (texLayer == 3) // grass texture index
             {
-                REQUIRE(unpackTintIndex(quad) == 1);
+                if (unpackFace(quad) == BlockFace::PosY)
+                {
+                    REQUIRE(unpackTintIndex(quad) == 1);
+                }
+                else
+                {
+                    REQUIRE(unpackTintIndex(quad) == 0);
+                }
                 REQUIRE(unpackWavingType(quad) == 2);
             }
         }

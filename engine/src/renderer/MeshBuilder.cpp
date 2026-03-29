@@ -2,6 +2,7 @@
 
 #include "voxel/renderer/AmbientOcclusion.h"
 #include "voxel/renderer/ModelRegistry.h"
+#include "voxel/renderer/TintPalette.h"
 #include "voxel/world/Block.h"
 #include "voxel/world/BlockRegistry.h"
 #include "voxel/world/ChunkSection.h"
@@ -310,6 +311,17 @@ void buildTransparentFaceMasks(
     }
 }
 
+/// For TINT_GRASS, only the top face (PosY = face 2) should receive biome tint.
+/// Leaves (TINT_FOLIAGE) and water (TINT_WATER) tint all faces.
+inline uint8_t effectiveTintForFace(uint8_t tintIndex, uint8_t faceIdx)
+{
+    if (tintIndex == TintPalette::TINT_GRASS && faceIdx != 2)
+    {
+        return TintPalette::TINT_NONE;
+    }
+    return tintIndex;
+}
+
 /// Greedy merge one face direction: extends quads in width then height, constrained by
 /// same block type AND same AO key. Emits packed quads into outQuads.
 void greedyMergeFace(
@@ -419,7 +431,7 @@ void greedyMergeFace(
                     ao2,
                     ao3,
                     flip,
-                    blockDef.tintIndex,
+                    effectiveTintForFace(blockDef.tintIndex, faceIdx),
                     blockDef.waving);
                 outQuads.push_back(quad);
             }
@@ -554,7 +566,7 @@ ChunkMesh MeshBuilder::buildNaive(
                             ao[2],
                             ao[3],
                             flip,
-                            blockDef.tintIndex,
+                            effectiveTintForFace(blockDef.tintIndex, f),
                             blockDef.waving);
 
                         if (blockDef.renderType == world::RenderType::Translucent)

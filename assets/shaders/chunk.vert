@@ -172,17 +172,31 @@ void main()
     }
 
     // ── UV coordinates per corner ───────────────────────────────────────────
-    // For PosY, corner winding maps V to Z-axis (width) and U to X-axis (height),
-    // so swap UV dimensions to match physical extents.
-    float uvW = (face == 2u) ? height : width;
-    float uvH = (face == 2u) ? width  : height;
+    // PosY and NegY: mesher maps width=Z, height=X; swap UV dimensions.
+    float uvW = (face == 2u || face == 3u) ? height : width;
+    float uvH = (face == 2u || face == 3u) ? width  : height;
 
-    vec2 uvs[4] = vec2[4](
-        vec2(0.0, 0.0),
-        vec2(0.0, uvH),
-        vec2(uvW,  uvH),
-        vec2(uvW,  0.0)
-    );
+    // Side faces: flip V so texture-top maps to world-top (high Y).
+    // Horizontal faces (PosY/NegY): keep standard mapping.
+    vec2 uvs[4];
+    if (face == 2u || face == 3u)
+    {
+        uvs = vec2[4](
+            vec2(0.0, 0.0),
+            vec2(0.0, uvH),
+            vec2(uvW, uvH),
+            vec2(uvW, 0.0)
+        );
+    }
+    else
+    {
+        uvs = vec2[4](
+            vec2(0.0, uvH),
+            vec2(0.0, 0.0),
+            vec2(uvW, 0.0),
+            vec2(uvW, uvH)
+        );
+    }
 
     // When flipped, rotate UVs to match the corner rotation
     if (flip == 1u)
