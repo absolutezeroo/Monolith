@@ -114,7 +114,7 @@ core::Result<void> ScriptEngine::loadScript(const std::filesystem::path& scriptP
     }
 
     // Filesystem sandbox: verify path is within an allowed directory
-    if (!m_allowedPaths.empty() && !isPathAllowed(canonicalPath))
+    if (!isPathAllowed(canonicalPath))
     {
         VX_LOG_WARN("Script path outside sandbox: {}", scriptPath.string());
         return std::unexpected(
@@ -190,7 +190,7 @@ void ScriptEngine::addAllowedPath(const std::filesystem::path& path)
     }
     else
     {
-        // If canonicalization fails, store the path as-is (best effort)
+        VX_LOG_WARN("Failed to canonicalize allowed path: {} ({})", path.string(), ec.message());
         m_allowedPaths.push_back(path);
     }
 }

@@ -79,6 +79,13 @@ find_package(sol2 CONFIG REQUIRED)
 find_path(LUAJIT_INCLUDE_DIR luajit.h PATH_SUFFIXES luajit)
 find_library(LUAJIT_LIBRARY NAMES luajit-5.1 lua51)
 
+if (NOT LUAJIT_INCLUDE_DIR)
+    message(FATAL_ERROR "LuaJIT include directory not found. Ensure luajit is installed via vcpkg.")
+endif ()
+if (NOT LUAJIT_LIBRARY)
+    message(FATAL_ERROR "LuaJIT library not found. Ensure luajit is installed via vcpkg.")
+endif ()
+
 target_link_libraries(VoxelEngine
         PUBLIC glm::glm
         PUBLIC spdlog::spdlog

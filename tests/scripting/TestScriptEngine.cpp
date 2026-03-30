@@ -153,12 +153,15 @@ TEST_CASE("ScriptEngine", "[scripting]")
         REQUIRE_FALSE(result.valid());
     }
 
-    SECTION("load nonexistent file returns ScriptError")
+    SECTION("load nonexistent file returns FileNotFound")
     {
         auto initResult = engine.init();
         REQUIRE(initResult.has_value());
 
-        auto result = engine.loadScript("nonexistent_script_that_does_not_exist.lua");
+        auto scriptsDir = getTestScriptsDir();
+        engine.addAllowedPath(scriptsDir);
+
+        auto result = engine.loadScript(scriptsDir / "nonexistent_script_that_does_not_exist.lua");
         REQUIRE_FALSE(result.has_value());
         REQUIRE(result.error().code == voxel::core::ErrorCode::FileNotFound);
     }
