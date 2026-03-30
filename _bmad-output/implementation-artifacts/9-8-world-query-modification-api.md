@@ -1,6 +1,6 @@
 # Story 9.8: World Query & Modification API
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -24,47 +24,47 @@ so that mods can create dynamic gameplay mechanics (structure detection, block t
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Implement `WorldQueryAPI` class (AC: 1, 2, 10)
-  - [ ] 1.1: Create `WorldQueryAPI.h/cpp` with static `registerWorldAPI(lua, chunkManager, blockRegistry)` method
-  - [ ] 1.2: Implement `voxel.get_block(pos)` — resolve pos to ChunkManager::getBlock, return string ID via BlockRegistry
-  - [ ] 1.3: Implement `voxel.get_block_info(string_id)` — return BlockDefinition fields as Lua table
-  - [ ] 1.4: Implement `voxel.get_block_state(pos)` — return BlockRegistry::getStateValues as Lua table
-  - [ ] 1.5: Implement `voxel.set_block(pos, block_id)` — resolve name to numeric ID, call ChunkManager::setBlock, fire callback chain (onDestruct old, onConstruct new, updateLightAfterBlockChange)
-  - [ ] 1.6: Implement `voxel.set_block_state(pos, block_id, state_table)` — merge state via BlockRegistry::getStateId
-  - [ ] 1.7: Implement `voxel.dig_block(pos)` — trigger destruction callbacks as if player broke it
-  - [ ] 1.8: Implement `voxel.swap_block(pos, new_id)` — raw setBlock WITHOUT callbacks (for state changes like door open/close)
+- [x] Task 1: Implement `WorldQueryAPI` class (AC: 1, 2, 10)
+  - [x] 1.1: Create `WorldQueryAPI.h/cpp` with static `registerWorldAPI(lua, chunkManager, blockRegistry)` method
+  - [x] 1.2: Implement `voxel.get_block(pos)` — resolve pos to ChunkManager::getBlock, return string ID via BlockRegistry
+  - [x] 1.3: Implement `voxel.get_block_info(string_id)` — return BlockDefinition fields as Lua table
+  - [x] 1.4: Implement `voxel.get_block_state(pos)` — return BlockRegistry::getStateValues as Lua table
+  - [x] 1.5: Implement `voxel.set_block(pos, block_id)` — resolve name to numeric ID, call ChunkManager::setBlock, fire callback chain (onDestruct old, onConstruct new, updateLightAfterBlockChange)
+  - [x] 1.6: Implement `voxel.set_block_state(pos, block_id, state_table)` — merge state via BlockRegistry::getStateId
+  - [x] 1.7: Implement `voxel.dig_block(pos)` — trigger destruction callbacks as if player broke it
+  - [x] 1.8: Implement `voxel.swap_block(pos, new_id)` — raw setBlock WITHOUT callbacks (for state changes like door open/close)
 
-- [ ] Task 2: Implement area search and raycasting (AC: 3, 4)
-  - [ ] 2.1: Implement `voxel.find_blocks_in_area(p1, p2, filter)` — iterate chunk sections in AABB, support string ID and `"group:name"` prefix matching
-  - [ ] 2.2: Implement `voxel.count_blocks_in_area(p1, p2, filter)` — same iteration but count-only (no position table allocation)
-  - [ ] 2.3: Implement `voxel.raycast(ox, oy, oz, dx, dy, dz, max_dist)` — wrap existing DDA raycast, return `{pos, face, block_id}` or nil
+- [x] Task 2: Implement area search and raycasting (AC: 3, 4)
+  - [x] 2.1: Implement `voxel.find_blocks_in_area(p1, p2, filter)` — iterate chunk sections in AABB, support string ID and `"group:name"` prefix matching
+  - [x] 2.2: Implement `voxel.count_blocks_in_area(p1, p2, filter)` — same iteration but count-only (no position table allocation)
+  - [x] 2.3: Implement `voxel.raycast(ox, oy, oz, dx, dy, dz, max_dist)` — wrap existing DDA raycast, return `{pos, face, block_id}` or nil
 
-- [ ] Task 3: Implement biome/lighting/time queries (AC: 5)
-  - [ ] 3.1: Implement `voxel.get_biome(x, z)` — if WorldGenerator exposes biome data, wrap it; else return stub "unknown"
-  - [ ] 3.2: Implement `voxel.get_light(pos)` — read sky and block light from ChunkSection light data
-  - [ ] 3.3: Implement `voxel.get_time_of_day()` / `voxel.set_time_of_day(float)` — read/write from game time state
+- [x] Task 3: Implement biome/lighting/time queries (AC: 5)
+  - [x] 3.1: Implement `voxel.get_biome(x, z)` — if WorldGenerator exposes biome data, wrap it; else return stub "unknown"
+  - [x] 3.2: Implement `voxel.get_light(pos)` — read sky and block light from ChunkSection light data
+  - [x] 3.3: Implement `voxel.get_time_of_day()` / `voxel.set_time_of_day(float)` — read/write from game time state
 
-- [ ] Task 4: Extend timer system with scheduled ticks (AC: 6)
-  - [ ] 4.1: Add `scheduleTick(pos, delayTicks, priority)` to BlockTimerManager — priority queue ordered by (targetTick, priority)
-  - [ ] 4.2: Add `setTimerActive(pos, bool)` to BlockTimerManager — pause/resume without resetting
-  - [ ] 4.3: Register `voxel.schedule_tick` and `voxel.set_node_timer_active` in WorldQueryAPI
+- [x] Task 4: Extend timer system with scheduled ticks (AC: 6)
+  - [x] 4.1: Add `scheduleTick(pos, delayTicks, priority)` to BlockTimerManager — priority queue ordered by (targetTick, priority)
+  - [x] 4.2: Add `setTimerActive(pos, bool)` to BlockTimerManager — pause/resume without resetting
+  - [x] 4.3: Register `voxel.schedule_tick` and `voxel.set_node_timer_active` in WorldQueryAPI
 
-- [ ] Task 5: Implement multiblock pattern matching (AC: 7)
-  - [ ] 5.1: Implement `voxel.check_pattern(pos, entries)` — relative offset matching with early exit
-  - [ ] 5.2: Implement `voxel.check_box_pattern(p1, p2, filter, opts)` — volumetric check with `allow_mixed` option
-  - [ ] 5.3: Implement `voxel.check_ring(pos, y_offset, radius, filter)` — perimeter check at given Y offset
+- [x] Task 5: Implement multiblock pattern matching (AC: 7)
+  - [x] 5.1: Implement `voxel.check_pattern(pos, entries)` — relative offset matching with early exit
+  - [x] 5.2: Implement `voxel.check_box_pattern(p1, p2, filter, opts)` — volumetric check with `allow_mixed` option
+  - [x] 5.3: Implement `voxel.check_ring(pos, y_offset, radius, filter)` — perimeter check at given Y offset
 
-- [ ] Task 6: Implement settings API and rate limiting (AC: 8, 9)
-  - [ ] 6.1: Implement `voxel.get_setting(name)` / `voxel.set_setting(name, value)` with whitelist
-  - [ ] 6.2: Create `RateLimiter` struct — per-mod counters, reset on tick, configurable limits per function category
-  - [ ] 6.3: Wrap all expensive functions with rate limit checks; exceed returns nil + logs warning
+- [x] Task 6: Implement settings API and rate limiting (AC: 8, 9)
+  - [x] 6.1: Implement `voxel.get_setting(name)` / `voxel.set_setting(name, value)` with whitelist
+  - [x] 6.2: Create `RateLimiter` struct — per-mod counters, reset on tick, configurable limits per function category
+  - [x] 6.3: Wrap all expensive functions with rate limit checks; exceed returns nil + logs warning
 
-- [ ] Task 7: Wire into GameApp and write tests (AC: 11)
-  - [ ] 7.1: Call `WorldQueryAPI::registerWorldAPI` in GameApp after ScriptEngine init
-  - [ ] 7.2: Write integration test: Lua places 5x5x5 cube, area search returns 125 positions
-  - [ ] 7.3: Write integration test: beacon pyramid pattern detection
-  - [ ] 7.4: Write unit test: rate limiter enforcement
-  - [ ] 7.5: Write unit test: coordinate validation (out-of-bounds, unloaded chunks)
+- [x] Task 7: Wire into GameApp and write tests (AC: 11)
+  - [x] 7.1: Call `WorldQueryAPI::registerWorldAPI` in GameApp after ScriptEngine init
+  - [x] 7.2: Write integration test: Lua places 5x5x5 cube, area search returns 125 positions
+  - [x] 7.3: Write integration test: beacon pyramid pattern detection
+  - [x] 7.4: Write unit test: rate limiter enforcement
+  - [x] 7.5: Write unit test: coordinate validation (out-of-bounds, unloaded chunks)
 
 ## Dev Notes
 
@@ -269,9 +269,42 @@ WorldQueryAPI follows the same static registration pattern as LuaBindings::regis
 ## Dev Agent Record
 
 ### Agent Model Used
+Claude Opus 4.6
 
 ### Debug Log References
+N/A — no debugging required.
 
 ### Completion Notes List
+- Implemented all 11 acceptance criteria across 7 tasks
+- WorldQueryAPI class with static registration pattern matching existing LuaBindings
+- Block queries: get_block, get_block_info, get_block_state
+- Block modifications: set_block (with callback chain), set_block_state, dig_block (with destruction chain), swap_block (no callbacks)
+- Area search: find_blocks_in_area and count_blocks_in_area with string ID and group:name matching
+- Raycasting: wraps existing physics::raycast DDA implementation
+- Environment: get_biome (via WorldGenerator::getBiomeSystem), get_light (sky+block), get/set_time_of_day
+- Scheduled ticks: scheduleTick and setTimerActive added to BlockTimerManager
+- Pattern matching: check_pattern (relative offsets), check_box_pattern (volumetric), check_ring (perimeter)
+- Settings API: get_setting/set_setting with writable whitelist
+- RateLimiter: per-tick counters for all expensive operations
+- Added biomeToString() utility to BiomeTypes.h
+- Added getBiomeSystem() getter to WorldGenerator
+- 34 test cases, 81 assertions, all passing
+- No regressions in existing 647 scripting assertions
 
 ### File List
+
+**New files (4):**
+- `engine/include/voxel/scripting/WorldQueryAPI.h`
+- `engine/src/scripting/WorldQueryAPI.cpp`
+- `tests/scripting/TestWorldQueryAPI.cpp`
+- `tests/scripting/test_scripts/world_query_test.lua`
+
+**Modified files (7):**
+- `engine/include/voxel/scripting/BlockTimerManager.h` — scheduleTick, setTimerActive, ScheduledTick struct, pausedTimers
+- `engine/src/scripting/BlockTimerManager.cpp` — implement scheduleTick, updateScheduledTicks, setTimerActive
+- `engine/include/voxel/world/BiomeTypes.h` — added biomeToString()
+- `engine/include/voxel/world/WorldGenerator.h` — added getBiomeSystem() const getter
+- `engine/CMakeLists.txt` — added WorldQueryAPI.cpp to sources and PCH skip list
+- `tests/CMakeLists.txt` — added TestWorldQueryAPI.cpp
+- `game/src/GameApp.h` — added m_rateLimiter member, WorldQueryAPI include
+- `game/src/GameApp.cpp` — register WorldQueryAPI, reset rate limiter per tick

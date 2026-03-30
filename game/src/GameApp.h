@@ -9,6 +9,7 @@
 #include "voxel/game/PlayerController.h"
 #include "voxel/input/InputManager.h"
 #include "voxel/physics/Raycast.h"
+#include "voxel/scripting/WorldQueryAPI.h"
 #include "voxel/renderer/Camera.h"
 #include "voxel/renderer/ChunkUploadManager.h"
 #include "voxel/renderer/MeshBuilder.h"
@@ -108,6 +109,7 @@ class GameApp : public voxel::game::GameLoop
     std::unique_ptr<voxel::scripting::LBMRegistry> m_lbmRegistry;
     std::unique_ptr<voxel::scripting::NeighborNotifier> m_neighborNotifier;
     std::unique_ptr<voxel::scripting::ShapeCache> m_shapeCache;
+    voxel::scripting::RateLimiter m_rateLimiter;
 
     // HUD state
     int m_hotbarSlot = 0;

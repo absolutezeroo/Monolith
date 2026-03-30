@@ -52,4 +52,21 @@ inline const BiomeDefinition& getBiomeDefinition(BiomeType type)
     return BIOME_DEFINITIONS[index];
 }
 
+/// Returns a lowercase string name for the given biome type (e.g., "desert", "forest").
+inline std::string_view biomeToString(BiomeType type)
+{
+    switch (type)
+    {
+    case BiomeType::Desert: return "desert";
+    case BiomeType::Savanna: return "savanna";
+    case BiomeType::Plains: return "plains";
+    case BiomeType::Forest: return "forest";
+    case BiomeType::Jungle: return "jungle";
+    case BiomeType::Taiga: return "taiga";
+    case BiomeType::Tundra: return "tundra";
+    case BiomeType::IcePlains: return "ice_plains";
+    default: return "unknown";
+    }
+}
+
 } // namespace voxel::world

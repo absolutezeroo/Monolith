@@ -51,6 +51,7 @@ add_executable(VoxelTests
     scripting/TestEntityBlockCallbacks.cpp
     scripting/TestBlockMetadata.cpp
     scripting/TestMetadataInventoryCallbacks.cpp
+    scripting/TestWorldQueryAPI.cpp
 )
 
 target_link_libraries(VoxelTests

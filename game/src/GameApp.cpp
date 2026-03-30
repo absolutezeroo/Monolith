@@ -13,6 +13,7 @@
 #include "voxel/scripting/NeighborNotifier.h"
 #include "voxel/scripting/ScriptEngine.h"
 #include "voxel/scripting/ShapeCache.h"
+#include "voxel/scripting/WorldQueryAPI.h"
 
 #include <GLFW/glfw3.h>
 #include <glm/geometric.hpp>
@@ -187,6 +188,9 @@ voxel::core::Result<void> GameApp::init(const std::string& shaderDir, std::optio
     voxel::scripting::LuaBindings::registerLBMAPI(
         m_scriptEngine->getLuaState(), *m_lbmRegistry, m_blockRegistry);
 
+    // World Query API registered after WorldGenerator is created (needs BiomeSystem)
+    // — deferred to after WorldGenerator construction below.
+
     // Create WorldGenerator
     m_worldGen =
         std::make_unique<voxel::world::WorldGenerator>(static_cast<uint64_t>(m_config.getSeed()), m_blockRegistry);
@@ -194,6 +198,17 @@ voxel::core::Result<void> GameApp::init(const std::string& shaderDir, std::optio
     // Inject WorldGenerator and BlockRegistry into ChunkManager
     m_chunkManager.setWorldGenerator(m_worldGen.get());
     m_chunkManager.setBlockRegistry(&m_blockRegistry);
+
+    // Register World Query API (needs WorldGenerator for BiomeSystem)
+    voxel::scripting::WorldQueryAPI::registerWorldAPI(
+        m_scriptEngine->getLuaState(),
+        m_chunkManager,
+        m_blockRegistry,
+        *m_callbackInvoker,
+        *m_timerManager,
+        m_rateLimiter,
+        &m_worldGen->getBiomeSystem(),
+        m_shapeCache.get());
 
     // Initialize async meshing pipeline
     auto jobResult = m_jobSystem.init();
@@ -925,6 +940,9 @@ void GameApp::tick(double dt)
 
     // Async meshing: poll results and dispatch dirty sections
     m_chunkManager.update(m_camera.getPosition());
+
+    // Reset rate limiter at start of each tick (before any Lua callbacks run)
+    m_rateLimiter.resetTick();
 
     // Block tick systems: timers and ABM scanning (after chunk streaming so data is current)
     m_timerManager->update(fdt, m_blockRegistry, *m_callbackInvoker);

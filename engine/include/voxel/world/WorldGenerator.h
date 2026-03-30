@@ -33,6 +33,7 @@ class WorldGenerator
     [[nodiscard]] glm::dvec3 findSpawnPoint() const;
 
     [[nodiscard]] uint64_t getSeed() const { return m_seed; }
+    [[nodiscard]] const BiomeSystem& getBiomeSystem() const { return m_biomeSystem; }
 
   private:
     /// Compute base terrain height at a world (x, z) position via spline-remapped continent noise.

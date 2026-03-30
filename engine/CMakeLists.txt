@@ -62,6 +62,7 @@ add_library(VoxelEngine STATIC
         src/scripting/LBMRegistry.cpp
         src/scripting/NeighborNotifier.cpp
         src/scripting/ShapeCache.cpp
+        src/scripting/WorldQueryAPI.cpp
 )
 
 target_include_directories(VoxelEngine
@@ -222,6 +223,7 @@ set_source_files_properties(
         src/scripting/LBMRegistry.cpp
         src/scripting/NeighborNotifier.cpp
         src/scripting/ShapeCache.cpp
+        src/scripting/WorldQueryAPI.cpp
         src/world/Block.cpp
         PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 if (MSVC)
@@ -235,6 +237,7 @@ if (MSVC)
             src/scripting/LBMRegistry.cpp
             src/scripting/NeighborNotifier.cpp
             src/scripting/ShapeCache.cpp
+            src/scripting/WorldQueryAPI.cpp
             src/world/Block.cpp
             APPEND_STRING PROPERTY COMPILE_FLAGS " /wd4702")
 endif ()
