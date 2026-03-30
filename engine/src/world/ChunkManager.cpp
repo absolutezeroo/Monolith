@@ -179,6 +179,29 @@ size_t ChunkManager::loadedChunkCount() const
     return m_chunks.size();
 }
 
+std::vector<glm::ivec2> ChunkManager::getLoadedChunkCoords() const
+{
+    std::vector<glm::ivec2> coords;
+    coords.reserve(m_chunks.size());
+    for (const auto& [coord, column] : m_chunks)
+    {
+        coords.push_back(coord);
+    }
+    return coords;
+}
+
+ChunkColumn* ChunkManager::getChunkColumn(const glm::ivec2& coord)
+{
+    auto it = m_chunks.find(coord);
+    return it != m_chunks.end() ? it->second.get() : nullptr;
+}
+
+const ChunkColumn* ChunkManager::getChunkColumn(const glm::ivec2& coord) const
+{
+    auto it = m_chunks.find(coord);
+    return it != m_chunks.end() ? it->second.get() : nullptr;
+}
+
 size_t ChunkManager::dirtyChunkCount() const
 {
     size_t count = 0;

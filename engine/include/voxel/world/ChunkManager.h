@@ -141,6 +141,14 @@ class ChunkManager
     /// Number of currently loaded chunk columns.
     [[nodiscard]] size_t loadedChunkCount() const;
 
+    /// Returns a snapshot of all loaded chunk coordinates (safe for iteration even if chunks change).
+    [[nodiscard]] std::vector<glm::ivec2> getLoadedChunkCoords() const;
+
+    /// Returns a non-owning pointer to the column at coord, or nullptr if not loaded.
+    /// For direct section access during ABM/LBM scanning.
+    [[nodiscard]] ChunkColumn* getChunkColumn(const glm::ivec2& coord);
+    [[nodiscard]] const ChunkColumn* getChunkColumn(const glm::ivec2& coord) const;
+
     /// Number of chunk columns with at least one dirty section.
     [[nodiscard]] size_t dirtyChunkCount() const;
 

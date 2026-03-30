@@ -34,6 +34,9 @@ struct BlockCallbacks
     std::optional<sol::protected_function> getExperience;     // (pos, player, tool_groups) -> int
     std::optional<sol::protected_function> onDigProgress;     // (pos, player, progress) -> bool
 
+    // --- Timer callbacks ---
+    std::optional<sol::protected_function> onTimer; // (pos, elapsed) -> bool (true = restart, false = stop)
+
     // --- Interaction callbacks ---
     std::optional<sol::protected_function> onRightclick;      // (pos, node, clicker, itemstack, pointed_thing) -> itemstack
     std::optional<sol::protected_function> onPunch;           // (pos, node, puncher, pointed_thing)
@@ -64,6 +67,10 @@ struct BlockCallbacks
             onInteractCancel.has_value())
         {
             mask |= 0x04;
+        }
+        if (onTimer.has_value())
+        {
+            mask |= 0x08;
         }
         return mask;
     }

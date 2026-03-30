@@ -1,0 +1,44 @@
+[03:07:00.287] [info] [ScriptEngine.cpp:53] ScriptEngine initialized (sol2 + LuaJIT)
+[03:07:00.288] [debug] [LuaBindings.cpp:34] Registered block 'test:punchable_block' (base state ID: 1)
+[03:07:00.288] [debug] [ScriptEngine.cpp:144] Loaded script: C:/Users/Clayton/RiderProjects/Monolith\tests\scripting\test_scripts\interaction_punch.lua
+[03:07:00.288] [info] [ScriptEngine.cpp:68] ScriptEngine shut down
+[03:07:00.288] [info] [ScriptEngine.cpp:53] ScriptEngine initialized (sol2 + LuaJIT)
+[03:07:00.289] [debug] [LuaBindings.cpp:34] Registered block 'test:grindstone' (base state ID: 1)
+[03:07:00.289] [debug] [ScriptEngine.cpp:144] Loaded script: C:/Users/Clayton/RiderProjects/Monolith\tests\scripting\test_scripts\interaction_sustained.lua
+[03:07:00.289] [info] [ScriptEngine.cpp:68] ScriptEngine shut down
+[03:07:00.290] [info] [ScriptEngine.cpp:53] ScriptEngine initialized (sol2 + LuaJIT)
+[03:07:00.290] [debug] [LuaBindings.cpp:34] Registered block 'test:priority_block' (base state ID: 1)
+[03:07:00.290] [debug] [ScriptEngine.cpp:144] Loaded script: C:/Users/Clayton/RiderProjects/Monolith\tests\scripting\test_scripts\interaction_priority.lua
+[03:07:00.290] [info] [ScriptEngine.cpp:68] ScriptEngine shut down
+[03:07:00.290] [info] [ScriptEngine.cpp:53] ScriptEngine initialized (sol2 + LuaJIT)
+[03:07:00.291] [debug] [LuaBindings.cpp:34] Registered block 'test:grindstone' (base state ID: 1)
+[03:07:00.291] [debug] [ScriptEngine.cpp:144] Loaded script: C:/Users/Clayton/RiderProjects/Monolith\tests\scripting\test_scripts\interaction_sustained.lua
+[03:07:00.291] [info] [ScriptEngine.cpp:68] ScriptEngine shut down
+[03:07:00.291] [info] [ScriptEngine.cpp:53] ScriptEngine initialized (sol2 + LuaJIT)
+[03:07:00.291] [debug] [LuaBindings.cpp:34] Registered block 'test:grindstone' (base state ID: 1)
+[03:07:00.291] [debug] [ScriptEngine.cpp:144] Loaded script: C:/Users/Clayton/RiderProjects/Monolith\tests\scripting\test_scripts\interaction_sustained.lua
+[03:07:00.291] [info] [ScriptEngine.cpp:68] ScriptEngine shut down
+[03:07:00.292] [info] [ScriptEngine.cpp:53] ScriptEngine initialized (sol2 + LuaJIT)
+[03:07:00.292] [debug] [LuaBindings.cpp:34] Registered block 'test:simple_block' (base state ID: 1)
+[03:07:00.292] [debug] [ScriptEngine.cpp:144] Loaded script: C:/Users/Clayton/RiderProjects/Monolith\tests\scripting\test_scripts\register_block.lua
+[03:07:00.292] [info] [ScriptEngine.cpp:68] ScriptEngine shut down
+[03:07:00.292] [info] [ScriptEngine.cpp:53] ScriptEngine initialized (sol2 + LuaJIT)
+[03:07:00.292] [debug] [LuaBindings.cpp:34] Registered block 'test:interactive_block' (base state ID: 1)
+[03:07:00.292] [debug] [ScriptEngine.cpp:144] Loaded script: C:/Users/Clayton/RiderProjects/Monolith\tests\scripting\test_scripts\interaction_rightclick.lua
+[03:07:00.293] [info] [ScriptEngine.cpp:68] ScriptEngine shut down
+[03:07:00.293] [info] [ScriptEngine.cpp:53] ScriptEngine initialized (sol2 + LuaJIT)
+[03:07:00.293] [debug] [LuaBindings.cpp:34] Registered block 'test:grindstone' (base state ID: 1)
+[03:07:00.293] [debug] [ScriptEngine.cpp:144] Loaded script: C:/Users/Clayton/RiderProjects/Monolith\tests\scripting\test_scripts\interaction_sustained.lua
+[03:07:00.293] [info] [ScriptEngine.cpp:68] ScriptEngine shut down
+[03:07:00.293] [info] [ScriptEngine.cpp:53] ScriptEngine initialized (sol2 + LuaJIT)
+[03:07:00.294] [debug] [LuaBindings.cpp:34] Registered block 'test:wand_block' (base state ID: 1)
+[03:07:00.294] [debug] [ScriptEngine.cpp:144] Loaded script: C:/Users/Clayton/RiderProjects/Monolith\tests\scripting\test_scripts\interaction_secondary_use.lua
+[03:07:00.294] [info] [ScriptEngine.cpp:68] ScriptEngine shut down
+[03:07:00.294] [info] [ScriptEngine.cpp:53] ScriptEngine initialized (sol2 + LuaJIT)
+[03:07:00.294] [debug] [LuaBindings.cpp:34] Registered block 'test:interactive_block' (base state ID: 1)
+[03:07:00.294] [debug] [ScriptEngine.cpp:144] Loaded script: C:/Users/Clayton/RiderProjects/Monolith\tests\scripting\test_scripts\interaction_rightclick.lua
+[03:07:00.294] [info] [ScriptEngine.cpp:68] ScriptEngine shut down
+[03:07:00.294] [info] [ScriptEngine.cpp:53] ScriptEngine initialized (sol2 + LuaJIT)
+[03:07:00.295] [debug] [LuaBindings.cpp:34] Registered block 'test:grindstone' (base state ID: 1)
+[03:07:00.295] [debug] [ScriptEngine.cpp:144] Loaded script: C:/Users/Clayton/RiderProjects/Monolith\tests\scripting\test_scripts\interaction_sustained.lua
+[03:07:00.295] [info] [ScriptEngine.cpp:68] ScriptEngine shut down

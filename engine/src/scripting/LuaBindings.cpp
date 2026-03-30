@@ -1,7 +1,10 @@
 #include "voxel/scripting/LuaBindings.h"
 
 #include "voxel/core/Log.h"
+#include "voxel/scripting/ABMRegistry.h"
 #include "voxel/scripting/BlockCallbacks.h"
+#include "voxel/scripting/BlockTimerManager.h"
+#include "voxel/scripting/LBMRegistry.h"
 #include "voxel/world/BlockRegistry.h"
 
 #include <sol/sol.hpp>
@@ -232,6 +235,9 @@ core::Result<world::BlockDefinition> LuaBindings::parseBlockDefinition(const sol
     std::optional<sol::protected_function> cbGetExperience;
     std::optional<sol::protected_function> cbOnDigProgress;
 
+    // Timer callbacks
+    std::optional<sol::protected_function> cbOnTimer;
+
     // Interaction callbacks
     std::optional<sol::protected_function> cbOnRightclick;
     std::optional<sol::protected_function> cbOnPunch;
@@ -258,6 +264,7 @@ core::Result<world::BlockDefinition> LuaBindings::parseBlockDefinition(const sol
     checkAndStore("get_drops", cbGetDrops);
     checkAndStore("get_experience", cbGetExperience);
     checkAndStore("on_dig_progress", cbOnDigProgress);
+    checkAndStore("on_timer", cbOnTimer);
     checkAndStore("on_rightclick", cbOnRightclick);
     checkAndStore("on_punch", cbOnPunch);
     checkAndStore("on_secondary_use", cbOnSecondaryUse);
@@ -286,6 +293,7 @@ core::Result<world::BlockDefinition> LuaBindings::parseBlockDefinition(const sol
         cbs->getDrops = std::move(cbGetDrops);
         cbs->getExperience = std::move(cbGetExperience);
         cbs->onDigProgress = std::move(cbOnDigProgress);
+        cbs->onTimer = std::move(cbOnTimer);
         cbs->onRightclick = std::move(cbOnRightclick);
         cbs->onPunch = std::move(cbOnPunch);
         cbs->onSecondaryUse = std::move(cbOnSecondaryUse);
@@ -302,6 +310,174 @@ core::Result<world::BlockDefinition> LuaBindings::parseBlockDefinition(const sol
 const std::unordered_map<std::string, ItemDefinition>& LuaBindings::getItemRegistry()
 {
     return s_itemRegistry;
+}
+
+static glm::ivec3 tableToPos(const sol::table& t)
+{
+    return {t.get_or("x", 0), t.get_or("y", 0), t.get_or("z", 0)};
+}
+
+static std::vector<std::string> parseStringTable(const sol::table& table)
+{
+    std::vector<std::string> result;
+    table.for_each([&](sol::object, sol::object val) {
+        if (val.is<std::string>())
+        {
+            result.push_back(val.as<std::string>());
+        }
+    });
+    return result;
+}
+
+static void resolveNodenames(
+    const std::vector<std::string>& names,
+    std::unordered_set<uint16_t>& resolved,
+    world::BlockRegistry& registry)
+{
+    for (const auto& name : names)
+    {
+        if (name.starts_with("group:"))
+        {
+            std::string groupName = name.substr(6);
+            for (uint16_t id = 1; id < registry.blockCount(); ++id)
+            {
+                const auto& def = registry.getBlockByTypeIndex(id);
+                if (def.groups.contains(groupName))
+                {
+                    resolved.insert(def.baseStateId);
+                }
+            }
+        }
+        else
+        {
+            uint16_t id = registry.getIdByName(name);
+            if (id != 0)
+            {
+                resolved.insert(id);
+            }
+            else
+            {
+                VX_LOG_WARN("ABM/LBM nodename '{}' not found in registry", name);
+            }
+        }
+    }
+}
+
+void LuaBindings::registerTimerAPI(sol::state& lua, BlockTimerManager& timerMgr)
+{
+    sol::table voxelTable = lua["voxel"];
+
+    voxelTable.set_function("set_timer", [&timerMgr](const sol::table& posTable, float seconds) {
+        glm::ivec3 pos = tableToPos(posTable);
+        timerMgr.setTimer(pos, seconds);
+    });
+
+    voxelTable.set_function("get_timer", [&lua, &timerMgr](const sol::table& posTable) -> sol::object {
+        glm::ivec3 pos = tableToPos(posTable);
+        auto remaining = timerMgr.getTimer(pos);
+        if (remaining.has_value())
+        {
+            return sol::make_object(lua, *remaining);
+        }
+        return sol::make_object(lua, sol::lua_nil);
+    });
+}
+
+void LuaBindings::registerABMAPI(sol::state& lua, ABMRegistry& abmRegistry, world::BlockRegistry& blockRegistry)
+{
+    sol::table voxelTable = lua["voxel"];
+
+    voxelTable.set_function("register_abm", [&abmRegistry, &blockRegistry](const sol::table& table) {
+        ABMDefinition def;
+        def.label = table.get_or<std::string>("label", "unnamed_abm");
+        def.interval = table.get_or("interval", 1.0f);
+        def.chance = table.get_or("chance", 1);
+
+        // Parse nodenames
+        auto nodenames = table.get<std::optional<sol::table>>("nodenames");
+        if (!nodenames.has_value())
+        {
+            VX_LOG_WARN("register_abm '{}': missing 'nodenames'", def.label);
+            return;
+        }
+        def.nodenames = parseStringTable(*nodenames);
+
+        // Parse optional neighbors
+        auto neighbors = table.get<std::optional<sol::table>>("neighbors");
+        if (neighbors.has_value())
+        {
+            def.neighbors = parseStringTable(*neighbors);
+            def.hasNeighborRequirement = !def.neighbors.empty();
+        }
+
+        // Extract action
+        auto action = table.get<std::optional<sol::protected_function>>("action");
+        if (!action.has_value())
+        {
+            VX_LOG_WARN("register_abm '{}': missing 'action'", def.label);
+            return;
+        }
+        def.action = std::move(*action);
+
+        // Validate
+        if (def.interval <= 0.0f)
+        {
+            VX_LOG_WARN("register_abm '{}': interval must be > 0", def.label);
+            return;
+        }
+        if (def.chance < 1)
+        {
+            VX_LOG_WARN("register_abm '{}': chance must be >= 1", def.label);
+            return;
+        }
+
+        // Resolve nodenames to numeric IDs
+        resolveNodenames(def.nodenames, def.resolvedNodenames, blockRegistry);
+        if (def.hasNeighborRequirement)
+        {
+            resolveNodenames(def.neighbors, def.resolvedNeighbors, blockRegistry);
+        }
+
+        std::string label = def.label;
+        abmRegistry.registerABM(std::move(def));
+        VX_LOG_INFO("Registered ABM: '{}'", label);
+    });
+}
+
+void LuaBindings::registerLBMAPI(sol::state& lua, LBMRegistry& lbmRegistry, world::BlockRegistry& blockRegistry)
+{
+    sol::table voxelTable = lua["voxel"];
+
+    voxelTable.set_function("register_lbm", [&lbmRegistry, &blockRegistry](const sol::table& table) {
+        LBMDefinition def;
+        def.label = table.get_or<std::string>("label", "unnamed_lbm");
+        def.runAtEveryLoad = table.get_or("run_at_every_load", false);
+
+        // Parse nodenames
+        auto nodenames = table.get<std::optional<sol::table>>("nodenames");
+        if (!nodenames.has_value())
+        {
+            VX_LOG_WARN("register_lbm '{}': missing 'nodenames'", def.label);
+            return;
+        }
+        def.nodenames = parseStringTable(*nodenames);
+
+        // Extract action
+        auto action = table.get<std::optional<sol::protected_function>>("action");
+        if (!action.has_value())
+        {
+            VX_LOG_WARN("register_lbm '{}': missing 'action'", def.label);
+            return;
+        }
+        def.action = std::move(*action);
+
+        // Resolve nodenames to numeric IDs
+        resolveNodenames(def.nodenames, def.resolvedNodenames, blockRegistry);
+
+        std::string label = def.label;
+        lbmRegistry.registerLBM(std::move(def));
+        VX_LOG_INFO("Registered LBM: '{}'", label);
+    });
 }
 
 void LuaBindings::parseTextures(const sol::table& texTable, world::BlockDefinition& def)

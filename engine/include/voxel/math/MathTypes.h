@@ -5,6 +5,8 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/constants.hpp>
 
+#include <functional>
+
 namespace voxel::math
 {
 
@@ -31,5 +33,17 @@ using UVec4 = glm::uvec4;
 // Matrix types
 using Mat3 = glm::mat3;
 using Mat4 = glm::mat4;
+
+/// Spatial hash for glm::ivec3 world positions using XOR-shift combination.
+struct IVec3Hash
+{
+    size_t operator()(const glm::ivec3& v) const noexcept
+    {
+        size_t h = std::hash<int>{}(v.x);
+        h ^= std::hash<int>{}(v.y) + 0x9e3779b9 + (h << 6) + (h >> 2);
+        h ^= std::hash<int>{}(v.z) + 0x9e3779b9 + (h << 6) + (h >> 2);
+        return h;
+    }
+};
 
 } // namespace voxel::math

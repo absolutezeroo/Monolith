@@ -39,6 +39,9 @@ namespace voxel::scripting
 {
 class ScriptEngine;
 class BlockCallbackInvoker;
+class BlockTimerManager;
+class ABMRegistry;
+class LBMRegistry;
 }
 
 class GameApp : public voxel::game::GameLoop
@@ -98,6 +101,9 @@ class GameApp : public voxel::game::GameLoop
     // Scripting
     std::unique_ptr<voxel::scripting::ScriptEngine> m_scriptEngine;
     std::unique_ptr<voxel::scripting::BlockCallbackInvoker> m_callbackInvoker;
+    std::unique_ptr<voxel::scripting::BlockTimerManager> m_timerManager;
+    std::unique_ptr<voxel::scripting::ABMRegistry> m_abmRegistry;
+    std::unique_ptr<voxel::scripting::LBMRegistry> m_lbmRegistry;
 
     // HUD state
     int m_hotbarSlot = 0;

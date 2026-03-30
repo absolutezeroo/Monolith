@@ -1,6 +1,6 @@
 # Story 9.4: Block Tick & Update System (Timers, ABM, LBM)
 
-Status: ready-for-dev
+Status: complete
 
 ## Story
 
@@ -1265,10 +1265,44 @@ This story establishes patterns used by:
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 4.6
 
 ### Debug Log References
 
+- ABMRegistry unused `registry` parameter fixed (MSVC C4100 treated as error)
+- sol2 nil type: `sol::make_object(lua, sol::lua_nil)` returns `sol::type::none` (-1) not `sol::type::lua_nil` (0) — test adjusted
+
 ### Completion Notes List
 
+- All 15 acceptance criteria implemented
+- ChunkLoaded events are subscribed for LBM but not yet published from ChunkManager::loadChunk. LBM works via direct onChunkLoaded() calls. Publishing will be added when chunk streaming is extended.
+- Timer persistence deferred to serialization story (TODO comments added)
+- LBM execution tracking is runtime-only (TODO comments added)
+- `registry` param kept in ABMRegistry::update() signature for future use (nodename re-resolution on hot-reload)
+
 ### File List
+
+| Action | File |
+|--------|------|
+| MODIFY | `engine/include/voxel/math/MathTypes.h` |
+| MODIFY | `engine/include/voxel/scripting/BlockCallbacks.h` |
+| MODIFY | `engine/include/voxel/scripting/BlockCallbackInvoker.h` |
+| MODIFY | `engine/src/scripting/BlockCallbackInvoker.cpp` |
+| MODIFY | `engine/include/voxel/scripting/LuaBindings.h` |
+| MODIFY | `engine/src/scripting/LuaBindings.cpp` |
+| MODIFY | `engine/include/voxel/world/ChunkManager.h` |
+| MODIFY | `engine/src/world/ChunkManager.cpp` |
+| MODIFY | `game/src/GameApp.h` |
+| MODIFY | `game/src/GameApp.cpp` |
+| MODIFY | `engine/CMakeLists.txt` |
+| MODIFY | `tests/CMakeLists.txt` |
+| NEW | `engine/include/voxel/scripting/BlockTimerManager.h` |
+| NEW | `engine/src/scripting/BlockTimerManager.cpp` |
+| NEW | `engine/include/voxel/scripting/ABMRegistry.h` |
+| NEW | `engine/src/scripting/ABMRegistry.cpp` |
+| NEW | `engine/include/voxel/scripting/LBMRegistry.h` |
+| NEW | `engine/src/scripting/LBMRegistry.cpp` |
+| NEW | `tests/scripting/TestBlockTimers.cpp` |
+| NEW | `tests/scripting/test_scripts/timer_furnace.lua` |
+| NEW | `tests/scripting/test_scripts/abm_grass_spread.lua` |
+| NEW | `tests/scripting/test_scripts/lbm_upgrade_torch.lua` |

@@ -39,6 +39,19 @@ public:
     void invokeAfterDig(
         const world::BlockDefinition& def, const glm::ivec3& pos, uint16_t oldBlockId, uint32_t playerId);
 
+    // --- Timer callbacks ---
+    [[nodiscard]] bool invokeOnTimer(
+        const world::BlockDefinition& def, const glm::ivec3& pos, float elapsed);
+
+    // --- ABM/LBM action callbacks (standalone functions, not per-block) ---
+    void invokeABMAction(
+        const sol::protected_function& action,
+        const glm::ivec3& pos,
+        uint16_t blockId,
+        int activeObjectCount);
+    void invokeLBMAction(
+        const sol::protected_function& action, const glm::ivec3& pos, uint16_t blockId, float dtimeS);
+
     // --- Interaction callbacks ---
     void invokeOnRightclick(
         const world::BlockDefinition& def, const glm::ivec3& pos, uint16_t blockId, uint32_t playerId);

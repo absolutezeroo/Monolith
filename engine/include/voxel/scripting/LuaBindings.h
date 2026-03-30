@@ -15,6 +15,13 @@ class BlockRegistry;
 
 namespace voxel::scripting
 {
+class BlockTimerManager;
+class ABMRegistry;
+class LBMRegistry;
+}
+
+namespace voxel::scripting
+{
 
 /// Minimal V1 item definition — just stores the Lua table fields.
 struct ItemDefinition
@@ -38,6 +45,15 @@ public:
     /// @param table The Lua table with block properties.
     /// @return The parsed BlockDefinition, or an error if validation fails.
     [[nodiscard]] static core::Result<world::BlockDefinition> parseBlockDefinition(const sol::table& table);
+
+    /// Bind `voxel.set_timer` and `voxel.get_timer` onto the existing `voxel` table.
+    static void registerTimerAPI(sol::state& lua, BlockTimerManager& timerMgr);
+
+    /// Bind `voxel.register_abm` onto the existing `voxel` table.
+    static void registerABMAPI(sol::state& lua, ABMRegistry& abmRegistry, world::BlockRegistry& blockRegistry);
+
+    /// Bind `voxel.register_lbm` onto the existing `voxel` table.
+    static void registerLBMAPI(sol::state& lua, LBMRegistry& lbmRegistry, world::BlockRegistry& blockRegistry);
 
     /// Access the item registry (populated by voxel.register_item calls).
     [[nodiscard]] static const std::unordered_map<std::string, ItemDefinition>& getItemRegistry();

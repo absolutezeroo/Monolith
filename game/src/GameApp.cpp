@@ -3,8 +3,11 @@
 #include "voxel/core/Log.h"
 #include "voxel/game/Window.h"
 #include "voxel/renderer/VulkanContext.h"
+#include "voxel/scripting/ABMRegistry.h"
 #include "voxel/scripting/BlockCallbackInvoker.h"
 #include "voxel/scripting/BlockCallbacks.h"
+#include "voxel/scripting/BlockTimerManager.h"
+#include "voxel/scripting/LBMRegistry.h"
 #include "voxel/scripting/LuaBindings.h"
 #include "voxel/scripting/ScriptEngine.h"
 
@@ -57,7 +60,10 @@ GameApp::~GameApp()
     m_chunkManager.shutdown();
     m_jobSystem.shutdown();
 
-    // Destroy callback invoker before script engine (it holds a ref to sol::state)
+    // Destroy Lua-dependent managers before script engine (they hold sol2 refs)
+    m_lbmRegistry.reset();
+    m_abmRegistry.reset();
+    m_timerManager.reset();
     m_callbackInvoker.reset();
     if (m_scriptEngine)
     {
@@ -150,6 +156,18 @@ voxel::core::Result<void> GameApp::init(const std::string& shaderDir, std::optio
     m_callbackInvoker =
         std::make_unique<voxel::scripting::BlockCallbackInvoker>(m_scriptEngine->getLuaState(), m_blockRegistry);
 
+    // Create tick systems: timers, ABM, LBM
+    m_timerManager = std::make_unique<voxel::scripting::BlockTimerManager>(m_chunkManager);
+    m_abmRegistry = std::make_unique<voxel::scripting::ABMRegistry>();
+    m_lbmRegistry = std::make_unique<voxel::scripting::LBMRegistry>();
+
+    // Bind timer/ABM/LBM Lua APIs
+    voxel::scripting::LuaBindings::registerTimerAPI(m_scriptEngine->getLuaState(), *m_timerManager);
+    voxel::scripting::LuaBindings::registerABMAPI(
+        m_scriptEngine->getLuaState(), *m_abmRegistry, m_blockRegistry);
+    voxel::scripting::LuaBindings::registerLBMAPI(
+        m_scriptEngine->getLuaState(), *m_lbmRegistry, m_blockRegistry);
+
     // Create WorldGenerator
     m_worldGen =
         std::make_unique<voxel::world::WorldGenerator>(static_cast<uint64_t>(m_config.getSeed()), m_blockRegistry);
@@ -208,6 +226,25 @@ voxel::core::Result<void> GameApp::init(const std::string& shaderDir, std::optio
             glm::ivec3 pos{e.position.x, e.position.y, e.position.z};
             const auto& newDef = m_blockRegistry.getBlockType(e.blockId);
             m_chunkManager.updateLightAfterBlockChange(pos, nullptr, &newDef);
+        });
+
+    // Timer cleanup on block break/place (AC: 12, 13)
+    m_eventBus.subscribe<voxel::game::EventType::BlockBroken>(
+        [this](const voxel::game::BlockBrokenEvent& e) {
+            glm::ivec3 pos{e.position.x, e.position.y, e.position.z};
+            m_timerManager->onBlockRemoved(pos);
+        });
+    m_eventBus.subscribe<voxel::game::EventType::BlockPlaced>(
+        [this](const voxel::game::BlockPlacedEvent& e) {
+            glm::ivec3 pos{e.position.x, e.position.y, e.position.z};
+            m_timerManager->onBlockRemoved(pos); // overwrite cancels existing timer
+        });
+
+    // LBM fires on chunk load
+    m_eventBus.subscribe<voxel::game::EventType::ChunkLoaded>(
+        [this](const voxel::game::ChunkLoadedEvent& e) {
+            glm::ivec2 coord{e.coord.x, e.coord.y};
+            m_lbmRegistry->onChunkLoaded(coord, m_chunkManager, m_blockRegistry, *m_callbackInvoker);
         });
 
     // Start with cursor captured for FPS camera
@@ -779,6 +816,10 @@ void GameApp::tick(double dt)
 
     // Async meshing: poll results and dispatch dirty sections
     m_chunkManager.update(m_camera.getPosition());
+
+    // Block tick systems: timers and ABM scanning (after chunk streaming so data is current)
+    m_timerManager->update(fdt, m_blockRegistry, *m_callbackInvoker);
+    m_abmRegistry->update(fdt, m_chunkManager, m_blockRegistry, *m_callbackInvoker);
 
     // NOTE: mesh uploads moved to render() — must happen AFTER beginFrame()
     // calls StagingBuffer::beginFrame() which resets the pending transfer list.

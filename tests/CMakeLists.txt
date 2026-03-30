@@ -46,6 +46,7 @@ add_executable(VoxelTests
     scripting/TestScriptEngine.cpp
     scripting/TestLuaBindings.cpp
     scripting/TestBlockInteraction.cpp
+    scripting/TestBlockTimers.cpp
 )
 
 target_link_libraries(VoxelTests

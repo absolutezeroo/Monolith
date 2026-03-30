@@ -172,6 +172,53 @@ void BlockCallbackInvoker::invokeAfterDig(
     }
 }
 
+// --- Timer callbacks ---
+
+bool BlockCallbackInvoker::invokeOnTimer(const world::BlockDefinition& def, const glm::ivec3& pos, float elapsed)
+{
+    if (!def.callbacks || !def.callbacks->onTimer.has_value())
+    {
+        return false;
+    }
+
+    sol::protected_function_result result = (*def.callbacks->onTimer)(posToTable(m_lua, pos), elapsed);
+    if (!result.valid())
+    {
+        sol::error err = result;
+        VX_LOG_WARN("Lua on_timer error for '{}': {}", def.stringId, err.what());
+        return false;
+    }
+
+    return result.get_type() == sol::type::boolean ? result.get<bool>() : false;
+}
+
+// --- ABM/LBM action callbacks ---
+
+void BlockCallbackInvoker::invokeABMAction(
+    const sol::protected_function& action,
+    const glm::ivec3& pos,
+    uint16_t blockId,
+    int activeObjectCount)
+{
+    sol::protected_function_result result = action(posToTable(m_lua, pos), blockId, activeObjectCount);
+    if (!result.valid())
+    {
+        sol::error err = result;
+        VX_LOG_WARN("Lua ABM action error at ({},{},{}): {}", pos.x, pos.y, pos.z, err.what());
+    }
+}
+
+void BlockCallbackInvoker::invokeLBMAction(
+    const sol::protected_function& action, const glm::ivec3& pos, uint16_t blockId, float dtimeS)
+{
+    sol::protected_function_result result = action(posToTable(m_lua, pos), blockId, dtimeS);
+    if (!result.valid())
+    {
+        sol::error err = result;
+        VX_LOG_WARN("Lua LBM action error at ({},{},{}): {}", pos.x, pos.y, pos.z, err.what());
+    }
+}
+
 // --- Interaction callbacks ---
 
 void BlockCallbackInvoker::invokeOnRightclick(
