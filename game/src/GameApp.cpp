@@ -176,9 +176,11 @@ voxel::core::Result<void> GameApp::init(const std::string& shaderDir, std::optio
     m_abmRegistry = std::make_unique<voxel::scripting::ABMRegistry>();
     m_lbmRegistry = std::make_unique<voxel::scripting::LBMRegistry>();
 
-    // Bind neighbor/timer/ABM/LBM Lua APIs
+    // Bind neighbor/timer/ABM/LBM/metadata Lua APIs
     voxel::scripting::LuaBindings::registerNeighborAPI(
         m_scriptEngine->getLuaState(), m_chunkManager, m_blockRegistry);
+    voxel::scripting::LuaBindings::registerMetadataAPI(
+        m_scriptEngine->getLuaState(), m_chunkManager);
     voxel::scripting::LuaBindings::registerTimerAPI(m_scriptEngine->getLuaState(), *m_timerManager);
     voxel::scripting::LuaBindings::registerABMAPI(
         m_scriptEngine->getLuaState(), *m_abmRegistry, m_blockRegistry);

@@ -6,8 +6,11 @@
 #include "voxel/scripting/BlockTimerManager.h"
 #include "voxel/scripting/EntityHandle.h"
 #include "voxel/scripting/LBMRegistry.h"
+#include "voxel/world/BlockInventory.h"
+#include "voxel/world/BlockMetadata.h"
 #include "voxel/world/BlockRegistry.h"
 #include "voxel/world/ChunkManager.h"
+#include "voxel/world/ItemStack.h"
 
 #include <sol/sol.hpp>
 
@@ -267,6 +270,14 @@ core::Result<world::BlockDefinition> LuaBindings::parseBlockDefinition(const sol
     std::optional<sol::protected_function> cbOnEntityCollide;
     std::optional<sol::protected_function> cbOnProjectileHit;
 
+    // Inventory callbacks
+    std::optional<sol::protected_function> cbAllowInventoryPut;
+    std::optional<sol::protected_function> cbAllowInventoryTake;
+    std::optional<sol::protected_function> cbAllowInventoryMove;
+    std::optional<sol::protected_function> cbOnInventoryPut;
+    std::optional<sol::protected_function> cbOnInventoryTake;
+    std::optional<sol::protected_function> cbOnInventoryMove;
+
     // Signal/power stubs
     std::optional<sol::protected_function> cbOnPowered;
     std::optional<sol::protected_function> cbGetComparatorOutput;
@@ -309,6 +320,12 @@ core::Result<world::BlockDefinition> LuaBindings::parseBlockDefinition(const sol
     checkAndStore("on_entity_fall_on", cbOnEntityFallOn);
     checkAndStore("on_entity_collide", cbOnEntityCollide);
     checkAndStore("on_projectile_hit", cbOnProjectileHit);
+    checkAndStore("allow_inventory_put", cbAllowInventoryPut);
+    checkAndStore("allow_inventory_take", cbAllowInventoryTake);
+    checkAndStore("allow_inventory_move", cbAllowInventoryMove);
+    checkAndStore("on_inventory_put", cbOnInventoryPut);
+    checkAndStore("on_inventory_take", cbOnInventoryTake);
+    checkAndStore("on_inventory_move", cbOnInventoryMove);
     checkAndStore("on_powered", cbOnPowered);
     checkAndStore("get_comparator_output", cbGetComparatorOutput);
     checkAndStore("get_push_reaction", cbGetPushReaction);
@@ -353,6 +370,12 @@ core::Result<world::BlockDefinition> LuaBindings::parseBlockDefinition(const sol
         cbs->onEntityFallOn = std::move(cbOnEntityFallOn);
         cbs->onEntityCollide = std::move(cbOnEntityCollide);
         cbs->onProjectileHit = std::move(cbOnProjectileHit);
+        cbs->allowInventoryPut = std::move(cbAllowInventoryPut);
+        cbs->allowInventoryTake = std::move(cbAllowInventoryTake);
+        cbs->allowInventoryMove = std::move(cbAllowInventoryMove);
+        cbs->onInventoryPut = std::move(cbOnInventoryPut);
+        cbs->onInventoryTake = std::move(cbOnInventoryTake);
+        cbs->onInventoryMove = std::move(cbOnInventoryMove);
         cbs->onPowered = std::move(cbOnPowered);
         cbs->getComparatorOutput = std::move(cbGetComparatorOutput);
         cbs->getPushReaction = std::move(cbGetPushReaction);
@@ -589,6 +612,82 @@ void LuaBindings::registerNeighborAPI(
             return lua.create_table_with("x", 0, "y", 0, "z", 0);
         }
         return lua.create_table_with("x", it->second.x, "y", it->second.y, "z", it->second.z);
+    });
+}
+
+void LuaBindings::registerMetadataAPI(sol::state& lua, world::ChunkManager& chunkManager)
+{
+    sol::table voxelTable = lua["voxel"];
+
+    // Register ItemStack usertype
+    lua.new_usertype<world::ItemStack>(
+        "ItemStack",
+        sol::constructors<world::ItemStack(), world::ItemStack(std::string, uint16_t)>(),
+        "get_name", &world::ItemStack::getName,
+        "get_count", &world::ItemStack::getCount,
+        "set_count", &world::ItemStack::setCount,
+        "is_empty", &world::ItemStack::isEmpty);
+
+    // Register BlockMetadata as MetaDataRef usertype
+    lua.new_usertype<world::BlockMetadata>(
+        "MetaDataRef",
+        "set_string", &world::BlockMetadata::setString,
+        "get_string", &world::BlockMetadata::getString,
+        "set_int", &world::BlockMetadata::setInt,
+        "get_int", &world::BlockMetadata::getInt,
+        "set_float", &world::BlockMetadata::setFloat,
+        "get_float", &world::BlockMetadata::getFloat,
+        "contains", &world::BlockMetadata::contains,
+        "erase", &world::BlockMetadata::erase);
+
+    // Register BlockInventory as InvRef usertype
+    lua.new_usertype<world::BlockInventory>(
+        "InvRef",
+        "set_size", &world::BlockInventory::setSize,
+        "get_size", &world::BlockInventory::getSize,
+        "get_stack", &world::BlockInventory::getStack,
+        "set_stack", &world::BlockInventory::setStack,
+        "is_empty", sol::overload(
+            static_cast<bool (world::BlockInventory::*)(const std::string&) const>(&world::BlockInventory::isEmpty),
+            static_cast<bool (world::BlockInventory::*)() const>(&world::BlockInventory::isEmpty)));
+
+    // voxel.get_meta(pos) -> MetaDataRef
+    voxelTable.set_function("get_meta", [&chunkManager](const sol::table& posTable) -> world::BlockMetadata& {
+        int x = posTable.get<int>("x");
+        int y = posTable.get<int>("y");
+        int z = posTable.get<int>("z");
+
+        glm::ivec2 chunkCoord = world::worldToChunkCoord({x, y, z});
+        auto* column = chunkManager.getChunk(chunkCoord);
+        if (!column)
+        {
+            VX_LOG_WARN("voxel.get_meta: chunk not loaded at ({}, {})", chunkCoord.x, chunkCoord.y);
+            static world::BlockMetadata s_dummyMeta;
+            s_dummyMeta.clear();
+            return s_dummyMeta;
+        }
+
+        glm::ivec3 local = world::worldToLocalPos({x, y, z});
+        return column->getOrCreateMetadata(local.x, local.y, local.z);
+    });
+
+    // voxel.get_inventory(pos) -> InvRef
+    voxelTable.set_function("get_inventory", [&chunkManager](const sol::table& posTable) -> world::BlockInventory& {
+        int x = posTable.get<int>("x");
+        int y = posTable.get<int>("y");
+        int z = posTable.get<int>("z");
+
+        glm::ivec2 chunkCoord = world::worldToChunkCoord({x, y, z});
+        auto* column = chunkManager.getChunk(chunkCoord);
+        if (!column)
+        {
+            VX_LOG_WARN("voxel.get_inventory: chunk not loaded at ({}, {})", chunkCoord.x, chunkCoord.y);
+            static world::BlockInventory s_dummyInv;
+            return s_dummyInv;
+        }
+
+        glm::ivec3 local = world::worldToLocalPos({x, y, z});
+        return column->getOrCreateInventory(local.x, local.y, local.z);
     });
 }
 

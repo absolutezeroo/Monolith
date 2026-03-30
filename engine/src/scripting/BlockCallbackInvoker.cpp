@@ -433,6 +433,153 @@ void BlockCallbackInvoker::invokeOnEntityCollide(
     }
 }
 
+// --- Inventory callbacks ---
+
+int BlockCallbackInvoker::invokeAllowInventoryPut(
+    const world::BlockDefinition& def,
+    const glm::ivec3& pos,
+    const std::string& listname,
+    size_t index,
+    const world::ItemStack& stack,
+    uint32_t playerId)
+{
+    if (!def.callbacks || !def.callbacks->allowInventoryPut.has_value())
+    {
+        return static_cast<int>(stack.count);
+    }
+
+    sol::protected_function_result result =
+        (*def.callbacks->allowInventoryPut)(posToTable(m_lua, pos), listname, index, stack, playerId);
+    if (!result.valid())
+    {
+        sol::error err = result;
+        VX_LOG_WARN("Lua allow_inventory_put error for '{}': {}", def.stringId, err.what());
+        return static_cast<int>(stack.count);
+    }
+
+    return result.get_type() == sol::type::number ? result.get<int>() : static_cast<int>(stack.count);
+}
+
+int BlockCallbackInvoker::invokeAllowInventoryTake(
+    const world::BlockDefinition& def,
+    const glm::ivec3& pos,
+    const std::string& listname,
+    size_t index,
+    const world::ItemStack& stack,
+    uint32_t playerId)
+{
+    if (!def.callbacks || !def.callbacks->allowInventoryTake.has_value())
+    {
+        return static_cast<int>(stack.count);
+    }
+
+    sol::protected_function_result result =
+        (*def.callbacks->allowInventoryTake)(posToTable(m_lua, pos), listname, index, stack, playerId);
+    if (!result.valid())
+    {
+        sol::error err = result;
+        VX_LOG_WARN("Lua allow_inventory_take error for '{}': {}", def.stringId, err.what());
+        return static_cast<int>(stack.count);
+    }
+
+    return result.get_type() == sol::type::number ? result.get<int>() : static_cast<int>(stack.count);
+}
+
+int BlockCallbackInvoker::invokeAllowInventoryMove(
+    const world::BlockDefinition& def,
+    const glm::ivec3& pos,
+    const std::string& fromList,
+    size_t fromIdx,
+    const std::string& toList,
+    size_t toIdx,
+    int count,
+    uint32_t playerId)
+{
+    if (!def.callbacks || !def.callbacks->allowInventoryMove.has_value())
+    {
+        return count;
+    }
+
+    sol::protected_function_result result =
+        (*def.callbacks->allowInventoryMove)(posToTable(m_lua, pos), fromList, fromIdx, toList, toIdx, count, playerId);
+    if (!result.valid())
+    {
+        sol::error err = result;
+        VX_LOG_WARN("Lua allow_inventory_move error for '{}': {}", def.stringId, err.what());
+        return count;
+    }
+
+    return result.get_type() == sol::type::number ? result.get<int>() : count;
+}
+
+void BlockCallbackInvoker::invokeOnInventoryPut(
+    const world::BlockDefinition& def,
+    const glm::ivec3& pos,
+    const std::string& listname,
+    size_t index,
+    const world::ItemStack& stack,
+    uint32_t playerId)
+{
+    if (!def.callbacks || !def.callbacks->onInventoryPut.has_value())
+    {
+        return;
+    }
+
+    sol::protected_function_result result =
+        (*def.callbacks->onInventoryPut)(posToTable(m_lua, pos), listname, index, stack, playerId);
+    if (!result.valid())
+    {
+        sol::error err = result;
+        VX_LOG_WARN("Lua on_inventory_put error for '{}': {}", def.stringId, err.what());
+    }
+}
+
+void BlockCallbackInvoker::invokeOnInventoryTake(
+    const world::BlockDefinition& def,
+    const glm::ivec3& pos,
+    const std::string& listname,
+    size_t index,
+    const world::ItemStack& stack,
+    uint32_t playerId)
+{
+    if (!def.callbacks || !def.callbacks->onInventoryTake.has_value())
+    {
+        return;
+    }
+
+    sol::protected_function_result result =
+        (*def.callbacks->onInventoryTake)(posToTable(m_lua, pos), listname, index, stack, playerId);
+    if (!result.valid())
+    {
+        sol::error err = result;
+        VX_LOG_WARN("Lua on_inventory_take error for '{}': {}", def.stringId, err.what());
+    }
+}
+
+void BlockCallbackInvoker::invokeOnInventoryMove(
+    const world::BlockDefinition& def,
+    const glm::ivec3& pos,
+    const std::string& fromList,
+    size_t fromIdx,
+    const std::string& toList,
+    size_t toIdx,
+    int count,
+    uint32_t playerId)
+{
+    if (!def.callbacks || !def.callbacks->onInventoryMove.has_value())
+    {
+        return;
+    }
+
+    sol::protected_function_result result =
+        (*def.callbacks->onInventoryMove)(posToTable(m_lua, pos), fromList, fromIdx, toList, toIdx, count, playerId);
+    if (!result.valid())
+    {
+        sol::error err = result;
+        VX_LOG_WARN("Lua on_inventory_move error for '{}': {}", def.stringId, err.what());
+    }
+}
+
 // --- Neighbor change callbacks ---
 
 void BlockCallbackInvoker::invokeOnNeighborChanged(

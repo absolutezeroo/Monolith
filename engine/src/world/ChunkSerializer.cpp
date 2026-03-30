@@ -1,5 +1,6 @@
 #include "voxel/world/ChunkSerializer.h"
 
+#include "BinaryIO.h"
 #include "voxel/core/Log.h"
 #include "voxel/world/BlockRegistry.h"
 #include "voxel/world/ChunkManager.h"
@@ -13,6 +14,10 @@
 
 namespace voxel::world
 {
+
+// Magic bytes for metadata/inventory sections
+static constexpr uint16_t MAGIC_METADATA = 0x4D44;  // "MD"
+static constexpr uint16_t MAGIC_INVENTORY = 0x4956;  // "IV"
 
 namespace
 {
@@ -37,132 +42,6 @@ std::filesystem::path regionFilePath(const std::filesystem::path& regionDir, glm
     std::string filename = "r." + std::to_string(regionCoord.x) + "." + std::to_string(regionCoord.y) + ".vxr";
     return regionDir / filename;
 }
-
-// --- Binary writer helpers ---
-
-class BinaryWriter
-{
-public:
-    void writeU8(uint8_t v) { m_buf.push_back(v); }
-
-    void writeU16(uint16_t v)
-    {
-        m_buf.push_back(static_cast<uint8_t>(v & 0xFF));
-        m_buf.push_back(static_cast<uint8_t>((v >> 8) & 0xFF));
-    }
-
-    void writeU32(uint32_t v)
-    {
-        m_buf.push_back(static_cast<uint8_t>(v & 0xFF));
-        m_buf.push_back(static_cast<uint8_t>((v >> 8) & 0xFF));
-        m_buf.push_back(static_cast<uint8_t>((v >> 16) & 0xFF));
-        m_buf.push_back(static_cast<uint8_t>((v >> 24) & 0xFF));
-    }
-
-    void writeU64(uint64_t v)
-    {
-        for (int i = 0; i < 8; ++i)
-        {
-            m_buf.push_back(static_cast<uint8_t>((v >> (i * 8)) & 0xFF));
-        }
-    }
-
-    void writeString(const std::string& s)
-    {
-        writeU16(static_cast<uint16_t>(s.size()));
-        m_buf.insert(m_buf.end(), s.begin(), s.end());
-    }
-
-    [[nodiscard]] std::vector<uint8_t>& data() { return m_buf; }
-    [[nodiscard]] const std::vector<uint8_t>& data() const { return m_buf; }
-
-private:
-    std::vector<uint8_t> m_buf;
-};
-
-// --- Binary reader helpers ---
-
-class BinaryReader
-{
-public:
-    explicit BinaryReader(std::span<const uint8_t> data) : m_data(data) {}
-
-    [[nodiscard]] bool hasRemaining(size_t bytes) const { return m_pos + bytes <= m_data.size(); }
-
-    [[nodiscard]] core::Result<uint8_t> readU8()
-    {
-        if (!hasRemaining(1))
-        {
-            return std::unexpected(
-                core::EngineError{core::ErrorCode::InvalidFormat, "Truncated data: expected uint8"});
-        }
-        return m_data[m_pos++];
-    }
-
-    [[nodiscard]] core::Result<uint16_t> readU16()
-    {
-        if (!hasRemaining(2))
-        {
-            return std::unexpected(
-                core::EngineError{core::ErrorCode::InvalidFormat, "Truncated data: expected uint16"});
-        }
-        uint16_t v = static_cast<uint16_t>(m_data[m_pos]) | (static_cast<uint16_t>(m_data[m_pos + 1]) << 8);
-        m_pos += 2;
-        return v;
-    }
-
-    [[nodiscard]] core::Result<uint32_t> readU32()
-    {
-        if (!hasRemaining(4))
-        {
-            return std::unexpected(
-                core::EngineError{core::ErrorCode::InvalidFormat, "Truncated data: expected uint32"});
-        }
-        uint32_t v = static_cast<uint32_t>(m_data[m_pos]) | (static_cast<uint32_t>(m_data[m_pos + 1]) << 8) |
-                     (static_cast<uint32_t>(m_data[m_pos + 2]) << 16) |
-                     (static_cast<uint32_t>(m_data[m_pos + 3]) << 24);
-        m_pos += 4;
-        return v;
-    }
-
-    [[nodiscard]] core::Result<uint64_t> readU64()
-    {
-        if (!hasRemaining(8))
-        {
-            return std::unexpected(
-                core::EngineError{core::ErrorCode::InvalidFormat, "Truncated data: expected uint64"});
-        }
-        uint64_t v = 0;
-        for (int i = 0; i < 8; ++i)
-        {
-            v |= static_cast<uint64_t>(m_data[m_pos + i]) << (i * 8);
-        }
-        m_pos += 8;
-        return v;
-    }
-
-    [[nodiscard]] core::Result<std::string> readString()
-    {
-        auto lenResult = readU16();
-        if (!lenResult.has_value())
-        {
-            return std::unexpected(lenResult.error());
-        }
-        uint16_t len = lenResult.value();
-        if (!hasRemaining(len))
-        {
-            return std::unexpected(
-                core::EngineError{core::ErrorCode::InvalidFormat, "Truncated data: expected string"});
-        }
-        std::string s(reinterpret_cast<const char*>(m_data.data() + m_pos), len);
-        m_pos += len;
-        return s;
-    }
-
-private:
-    std::span<const uint8_t> m_data;
-    size_t m_pos = 0;
-};
 
 } // namespace
 
@@ -212,6 +91,26 @@ std::vector<uint8_t> ChunkSerializer::serializeColumn(const ChunkColumn& column,
         {
             writer.writeU64(word);
         }
+    }
+
+    // --- Metadata section ---
+    const auto& metaMap = column.allMetadata();
+    writer.writeU16(MAGIC_METADATA);
+    writer.writeU16(static_cast<uint16_t>(metaMap.size()));
+    for (const auto& [packedIdx, meta] : metaMap)
+    {
+        writer.writeU16(packedIdx);
+        meta.serialize(writer);
+    }
+
+    // --- Inventory section ---
+    const auto& invMap = column.allInventories();
+    writer.writeU16(MAGIC_INVENTORY);
+    writer.writeU16(static_cast<uint16_t>(invMap.size()));
+    for (const auto& [packedIdx, inv] : invMap)
+    {
+        writer.writeU16(packedIdx);
+        inv.serialize(writer);
     }
 
     return std::move(writer.data());
@@ -305,6 +204,75 @@ core::Result<ChunkColumn> ChunkSerializer::deserializeColumn(
         // Copy into the column — default copy assignment transfers both blocks[]
         // and m_nonAirCount (correctly maintained by PaletteCompression::decompress).
         column.getOrCreateSection(i) = decompressed;
+    }
+
+    // --- Metadata section (backward compatible: old files may not have this) ---
+    if (reader.hasRemaining(2))
+    {
+        auto magicResult = reader.readU16();
+        if (magicResult.has_value() && magicResult.value() == MAGIC_METADATA)
+        {
+            auto metaCountResult = reader.readU16();
+            if (!metaCountResult.has_value())
+            {
+                return std::unexpected(metaCountResult.error());
+            }
+            uint16_t metaCount = metaCountResult.value();
+
+            for (uint16_t m = 0; m < metaCount; ++m)
+            {
+                auto idxResult = reader.readU16();
+                if (!idxResult.has_value())
+                {
+                    return std::unexpected(idxResult.error());
+                }
+                auto metaResult = BlockMetadata::deserialize(reader);
+                if (!metaResult.has_value())
+                {
+                    return std::unexpected(metaResult.error());
+                }
+                // Unpack index back to local coords for getOrCreateMetadata
+                uint16_t packed = idxResult.value();
+                int x = packed % ChunkSection::SIZE;
+                int z = (packed / ChunkSection::SIZE) % ChunkSection::SIZE;
+                int y = packed / (ChunkSection::SIZE * ChunkSection::SIZE);
+                column.getOrCreateMetadata(x, y, z) = std::move(metaResult.value());
+            }
+        }
+    }
+
+    // --- Inventory section (backward compatible) ---
+    if (reader.hasRemaining(2))
+    {
+        auto magicResult = reader.readU16();
+        if (magicResult.has_value() && magicResult.value() == MAGIC_INVENTORY)
+        {
+            auto invCountResult = reader.readU16();
+            if (!invCountResult.has_value())
+            {
+                return std::unexpected(invCountResult.error());
+            }
+            uint16_t invCount = invCountResult.value();
+
+            for (uint16_t v = 0; v < invCount; ++v)
+            {
+                auto idxResult = reader.readU16();
+                if (!idxResult.has_value())
+                {
+                    return std::unexpected(idxResult.error());
+                }
+                auto invResult = BlockInventory::deserialize(reader);
+                if (!invResult.has_value())
+                {
+                    return std::unexpected(invResult.error());
+                }
+                uint16_t packed = idxResult.value();
+                int x = packed % ChunkSection::SIZE;
+                int z = (packed / ChunkSection::SIZE) % ChunkSection::SIZE;
+                int y = packed / (ChunkSection::SIZE * ChunkSection::SIZE);
+                column.getOrCreateInventory(x, y, z) = std::move(invResult.value());
+            }
+        }
     }
 
     return column;

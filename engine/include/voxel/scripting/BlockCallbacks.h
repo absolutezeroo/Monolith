@@ -64,6 +64,14 @@ struct BlockCallbacks
     std::optional<sol::protected_function> onEntityCollide;  // (pos, entity, facing, velocity, is_impact)
     std::optional<sol::protected_function> onProjectileHit;  // (pos, projectile, hit_result) — V1 stub, never invoked
 
+    // --- Inventory callbacks ---
+    std::optional<sol::protected_function> allowInventoryPut;   // (pos, listname, index, stack, player) -> int
+    std::optional<sol::protected_function> allowInventoryTake;  // (pos, listname, index, stack, player) -> int
+    std::optional<sol::protected_function> allowInventoryMove;  // (pos, from_list, from_idx, to_list, to_idx, count, player) -> int
+    std::optional<sol::protected_function> onInventoryPut;      // (pos, listname, index, stack, player)
+    std::optional<sol::protected_function> onInventoryTake;     // (pos, listname, index, stack, player)
+    std::optional<sol::protected_function> onInventoryMove;     // (pos, from_list, from_idx, to_list, to_idx, count, player)
+
     // --- Signal/power stubs ---
     std::optional<sol::protected_function> onPowered;           // (pos, power_level, source_pos)
     std::optional<sol::protected_function> getComparatorOutput; // (pos) -> int (0-15)
@@ -71,10 +79,10 @@ struct BlockCallbacks
 
     /// Quick check: returns a bitmask of which callback categories are set.
     /// Bit 0 = placement, Bit 1 = destruction, Bit 2 = interaction, Bit 3 = timer,
-    /// Bit 4 = neighbor, Bit 5 = shape, Bit 6 = signal, Bit 7 = entity.
-    [[nodiscard]] uint8_t categoryMask() const
+    /// Bit 4 = neighbor, Bit 5 = shape, Bit 6 = signal, Bit 7 = entity, Bit 8 = inventory.
+    [[nodiscard]] uint16_t categoryMask() const
     {
-        uint8_t mask = 0;
+        uint16_t mask = 0;
         if (canPlace.has_value() || getStateForPlacement.has_value() || onPlace.has_value() ||
             onConstruct.has_value() || afterPlace.has_value() || canBeReplaced.has_value())
         {
@@ -113,6 +121,11 @@ struct BlockCallbacks
             onEntityCollide.has_value() || onProjectileHit.has_value())
         {
             mask |= 0x80;
+        }
+        if (allowInventoryPut.has_value() || allowInventoryTake.has_value() || allowInventoryMove.has_value() ||
+            onInventoryPut.has_value() || onInventoryTake.has_value() || onInventoryMove.has_value())
+        {
+            mask |= 0x100;
         }
         return mask;
     }

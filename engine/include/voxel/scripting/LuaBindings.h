@@ -62,6 +62,9 @@ public:
     /// Register the EntityHandle usertype so Lua callbacks can interact with entities.
     static void registerEntityAPI(sol::state& lua);
 
+    /// Register ItemStack, MetaDataRef, InvRef usertypes and voxel.get_meta / voxel.get_inventory.
+    static void registerMetadataAPI(sol::state& lua, world::ChunkManager& chunkManager);
+
     /// Access the item registry (populated by voxel.register_item calls).
     [[nodiscard]] static const std::unordered_map<std::string, ItemDefinition>& getItemRegistry();
 

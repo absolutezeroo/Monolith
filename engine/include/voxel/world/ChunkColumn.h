@@ -1,5 +1,7 @@
 #pragma once
 
+#include "voxel/world/BlockInventory.h"
+#include "voxel/world/BlockMetadata.h"
 #include "voxel/world/ChunkSection.h"
 #include "voxel/world/LightMap.h"
 
@@ -8,6 +10,7 @@
 #include <array>
 #include <cstdint>
 #include <memory>
+#include <unordered_map>
 
 namespace voxel::world
 {
@@ -56,6 +59,27 @@ class ChunkColumn
     void setHeight(int x, int z, uint8_t y);
     void buildHeightMap(const BlockRegistry& registry);
 
+    // Metadata access (per-block key-value store)
+    [[nodiscard]] BlockMetadata* getMetadata(int x, int y, int z);
+    [[nodiscard]] const BlockMetadata* getMetadata(int x, int y, int z) const;
+    BlockMetadata& getOrCreateMetadata(int x, int y, int z);
+    void removeMetadata(int x, int y, int z);
+
+    // Inventory access (per-block named lists)
+    [[nodiscard]] BlockInventory* getInventory(int x, int y, int z);
+    [[nodiscard]] const BlockInventory* getInventory(int x, int y, int z) const;
+    BlockInventory& getOrCreateInventory(int x, int y, int z);
+    void removeInventory(int x, int y, int z);
+
+    [[nodiscard]] bool hasBlockData(int x, int y, int z) const;
+
+    // Raw map access for serialization
+    [[nodiscard]] const std::unordered_map<uint16_t, BlockMetadata>& allMetadata() const { return m_metadata; }
+    [[nodiscard]] const std::unordered_map<uint16_t, BlockInventory>& allInventories() const { return m_inventories; }
+
+    /// Pack local coordinates into a flat index for metadata/inventory maps.
+    [[nodiscard]] static uint16_t packLocalIndex(int x, int y, int z);
+
     // Queries
     [[nodiscard]] bool isAllEmpty() const;
     [[nodiscard]] int getHighestNonEmptySection() const;
@@ -68,6 +92,10 @@ class ChunkColumn
     std::array<LightMap, SECTIONS_PER_COLUMN> m_lightMaps;
     std::array<bool, SECTIONS_PER_COLUMN> m_dirty;
     std::array<uint8_t, HEIGHTMAP_SIZE> m_heightMap;
+
+    // Sparse per-block data — only blocks with metadata/inventory allocate storage.
+    std::unordered_map<uint16_t, BlockMetadata> m_metadata;
+    std::unordered_map<uint16_t, BlockInventory> m_inventories;
 };
 
 } // namespace voxel::world

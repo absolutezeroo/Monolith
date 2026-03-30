@@ -181,12 +181,12 @@ TEST_CASE("ChunkSerializer empty chunk", "[world][serialization]")
         }
     }
 
-    SECTION("empty column binary is small (just a bitmask)")
+    SECTION("empty column binary is small (bitmask + metadata/inventory headers)")
     {
         ChunkColumn column({0, 0});
         std::vector<uint8_t> serialized = ChunkSerializer::serializeColumn(column, registry);
-        // Only the 2-byte section bitmask (all zeros)
-        CHECK(serialized.size() == 2);
+        // 2-byte bitmask + 4-byte metadata section (magic+count=0) + 4-byte inventory section (magic+count=0)
+        CHECK(serialized.size() == 10);
     }
 }
 

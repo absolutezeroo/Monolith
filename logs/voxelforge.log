@@ -1,0 +1,85 @@
+[04:44:08.303] [info] [ScriptEngine.cpp:53] ScriptEngine initialized (sol2 + LuaJIT)
+[04:44:08.304] [debug] [LuaBindings.cpp:42] Registered block 'test:simple_block' (base state ID: 1)
+[04:44:08.304] [debug] [ScriptEngine.cpp:144] Loaded script: C:/Users/Clayton/RiderProjects/Monolith\tests\scripting\test_scripts\register_block.lua
+[04:44:08.304] [info] [ScriptEngine.cpp:68] ScriptEngine shut down
+[04:44:08.304] [info] [ScriptEngine.cpp:53] ScriptEngine initialized (sol2 + LuaJIT)
+[04:44:08.305] [debug] [LuaBindings.cpp:42] Registered block 'test:simple_block' (base state ID: 1)
+[04:44:08.305] [debug] [ScriptEngine.cpp:144] Loaded script: C:/Users/Clayton/RiderProjects/Monolith\tests\scripting\test_scripts\register_block.lua
+[04:44:08.305] [info] [ScriptEngine.cpp:68] ScriptEngine shut down
+[04:44:08.329] [info] [ScriptEngine.cpp:53] ScriptEngine initialized (sol2 + LuaJIT)
+[04:44:08.329] [debug] [LuaBindings.cpp:42] Registered block 'test:callback_block' (base state ID: 1)
+[04:44:08.329] [debug] [ScriptEngine.cpp:144] Loaded script: C:/Users/Clayton/RiderProjects/Monolith\tests\scripting\test_scripts\register_block_with_callbacks.lua
+[04:44:08.329] [info] [ScriptEngine.cpp:68] ScriptEngine shut down
+[04:44:08.330] [info] [ScriptEngine.cpp:53] ScriptEngine initialized (sol2 + LuaJIT)
+[04:44:08.331] [debug] [LuaBindings.cpp:42] Registered block 'test:chest' (base state ID: 1)
+[04:44:08.331] [debug] [ScriptEngine.cpp:144] Loaded script: C:/Users/Clayton/RiderProjects/Monolith\tests\scripting\test_scripts\inventory_chest.lua
+[04:44:08.331] [info] [ScriptEngine.cpp:68] ScriptEngine shut down
+[04:44:08.342] [info] [ScriptEngine.cpp:53] ScriptEngine initialized (sol2 + LuaJIT)
+[04:44:08.343] [debug] [LuaBindings.cpp:42] Registered block 'test:cactus' (base state ID: 1)
+[04:44:08.343] [debug] [ScriptEngine.cpp:144] Loaded script: C:/Users/Clayton/RiderProjects/Monolith\tests\scripting\test_scripts\entity_inside.lua
+[04:44:08.343] [info] [EntityHandle.cpp:17] Entity damage: 0.5 HP
+[04:44:08.343] [info] [ScriptEngine.cpp:68] ScriptEngine shut down
+[04:44:08.345] [info] [ScriptEngine.cpp:53] ScriptEngine initialized (sol2 + LuaJIT)
+[04:44:08.346] [debug] [LuaBindings.cpp:42] Registered block 'test:simple_block' (base state ID: 1)
+[04:44:08.346] [debug] [ScriptEngine.cpp:144] Loaded script: C:/Users/Clayton/RiderProjects/Monolith\tests\scripting\test_scripts\register_block.lua
+[04:44:08.346] [info] [ScriptEngine.cpp:68] ScriptEngine shut down
+[04:44:08.979] [info] [ScriptEngine.cpp:53] ScriptEngine initialized (sol2 + LuaJIT)
+[04:44:08.979] [debug] [LuaBindings.cpp:42] Registered block 'test:torch_old' (base state ID: 1)
+[04:44:08.979] [info] [LuaBindings.cpp:557] Registered LBM: 'Upgrade old torches test'
+[04:44:08.979] [debug] [ScriptEngine.cpp:144] Loaded script: C:/Users/Clayton/RiderProjects/Monolith\tests\scripting\test_scripts\lbm_upgrade_torch.lua
+[04:44:08.979] [info] [ScriptEngine.cpp:68] ScriptEngine shut down
+[04:44:10.218] [info] [ScriptEngine.cpp:53] ScriptEngine initialized (sol2 + LuaJIT)
+[04:44:10.219] [debug] [LuaBindings.cpp:42] Registered block 'base:stone' (base state ID: 1)
+[04:44:10.219] [debug] [LuaBindings.cpp:42] Registered block 'base:dirt' (base state ID: 2)
+[04:44:10.219] [debug] [LuaBindings.cpp:42] Registered block 'base:grass_block' (base state ID: 3)
+[04:44:10.219] [debug] [LuaBindings.cpp:42] Registered block 'base:sand' (base state ID: 4)
+[04:44:10.219] [debug] [LuaBindings.cpp:42] Registered block 'base:water' (base state ID: 5)
+[04:44:10.220] [debug] [LuaBindings.cpp:42] Registered block 'base:oak_log' (base state ID: 6)
+[04:44:10.220] [debug] [LuaBindings.cpp:42] Registered block 'base:oak_leaves' (base state ID: 7)
+[04:44:10.220] [debug] [LuaBindings.cpp:42] Registered block 'base:glass' (base state ID: 8)
+[04:44:10.220] [debug] [LuaBindings.cpp:42] Registered block 'base:glowstone' (base state ID: 9)
+[04:44:10.220] [debug] [LuaBindings.cpp:42] Registered block 'base:bedrock' (base state ID: 10)
+[04:44:10.220] [debug] [LuaBindings.cpp:42] Registered block 'base:sandstone' (base state ID: 11)
+[04:44:10.220] [debug] [LuaBindings.cpp:42] Registered block 'base:snow_block' (base state ID: 12)
+[04:44:10.220] [debug] [LuaBindings.cpp:42] Registered block 'base:torch' (base state ID: 13)
+[04:44:10.220] [debug] [LuaBindings.cpp:42] Registered block 'base:birch_log' (base state ID: 14)
+[04:44:10.221] [debug] [LuaBindings.cpp:42] Registered block 'base:birch_leaves' (base state ID: 15)
+[04:44:10.221] [debug] [LuaBindings.cpp:42] Registered block 'base:spruce_log' (base state ID: 16)
+[04:44:10.221] [debug] [LuaBindings.cpp:42] Registered block 'base:spruce_leaves' (base state ID: 17)
+[04:44:10.221] [debug] [LuaBindings.cpp:42] Registered block 'base:jungle_log' (base state ID: 18)
+[04:44:10.221] [debug] [LuaBindings.cpp:42] Registered block 'base:jungle_leaves' (base state ID: 19)
+[04:44:10.221] [debug] [LuaBindings.cpp:42] Registered block 'base:cactus' (base state ID: 20)
+[04:44:10.221] [debug] [LuaBindings.cpp:42] Registered block 'base:tall_grass' (base state ID: 21)
+[04:44:10.221] [debug] [LuaBindings.cpp:42] Registered block 'base:flower_red' (base state ID: 22)
+[04:44:10.221] [debug] [LuaBindings.cpp:42] Registered block 'base:flower_yellow' (base state ID: 23)
+[04:44:10.221] [debug] [LuaBindings.cpp:42] Registered block 'base:dead_bush' (base state ID: 24)
+[04:44:10.221] [debug] [LuaBindings.cpp:42] Registered block 'base:snow_layer' (base state ID: 25)
+[04:44:10.222] [debug] [LuaBindings.cpp:42] Registered block 'base:coal_ore' (base state ID: 26)
+[04:44:10.222] [debug] [LuaBindings.cpp:42] Registered block 'base:iron_ore' (base state ID: 27)
+[04:44:10.222] [debug] [LuaBindings.cpp:42] Registered block 'base:gold_ore' (base state ID: 28)
+[04:44:10.222] [debug] [LuaBindings.cpp:42] Registered block 'base:diamond_ore' (base state ID: 29)
+[04:44:10.222] [debug] [ScriptEngine.cpp:144] Loaded script: C:/Users/Clayton/RiderProjects/Monolith/assets\scripts\base\init.lua
+[04:44:10.222] [info] [ScriptEngine.cpp:68] ScriptEngine shut down
+[04:44:12.291] [info] [ScriptEngine.cpp:53] ScriptEngine initialized (sol2 + LuaJIT)
+[04:44:12.292] [debug] [LuaBindings.cpp:42] Registered block 'test:priority_block' (base state ID: 1)
+[04:44:12.292] [debug] [ScriptEngine.cpp:144] Loaded script: C:/Users/Clayton/RiderProjects/Monolith\tests\scripting\test_scripts\interaction_priority.lua
+[04:44:12.292] [info] [ScriptEngine.cpp:68] ScriptEngine shut down
+[04:44:12.293] [info] [ScriptEngine.cpp:53] ScriptEngine initialized (sol2 + LuaJIT)
+[04:44:12.293] [debug] [LuaBindings.cpp:42] Registered block 'test:counter_shape' (base state ID: 1)
+[04:44:12.293] [info] [ScriptEngine.cpp:68] ScriptEngine shut down
+[04:44:12.297] [info] [ScriptEngine.cpp:53] ScriptEngine initialized (sol2 + LuaJIT)
+[04:44:12.298] [debug] [LuaBindings.cpp:42] Registered block 'test:torch_old' (base state ID: 1)
+[04:44:12.298] [info] [LuaBindings.cpp:557] Registered LBM: 'Upgrade old torches test'
+[04:44:12.298] [debug] [ScriptEngine.cpp:144] Loaded script: C:/Users/Clayton/RiderProjects/Monolith\tests\scripting\test_scripts\lbm_upgrade_torch.lua
+[04:44:12.298] [info] [ScriptEngine.cpp:68] ScriptEngine shut down
+[04:44:12.300] [info] [ScriptEngine.cpp:53] ScriptEngine initialized (sol2 + LuaJIT)
+[04:44:12.301] [debug] [LuaBindings.cpp:42] Registered block 'test:observer' (base state ID: 1)
+[04:44:12.301] [info] [ScriptEngine.cpp:68] ScriptEngine shut down
+[04:44:13.984] [info] [ScriptEngine.cpp:53] ScriptEngine initialized (sol2 + LuaJIT)
+[04:44:13.985] [debug] [LuaBindings.cpp:42] Registered block 'test:locked_chest' (base state ID: 1)
+[04:44:13.985] [debug] [ScriptEngine.cpp:144] Loaded script: C:/Users/Clayton/RiderProjects/Monolith\tests\scripting\test_scripts\inventory_deny.lua
+[04:44:13.985] [info] [ScriptEngine.cpp:68] ScriptEngine shut down
+[04:44:13.995] [info] [ScriptEngine.cpp:53] ScriptEngine initialized (sol2 + LuaJIT)
+[04:44:13.996] [debug] [LuaBindings.cpp:42] Registered block 'test:sign' (base state ID: 1)
+[04:44:13.996] [debug] [ScriptEngine.cpp:144] Loaded script: C:/Users/Clayton/RiderProjects/Monolith\tests\scripting\test_scripts\metadata_basic.lua
+[04:44:13.997] [info] [ScriptEngine.cpp:68] ScriptEngine shut down

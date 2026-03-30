@@ -62,6 +62,15 @@ void ChunkColumn::setBlock(int x, int y, int z, uint16_t id)
     int sectionIndex = y / ChunkSection::SIZE;
     int localY = y % ChunkSection::SIZE;
 
+    // Remove stale metadata/inventory when block type changes
+    uint16_t oldId = getBlock(x, y, z);
+    if (oldId != id)
+    {
+        uint16_t packed = packLocalIndex(x, y, z);
+        m_metadata.erase(packed);
+        m_inventories.erase(packed);
+    }
+
     ChunkSection& section = getOrCreateSection(sectionIndex);
     section.setBlock(x, localY, z, id);
     m_dirty[sectionIndex] = true;
@@ -163,6 +172,65 @@ int ChunkColumn::getHighestNonEmptySection() const
         }
     }
     return -1;
+}
+
+// --- Metadata accessors ---
+
+uint16_t ChunkColumn::packLocalIndex(int x, int y, int z)
+{
+    return static_cast<uint16_t>(x + z * ChunkSection::SIZE + y * ChunkSection::SIZE * ChunkSection::SIZE);
+}
+
+BlockMetadata* ChunkColumn::getMetadata(int x, int y, int z)
+{
+    auto it = m_metadata.find(packLocalIndex(x, y, z));
+    return it != m_metadata.end() ? &it->second : nullptr;
+}
+
+const BlockMetadata* ChunkColumn::getMetadata(int x, int y, int z) const
+{
+    auto it = m_metadata.find(packLocalIndex(x, y, z));
+    return it != m_metadata.end() ? &it->second : nullptr;
+}
+
+BlockMetadata& ChunkColumn::getOrCreateMetadata(int x, int y, int z)
+{
+    return m_metadata[packLocalIndex(x, y, z)];
+}
+
+void ChunkColumn::removeMetadata(int x, int y, int z)
+{
+    m_metadata.erase(packLocalIndex(x, y, z));
+}
+
+// --- Inventory accessors ---
+
+BlockInventory* ChunkColumn::getInventory(int x, int y, int z)
+{
+    auto it = m_inventories.find(packLocalIndex(x, y, z));
+    return it != m_inventories.end() ? &it->second : nullptr;
+}
+
+const BlockInventory* ChunkColumn::getInventory(int x, int y, int z) const
+{
+    auto it = m_inventories.find(packLocalIndex(x, y, z));
+    return it != m_inventories.end() ? &it->second : nullptr;
+}
+
+BlockInventory& ChunkColumn::getOrCreateInventory(int x, int y, int z)
+{
+    return m_inventories[packLocalIndex(x, y, z)];
+}
+
+void ChunkColumn::removeInventory(int x, int y, int z)
+{
+    m_inventories.erase(packLocalIndex(x, y, z));
+}
+
+bool ChunkColumn::hasBlockData(int x, int y, int z) const
+{
+    uint16_t packed = packLocalIndex(x, y, z);
+    return m_metadata.contains(packed) || m_inventories.contains(packed);
 }
 
 } // namespace voxel::world

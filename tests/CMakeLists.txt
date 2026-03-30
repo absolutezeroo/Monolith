@@ -49,6 +49,8 @@ add_executable(VoxelTests
     scripting/TestBlockTimers.cpp
     scripting/TestNeighborShape.cpp
     scripting/TestEntityBlockCallbacks.cpp
+    scripting/TestBlockMetadata.cpp
+    scripting/TestMetadataInventoryCallbacks.cpp
 )
 
 target_link_libraries(VoxelTests

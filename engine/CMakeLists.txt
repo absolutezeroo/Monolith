@@ -50,6 +50,9 @@ add_library(VoxelEngine STATIC
         src/world/WorldGenerator.cpp
         src/input/InputManager.cpp
         src/physics/Raycast.cpp
+        src/world/ItemStack.cpp
+        src/world/BlockMetadata.cpp
+        src/world/BlockInventory.cpp
         src/scripting/ScriptEngine.cpp
         src/scripting/LuaBindings.cpp
         src/scripting/BlockCallbackInvoker.cpp

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "voxel/math/AABB.h"
+#include "voxel/world/ItemStack.h"
 
 #include <sol/forward.hpp>
 
@@ -105,6 +106,54 @@ public:
         const std::string& direction,
         sol::object neighborState);
     [[nodiscard]] bool invokeCanSurvive(const world::BlockDefinition& def, const glm::ivec3& pos);
+
+    // --- Inventory callbacks ---
+    [[nodiscard]] int invokeAllowInventoryPut(
+        const world::BlockDefinition& def,
+        const glm::ivec3& pos,
+        const std::string& listname,
+        size_t index,
+        const world::ItemStack& stack,
+        uint32_t playerId);
+    [[nodiscard]] int invokeAllowInventoryTake(
+        const world::BlockDefinition& def,
+        const glm::ivec3& pos,
+        const std::string& listname,
+        size_t index,
+        const world::ItemStack& stack,
+        uint32_t playerId);
+    [[nodiscard]] int invokeAllowInventoryMove(
+        const world::BlockDefinition& def,
+        const glm::ivec3& pos,
+        const std::string& fromList,
+        size_t fromIdx,
+        const std::string& toList,
+        size_t toIdx,
+        int count,
+        uint32_t playerId);
+    void invokeOnInventoryPut(
+        const world::BlockDefinition& def,
+        const glm::ivec3& pos,
+        const std::string& listname,
+        size_t index,
+        const world::ItemStack& stack,
+        uint32_t playerId);
+    void invokeOnInventoryTake(
+        const world::BlockDefinition& def,
+        const glm::ivec3& pos,
+        const std::string& listname,
+        size_t index,
+        const world::ItemStack& stack,
+        uint32_t playerId);
+    void invokeOnInventoryMove(
+        const world::BlockDefinition& def,
+        const glm::ivec3& pos,
+        const std::string& fromList,
+        size_t fromIdx,
+        const std::string& toList,
+        size_t toIdx,
+        int count,
+        uint32_t playerId);
 
     // --- Shape callbacks ---
     [[nodiscard]] std::vector<math::AABB> invokeGetCollisionShape(

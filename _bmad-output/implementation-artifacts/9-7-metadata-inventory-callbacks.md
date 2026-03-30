@@ -1,6 +1,6 @@
 # Story 9.7: Metadata & Inventory Callbacks
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -731,8 +731,52 @@ This story establishes patterns used by:
 
 ### Agent Model Used
 
-### Debug Log References
+Claude Opus 4.6
 
 ### Completion Notes List
 
+- All 11 story tasks completed.
+- `ItemStack` value type: `engine/include/voxel/world/ItemStack.h`, `engine/src/world/ItemStack.cpp`
+- `BlockMetadata` class with typed `variant<string, int32, float>` storage and binary serialization
+- `BlockInventory` class with named lists of ItemStack and binary serialization
+- `BinaryIO.h` extracted from ChunkSerializer as shared internal header (in `src/`, not `include/`)
+- ChunkColumn gains sparse `unordered_map<uint16_t, BlockMetadata>` and `unordered_map<uint16_t, BlockInventory>`; setBlock auto-clears stale data on block type change
+- ChunkSerializer extended with backward-compatible metadata/inventory sections using magic markers (0x4D44, 0x4956)
+- 6 inventory callbacks added to BlockCallbacks: allow_inventory_{put,take,move}, on_inventory_{put,take,move}
+- categoryMask expanded from uint8_t to uint16_t to accommodate bit 8 (inventory)
+- 6 invoke methods added to BlockCallbackInvoker following existing pattern
+- 6 callback extractions added to LuaBindings::parseBlockDefinition
+- `registerMetadataAPI()` registers ItemStack/MetaDataRef/InvRef usertypes and voxel.get_meta/get_inventory
+- Updated existing TestChunkSerializer test to account for new metadata/inventory section overhead (2→10 bytes)
+- **Tests**: 327 test cases, 490,635 assertions, all passing
+- **New tests**: 16 test cases covering ItemStack, BlockMetadata, BlockInventory, ChunkColumn storage, serialization roundtrip, backward compat, Lua integration
+
 ### File List
+
+| Action | File |
+|--------|------|
+| NEW | `engine/include/voxel/world/ItemStack.h` |
+| NEW | `engine/src/world/ItemStack.cpp` |
+| NEW | `engine/include/voxel/world/BlockMetadata.h` |
+| NEW | `engine/src/world/BlockMetadata.cpp` |
+| NEW | `engine/include/voxel/world/BlockInventory.h` |
+| NEW | `engine/src/world/BlockInventory.cpp` |
+| NEW | `engine/src/world/BinaryIO.h` |
+| MODIFY | `engine/include/voxel/world/ChunkColumn.h` |
+| MODIFY | `engine/src/world/ChunkColumn.cpp` |
+| MODIFY | `engine/src/world/ChunkSerializer.cpp` |
+| MODIFY | `engine/include/voxel/scripting/BlockCallbacks.h` |
+| MODIFY | `engine/include/voxel/scripting/BlockCallbackInvoker.h` |
+| MODIFY | `engine/src/scripting/BlockCallbackInvoker.cpp` |
+| MODIFY | `engine/include/voxel/scripting/LuaBindings.h` |
+| MODIFY | `engine/src/scripting/LuaBindings.cpp` |
+| MODIFY | `engine/CMakeLists.txt` |
+| MODIFY | `game/src/GameApp.cpp` |
+| NEW | `tests/scripting/TestBlockMetadata.cpp` |
+| NEW | `tests/scripting/TestMetadataInventoryCallbacks.cpp` |
+| NEW | `tests/scripting/test_scripts/metadata_basic.lua` |
+| NEW | `tests/scripting/test_scripts/inventory_chest.lua` |
+| NEW | `tests/scripting/test_scripts/inventory_deny.lua` |
+| NEW | `tests/scripting/test_scripts/inventory_notify.lua` |
+| MODIFY | `tests/CMakeLists.txt` |
+| MODIFY | `tests/world/TestChunkSerializer.cpp` |
