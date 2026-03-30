@@ -747,6 +747,17 @@ void GameApp::tick(double dt)
     else
     {
         m_player.resetMining();
+        if (m_player.isInteracting())
+        {
+            const auto& state = m_player.getInteractionState();
+            const auto& def = m_blockRegistry.getBlockType(state.targetBlockId);
+            if (m_callbackInvoker)
+            {
+                (void)m_callbackInvoker->invokeOnInteractCancel(
+                    def, state.targetBlockPos, 0, state.elapsedTime, "ui_captured");
+            }
+            m_player.cancelInteraction();
+        }
     }
 
     // Sync overlay sliders back to camera

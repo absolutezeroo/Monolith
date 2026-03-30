@@ -1,6 +1,6 @@
 # Story 9.3: Block Interaction Callbacks (Right-click, Punch, Multi-phase)
 
-Status: review
+Status: done
 
 ## Story
 
@@ -710,13 +710,14 @@ Claude Opus 4.6
 - Task 5: Wired RMB priority chain in handleBlockInteraction: on_interact_start > on_rightclick > placement. Added sustained interaction step/stop/release handling.
 - Task 6: Added LMB punch callback invocation on press frame, coexisting independently with mining.
 - Task 7: Implemented cancel conditions: distance >2.5 blocks, block changed, Escape key. Added TODO for damage-based cancel.
-- Task 8: Added InteractBlock command type with InteractAction enum and InteractBlockPayload to GameCommand.h. Sustained interaction runs directly via PlayerController (not command queue) per story design.
-- Task 9: Created 9 integration tests in TestBlockInteraction.cpp covering all callbacks, priority logic, and safe defaults. 4 Lua test scripts created.
-- Task 10: All 269 tests pass (490,338 assertions). Zero warnings under /W4 /WX. Both VoxelGame and VoxelTests build cleanly.
+- Task 8: Interaction callbacks fire directly (not via command queue) — discrete actions (rightclick, punch) don't need replay semantics. InteractBlock command type removed during code review as dead code.
+- Task 9: Created 10 integration tests in TestBlockInteraction.cpp covering all callbacks (including on_secondary_use), priority logic, and safe defaults. 5 Lua test scripts created.
+- Task 10: All 270 tests pass (490,345 assertions). Zero warnings under /W4 /WX. Both VoxelGame and VoxelTests build cleanly.
 
 ### Change Log
 
 - 2026-03-30: Implemented Story 9.3 — Block interaction callbacks (rightclick, punch, multi-phase hold)
+- 2026-03-30: Code review fixes — removed dead InteractBlock command code, added ImGui mouse capture cancellation for sustained interactions, added on_secondary_use positive test
 
 ### File List
 
@@ -726,12 +727,13 @@ Claude Opus 4.6
 - engine/src/scripting/LuaBindings.cpp (MODIFIED — extract 7 interaction callbacks in parseBlockDefinition)
 - engine/include/voxel/game/PlayerController.h (MODIFIED — added InteractionState struct + interaction methods)
 - engine/src/game/PlayerController.cpp (MODIFIED — implemented interaction state management)
-- engine/include/voxel/game/GameCommand.h (MODIFIED — added InteractBlock command type, InteractAction enum, InteractBlockPayload)
+- engine/include/voxel/game/GameCommand.h (MODIFIED — review: removed unused InteractBlock command type)
 - game/src/GameApp.h (UNCHANGED)
-- game/src/GameApp.cpp (MODIFIED — wired interaction priority chain, punch callback, sustained interaction, cancel conditions)
-- tests/scripting/TestBlockInteraction.cpp (NEW — 9 integration tests, 57 assertions)
+- game/src/GameApp.cpp (MODIFIED — wired interaction priority chain, punch callback, sustained interaction, cancel conditions; review: added ImGui capture cancellation)
+- tests/scripting/TestBlockInteraction.cpp (NEW — 10 integration tests, 64 assertions)
 - tests/scripting/test_scripts/interaction_rightclick.lua (NEW)
 - tests/scripting/test_scripts/interaction_sustained.lua (NEW)
 - tests/scripting/test_scripts/interaction_punch.lua (NEW)
 - tests/scripting/test_scripts/interaction_priority.lua (NEW)
+- tests/scripting/test_scripts/interaction_secondary_use.lua (NEW — review: added positive test)
 - tests/CMakeLists.txt (MODIFIED — added TestBlockInteraction.cpp)

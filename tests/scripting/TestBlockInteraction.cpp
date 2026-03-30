@@ -217,6 +217,32 @@ TEST_CASE("Block interaction: on_rightclick fires when no on_interact_start", "[
 }
 
 // ============================================================================
+// on_secondary_use callback
+// ============================================================================
+
+TEST_CASE("Block interaction: on_secondary_use fires correctly", "[scripting][interaction]")
+{
+    ScriptEngine engine;
+    BlockRegistry registry;
+    setupEngine(engine, registry);
+    loadTestScript(engine, "interaction_secondary_use.lua");
+
+    auto& lua = engine.getLuaState();
+    uint16_t id = registry.getIdByName("test:wand_block");
+    REQUIRE(id != BLOCK_AIR);
+
+    const auto& def = registry.getBlockType(id);
+    REQUIRE(def.callbacks != nullptr);
+    REQUIRE(def.callbacks->onSecondaryUse.has_value());
+
+    BlockCallbackInvoker invoker(lua, registry);
+    invoker.invokeOnSecondaryUse(def, 42);
+
+    CHECK(lua["test_secondary_use_fired"].get<bool>() == true);
+    CHECK(lua["test_secondary_use_user"].get<uint32_t>() == 42);
+}
+
+// ============================================================================
 // Missing callbacks return safe defaults
 // ============================================================================
 

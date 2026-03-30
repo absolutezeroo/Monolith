@@ -15,16 +15,7 @@ enum class CommandType : core::uint8
     BreakBlock,
     MovePlayer,
     Jump,
-    ToggleSprint,
-    InteractBlock
-};
-
-/// Action subtypes for block interaction commands.
-enum class InteractAction : core::uint8
-{
-    Rightclick,
-    Punch,
-    SecondaryUse
+    ToggleSprint
 };
 
 struct PlaceBlockPayload
@@ -54,12 +45,6 @@ struct ToggleSprintPayload
     bool enabled;
 };
 
-struct InteractBlockPayload
-{
-    math::IVec3 position;
-    InteractAction action;
-};
-
 /// A serializable game action. All state mutation flows through GameCommand objects
 /// pushed to a CommandQueue and consumed during the simulation tick.
 /// @see CommandQueue, ADR-010
@@ -73,8 +58,7 @@ struct GameCommand
         BreakBlockPayload,
         MovePlayerPayload,
         JumpPayload,
-        ToggleSprintPayload,
-        InteractBlockPayload>
+        ToggleSprintPayload>
         payload;
 };
 
