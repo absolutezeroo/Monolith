@@ -1,9 +1,15 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
+
+namespace voxel::scripting
+{
+struct BlockCallbacks;
+}
 
 namespace voxel::world
 {
@@ -53,6 +59,15 @@ struct BlockStateProperty
 
 /// Maps property names to their current string values.
 using StateMap = std::unordered_map<std::string, std::string>;
+
+/// Custom deleter for unique_ptr<BlockCallbacks> — allows forward-declaration
+/// of BlockCallbacks in this header while keeping BlockDefinition an aggregate.
+struct BlockCallbacksDeleter
+{
+    void operator()(voxel::scripting::BlockCallbacks* p) const;
+};
+
+using BlockCallbacksPtr = std::unique_ptr<voxel::scripting::BlockCallbacks, BlockCallbacksDeleter>;
 
 struct BlockDefinition
 {
@@ -114,6 +129,9 @@ struct BlockDefinition
     uint8_t powerOutput = 0;
     bool isPowerSource = false;
     bool isPowerConductor = true;
+
+    // --- Lua callbacks (null if no script attached) ---
+    BlockCallbacksPtr callbacks;
 
     // --- Block states ---
     std::vector<BlockStateProperty> properties;

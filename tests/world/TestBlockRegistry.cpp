@@ -26,13 +26,13 @@ TEST_CASE("BlockRegistry", "[world]")
     {
         BlockDefinition stone;
         stone.stringId = "base:stone";
-        auto result = registry.registerBlock(stone);
+        auto result = registry.registerBlock(std::move(stone));
         REQUIRE(result.has_value());
         REQUIRE(result.value() == 1);
 
         BlockDefinition dirt;
         dirt.stringId = "base:dirt";
-        result = registry.registerBlock(dirt);
+        result = registry.registerBlock(std::move(dirt));
         REQUIRE(result.has_value());
         REQUIRE(result.value() == 2);
     }
@@ -43,7 +43,7 @@ TEST_CASE("BlockRegistry", "[world]")
         stone.stringId = "base:stone";
         stone.hardness = 1.5f;
         stone.isSolid = true;
-        auto id = registry.registerBlock(stone);
+        auto id = registry.registerBlock(std::move(stone));
         REQUIRE(id.has_value());
 
         const auto& block = registry.getBlockByTypeIndex(id.value());
@@ -56,7 +56,7 @@ TEST_CASE("BlockRegistry", "[world]")
     {
         BlockDefinition stone;
         stone.stringId = "base:stone";
-        auto id = registry.registerBlock(stone);
+        auto id = registry.registerBlock(std::move(stone));
         REQUIRE(id.has_value());
         REQUIRE(registry.getIdByName("base:stone") == id.value());
     }
@@ -70,11 +70,11 @@ TEST_CASE("BlockRegistry", "[world]")
     {
         BlockDefinition stone;
         stone.stringId = "base:stone";
-        REQUIRE(registry.registerBlock(stone).has_value());
+        REQUIRE(registry.registerBlock(std::move(stone)).has_value());
 
         BlockDefinition stoneDup;
         stoneDup.stringId = "base:stone";
-        auto result = registry.registerBlock(stoneDup);
+        auto result = registry.registerBlock(std::move(stoneDup));
         REQUIRE_FALSE(result.has_value());
         REQUIRE(result.error().code == voxel::core::ErrorCode::InvalidArgument);
     }
@@ -83,7 +83,7 @@ TEST_CASE("BlockRegistry", "[world]")
     {
         BlockDefinition bad;
         bad.stringId = "nonamespace";
-        auto result = registry.registerBlock(bad);
+        auto result = registry.registerBlock(std::move(bad));
         REQUIRE_FALSE(result.has_value());
         REQUIRE(result.error().code == voxel::core::ErrorCode::InvalidArgument);
     }
@@ -92,7 +92,7 @@ TEST_CASE("BlockRegistry", "[world]")
     {
         BlockDefinition bad;
         bad.stringId = ":empty_ns";
-        auto result = registry.registerBlock(bad);
+        auto result = registry.registerBlock(std::move(bad));
         REQUIRE_FALSE(result.has_value());
     }
 
@@ -100,7 +100,7 @@ TEST_CASE("BlockRegistry", "[world]")
     {
         BlockDefinition bad;
         bad.stringId = "empty_name:";
-        auto result = registry.registerBlock(bad);
+        auto result = registry.registerBlock(std::move(bad));
         REQUIRE_FALSE(result.has_value());
     }
 
@@ -108,7 +108,7 @@ TEST_CASE("BlockRegistry", "[world]")
     {
         BlockDefinition bad;
         bad.stringId = "a:b:c";
-        auto result = registry.registerBlock(bad);
+        auto result = registry.registerBlock(std::move(bad));
         REQUIRE_FALSE(result.has_value());
     }
 
@@ -118,12 +118,12 @@ TEST_CASE("BlockRegistry", "[world]")
 
         BlockDefinition stone;
         stone.stringId = "base:stone";
-        [[maybe_unused]] auto r1 = registry.registerBlock(stone);
+        [[maybe_unused]] auto r1 = registry.registerBlock(std::move(stone));
         REQUIRE(registry.blockCount() == 2);
 
         BlockDefinition dirt;
         dirt.stringId = "base:dirt";
-        [[maybe_unused]] auto r2 = registry.registerBlock(dirt);
+        [[maybe_unused]] auto r2 = registry.registerBlock(std::move(dirt));
         REQUIRE(registry.blockCount() == 3);
     }
 }
@@ -429,7 +429,7 @@ TEST_CASE("BlockState - simple blocks", "[world][state]")
     {
         BlockDefinition stone;
         stone.stringId = "base:stone";
-        auto result = registry.registerBlock(stone);
+        auto result = registry.registerBlock(std::move(stone));
         REQUIRE(result.has_value());
         REQUIRE(result.value() == 1); // baseStateId = 1 (after air=0)
 
@@ -442,7 +442,7 @@ TEST_CASE("BlockState - simple blocks", "[world][state]")
     {
         BlockDefinition stone;
         stone.stringId = "base:stone";
-        auto stoneStateId = registry.registerBlock(stone).value();
+        auto stoneStateId = registry.registerBlock(std::move(stone)).value();
 
         const auto& def = registry.getBlockType(stoneStateId);
         REQUIRE(def.stringId == "base:stone");
@@ -460,7 +460,7 @@ TEST_CASE("BlockState - simple blocks", "[world][state]")
     {
         BlockDefinition stone;
         stone.stringId = "base:stone";
-        auto stoneStateId = registry.registerBlock(stone).value();
+        auto stoneStateId = registry.registerBlock(std::move(stone)).value();
 
         StateMap values = registry.getStateValues(stoneStateId);
         REQUIRE(values.empty());
@@ -487,11 +487,11 @@ TEST_CASE("BlockState - multi-state blocks", "[world][state]")
     // Register some simple blocks first
     BlockDefinition stone;
     stone.stringId = "base:stone";
-    [[maybe_unused]] auto stoneId = registry.registerBlock(stone);
+    [[maybe_unused]] auto stoneId = registry.registerBlock(std::move(stone));
 
     BlockDefinition dirt;
     dirt.stringId = "base:dirt";
-    [[maybe_unused]] auto dirtId = registry.registerBlock(dirt);
+    [[maybe_unused]] auto dirtId = registry.registerBlock(std::move(dirt));
 
     // Register a door with 4 properties: facing(4) x half(2) x open(2) x hinge(2) = 32 states
     BlockDefinition door;
@@ -505,7 +505,7 @@ TEST_CASE("BlockState - multi-state blocks", "[world][state]")
 
     SECTION("multi-state block has correct stateCount and consecutive state IDs")
     {
-        auto doorResult = registry.registerBlock(door);
+        auto doorResult = registry.registerBlock(std::move(door));
         REQUIRE(doorResult.has_value());
         uint16_t doorBaseState = doorResult.value();
         // air=0, stone=1, dirt=2, door starts at 3
@@ -518,7 +518,7 @@ TEST_CASE("BlockState - multi-state blocks", "[world][state]")
 
     SECTION("getBlockType resolves all 32 door states to same definition")
     {
-        auto doorBaseState = registry.registerBlock(door).value();
+        auto doorBaseState = registry.registerBlock(std::move(door)).value();
         for (uint16_t s = doorBaseState; s < doorBaseState + 32; ++s)
         {
             const auto& def = registry.getBlockType(s);
@@ -528,7 +528,7 @@ TEST_CASE("BlockState - multi-state blocks", "[world][state]")
 
     SECTION("getStateValues decomposes all permutations correctly")
     {
-        auto doorBaseState = registry.registerBlock(door).value();
+        auto doorBaseState = registry.registerBlock(std::move(door)).value();
         const std::vector<std::string> facings = {"north", "south", "east", "west"};
         const std::vector<std::string> halves = {"upper", "lower"};
         const std::vector<std::string> opens = {"false", "true"};
@@ -558,7 +558,7 @@ TEST_CASE("BlockState - multi-state blocks", "[world][state]")
 
     SECTION("getStateId roundtrip: compose → decompose → matches")
     {
-        auto doorBaseState = registry.registerBlock(door).value();
+        auto doorBaseState = registry.registerBlock(std::move(door)).value();
 
         StateMap input = {
             {"facing", "east"},
@@ -577,7 +577,7 @@ TEST_CASE("BlockState - multi-state blocks", "[world][state]")
 
     SECTION("withProperty changes only the specified property")
     {
-        auto doorBaseState = registry.registerBlock(door).value();
+        auto doorBaseState = registry.registerBlock(std::move(door)).value();
 
         // Start with facing=north, half=upper, open=false, hinge=left (offset 0)
         uint16_t original = doorBaseState;
@@ -605,7 +605,7 @@ TEST_CASE("BlockState - totalStateCount", "[world][state]")
 
         BlockDefinition stone;
         stone.stringId = "base:stone";
-        auto stoneResult = registry.registerBlock(stone);
+        auto stoneResult = registry.registerBlock(std::move(stone));
         REQUIRE(stoneResult.has_value());
         REQUIRE(registry.totalStateCount() == 2);
 
@@ -616,13 +616,13 @@ TEST_CASE("BlockState - totalStateCount", "[world][state]")
             {.name = "facing", .values = {"north", "south", "east", "west"}},
             {.name = "half", .values = {"top", "bottom"}}
         };
-        auto slabResult = registry.registerBlock(slab);
+        auto slabResult = registry.registerBlock(std::move(slab));
         REQUIRE(slabResult.has_value());
         REQUIRE(registry.totalStateCount() == 10); // 1 + 1 + 8
 
         BlockDefinition dirt;
         dirt.stringId = "base:dirt";
-        auto dirtResult = registry.registerBlock(dirt);
+        auto dirtResult = registry.registerBlock(std::move(dirt));
         REQUIRE(dirtResult.has_value());
         REQUIRE(registry.totalStateCount() == 11); // 1 + 1 + 8 + 1
     }
@@ -634,7 +634,7 @@ TEST_CASE("BlockState - totalStateCount", "[world][state]")
         {
             BlockDefinition def;
             def.stringId = "test:block_" + std::to_string(i);
-            auto result = registry.registerBlock(def);
+            auto result = registry.registerBlock(std::move(def));
             REQUIRE(result.has_value());
         }
 
@@ -647,7 +647,7 @@ TEST_CASE("BlockState - totalStateCount", "[world][state]")
                 {.name = "facing", .values = {"north", "south", "east", "west"}},
                 {.name = "half", .values = {"top", "bottom"}}
             };
-            auto result = registry.registerBlock(def);
+            auto result = registry.registerBlock(std::move(def));
             REQUIRE(result.has_value());
         }
 

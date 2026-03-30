@@ -1,0 +1,61 @@
+#pragma once
+
+#include "voxel/core/Result.h"
+#include "voxel/world/Block.h"
+
+#include <sol/forward.hpp>
+
+#include <string>
+#include <unordered_map>
+
+namespace voxel::world
+{
+class BlockRegistry;
+}
+
+namespace voxel::scripting
+{
+
+/// Minimal V1 item definition — just stores the Lua table fields.
+struct ItemDefinition
+{
+    std::string id;
+    int stackSize = 64;
+    std::string block; // Associated block ID, if any.
+};
+
+/// Binds Lua API functions (voxel.register_block, voxel.register_item) to the engine.
+/// Parses Lua tables into BlockDefinition and registers them via BlockRegistry.
+class LuaBindings
+{
+public:
+    /// Bind `voxel.register_block` and `voxel.register_item` onto the existing `voxel` table.
+    /// @param lua The Lua state (must already have a `voxel` table from ScriptEngine::init).
+    /// @param registry The block registry to register blocks into.
+    static void registerBlockAPI(sol::state& lua, world::BlockRegistry& registry);
+
+    /// Parse a Lua table into a BlockDefinition. Public for testability.
+    /// @param table The Lua table with block properties.
+    /// @return The parsed BlockDefinition, or an error if validation fails.
+    [[nodiscard]] static core::Result<world::BlockDefinition> parseBlockDefinition(const sol::table& table);
+
+    /// Access the item registry (populated by voxel.register_item calls).
+    [[nodiscard]] static const std::unordered_map<std::string, ItemDefinition>& getItemRegistry();
+
+private:
+    static void parseTextures(const sol::table& texTable, world::BlockDefinition& def);
+    static void parseGroups(const sol::table& groupsTable, world::BlockDefinition& def);
+    static void parseProperties(const sol::table& propsTable, world::BlockDefinition& def);
+    static void parseSounds(const sol::table& soundsTable, world::BlockDefinition& def);
+    static void parseLiquid(const sol::table& liquidTable, world::BlockDefinition& def);
+
+    static world::RenderType parseRenderType(std::string_view str);
+    static world::ModelType parseModelType(std::string_view str);
+    static world::LiquidType parseLiquidType(std::string_view str);
+    static world::PushReaction parsePushReaction(std::string_view str);
+    static uint8_t parseTintIndex(std::string_view str);
+
+    static std::unordered_map<std::string, ItemDefinition> s_itemRegistry;
+};
+
+} // namespace voxel::scripting

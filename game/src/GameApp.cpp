@@ -3,6 +3,9 @@
 #include "voxel/core/Log.h"
 #include "voxel/game/Window.h"
 #include "voxel/renderer/VulkanContext.h"
+#include "voxel/scripting/BlockCallbackInvoker.h"
+#include "voxel/scripting/LuaBindings.h"
+#include "voxel/scripting/ScriptEngine.h"
 
 #include <GLFW/glfw3.h>
 #include <glm/geometric.hpp>
@@ -52,6 +55,13 @@ GameApp::~GameApp()
     // so all tasks must complete while those objects are still alive.
     m_chunkManager.shutdown();
     m_jobSystem.shutdown();
+
+    // Destroy callback invoker before script engine (it holds a ref to sol::state)
+    m_callbackInvoker.reset();
+    if (m_scriptEngine)
+    {
+        m_scriptEngine->shutdown();
+    }
 
     // Save config on exit — sync all persisted settings back before writing
     if (!m_configPath.empty())
@@ -115,14 +125,29 @@ voxel::core::Result<void> GameApp::init(const std::string& shaderDir, std::optio
     // Persist seed to config
     m_config.save(m_configPath);
 
-    // Register basic terrain blocks
-    using voxel::world::BlockDefinition;
-    std::string blocksPath = std::string(VX_ASSETS_DIR) + "/scripts/base/blocks.json";
-    auto loadBlocksResult = m_blockRegistry.loadFromJson(blocksPath);
-    if (!loadBlocksResult.has_value())
+    // Initialize scripting engine
+    m_scriptEngine = std::make_unique<voxel::scripting::ScriptEngine>();
+    auto scriptInitResult = m_scriptEngine->init();
+    if (!scriptInitResult.has_value())
     {
-        return std::unexpected(loadBlocksResult.error());
+        return std::unexpected(scriptInitResult.error());
     }
+
+    // Bind Lua block registration API
+    voxel::scripting::LuaBindings::registerBlockAPI(m_scriptEngine->getLuaState(), m_blockRegistry);
+
+    // Load base block registrations from Lua (replaces blocks.json)
+    std::filesystem::path assetsDir(VX_ASSETS_DIR);
+    m_scriptEngine->addAllowedPath(assetsDir / "scripts");
+    auto loadInitResult = m_scriptEngine->loadScript(assetsDir / "scripts" / "base" / "init.lua");
+    if (!loadInitResult.has_value())
+    {
+        return std::unexpected(loadInitResult.error());
+    }
+
+    // Create callback invoker for block lifecycle events
+    m_callbackInvoker =
+        std::make_unique<voxel::scripting::BlockCallbackInvoker>(m_scriptEngine->getLuaState(), m_blockRegistry);
 
     // Create WorldGenerator
     m_worldGen =
@@ -315,7 +340,37 @@ void GameApp::handleBlockInteraction(float dt)
             {
                 break; // Nothing to break
             }
+            const auto& def = m_blockRegistry.getBlockType(previousId);
+
+            // Callback: can_dig → abort if false
+            if (m_callbackInvoker && !m_callbackInvoker->invokeCanDig(def, pos, cmd.playerId))
+            {
+                break;
+            }
+
+            // Callback: on_destruct (block still exists)
+            if (m_callbackInvoker)
+            {
+                m_callbackInvoker->invokeOnDestruct(def, pos);
+            }
+
+            // Callback: on_dig → abort if returns false
+            if (m_callbackInvoker && !m_callbackInvoker->invokeOnDig(def, pos, previousId, cmd.playerId))
+            {
+                break;
+            }
+
+            // Remove block
             m_chunkManager.setBlock(pos, voxel::world::BLOCK_AIR);
+
+            // Callback: after_destruct, after_dig
+            if (m_callbackInvoker)
+            {
+                m_callbackInvoker->invokeAfterDestruct(def, pos, previousId);
+                m_callbackInvoker->invokeAfterDig(def, pos, previousId, cmd.playerId);
+            }
+
+            // EventBus fires AFTER all per-block callbacks
             m_eventBus.publish<voxel::game::EventType::BlockBroken>(
                 voxel::game::BlockBrokenEvent{payload.position, previousId});
             VX_LOG_DEBUG("Block broken at ({},{},{}): id={}", pos.x, pos.y, pos.z, previousId);
@@ -347,7 +402,31 @@ void GameApp::handleBlockInteraction(float dt)
                 break; // Can't place inside yourself
             }
 
+            const auto& newDef = m_blockRegistry.getBlockType(payload.blockId);
+
+            // Callback: can_place → abort if false
+            if (m_callbackInvoker && !m_callbackInvoker->invokeCanPlace(newDef, pos, cmd.playerId))
+            {
+                break;
+            }
+
+            // Callback: on_place
+            if (m_callbackInvoker)
+            {
+                m_callbackInvoker->invokeOnPlace(newDef, pos, cmd.playerId);
+            }
+
+            // Set block
             m_chunkManager.setBlock(pos, payload.blockId);
+
+            // Callback: on_construct, after_place
+            if (m_callbackInvoker)
+            {
+                m_callbackInvoker->invokeOnConstruct(newDef, pos);
+                m_callbackInvoker->invokeAfterPlace(newDef, pos, cmd.playerId);
+            }
+
+            // EventBus fires AFTER all per-block callbacks
             m_eventBus.publish<voxel::game::EventType::BlockPlaced>(
                 voxel::game::BlockPlacedEvent{payload.position, payload.blockId});
             VX_LOG_DEBUG("Block placed at ({},{},{}): id={}", pos.x, pos.y, pos.z, payload.blockId);

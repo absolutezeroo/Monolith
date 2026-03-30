@@ -35,6 +35,12 @@ namespace voxel::renderer
 class VulkanContext;
 }
 
+namespace voxel::scripting
+{
+class ScriptEngine;
+class BlockCallbackInvoker;
+}
+
 class GameApp : public voxel::game::GameLoop
 {
   public:
@@ -88,6 +94,10 @@ class GameApp : public voxel::game::GameLoop
     voxel::game::EventBus m_eventBus;
     bool m_flyMode = true; // Start in fly mode — toggled with F7
     bool m_isSprinting = false; // Persistent sprint toggle state
+
+    // Scripting
+    std::unique_ptr<voxel::scripting::ScriptEngine> m_scriptEngine;
+    std::unique_ptr<voxel::scripting::BlockCallbackInvoker> m_callbackInvoker;
 
     // HUD state
     int m_hotbarSlot = 0;

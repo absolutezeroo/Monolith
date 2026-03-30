@@ -21,6 +21,7 @@ add_library(VoxelEngine STATIC
         src/renderer/ImGuiImplGlfw.cpp
         src/renderer/StbImageImpl.cpp
         src/renderer/StbImageWriteImpl.cpp
+        src/world/Block.cpp
         src/world/ChunkSection.cpp
         src/world/ChunkColumn.cpp
         src/world/BlockRegistry.cpp
@@ -50,6 +51,8 @@ add_library(VoxelEngine STATIC
         src/input/InputManager.cpp
         src/physics/Raycast.cpp
         src/scripting/ScriptEngine.cpp
+        src/scripting/LuaBindings.cpp
+        src/scripting/BlockCallbackInvoker.cpp
 )
 
 target_include_directories(VoxelEngine
@@ -198,11 +201,20 @@ else ()
             APPEND_STRING PROPERTY COMPILE_FLAGS " -w")
 endif ()
 
-# ScriptEngine.cpp — sol2 is a massive header (~50K lines); skip PCH to avoid conflicts
+# TUs that include sol2 (~50K lines); skip PCH to avoid conflicts
 # and suppress third-party warnings from sol2/LuaJIT headers.
-set_source_files_properties(src/scripting/ScriptEngine.cpp PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
+set_source_files_properties(
+        src/scripting/ScriptEngine.cpp
+        src/scripting/LuaBindings.cpp
+        src/scripting/BlockCallbackInvoker.cpp
+        src/world/Block.cpp
+        PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 if (MSVC)
-    set_property(SOURCE src/scripting/ScriptEngine.cpp
+    set_property(SOURCE
+            src/scripting/ScriptEngine.cpp
+            src/scripting/LuaBindings.cpp
+            src/scripting/BlockCallbackInvoker.cpp
+            src/world/Block.cpp
             APPEND_STRING PROPERTY COMPILE_FLAGS " /wd4702")
 endif ()
 
