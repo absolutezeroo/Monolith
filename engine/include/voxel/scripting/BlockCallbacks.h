@@ -46,8 +46,25 @@ struct BlockCallbacks
     std::optional<sol::protected_function> onInteractStop;    // (pos, player, elapsed_seconds)
     std::optional<sol::protected_function> onInteractCancel;  // (pos, player, elapsed_seconds, reason) -> bool
 
+    // --- Neighbor change callbacks ---
+    std::optional<sol::protected_function> onNeighborChanged;  // (pos, neighbor_pos, neighbor_node)
+    std::optional<sol::protected_function> updateShape;        // (pos, direction, neighbor_state) -> state|nil
+    std::optional<sol::protected_function> canSurvive;         // (pos) -> bool
+
+    // --- Physics/collision shape callbacks ---
+    std::optional<sol::protected_function> getCollisionShape;  // (pos) -> table of {x1,y1,z1,x2,y2,z2}
+    std::optional<sol::protected_function> getSelectionShape;  // (pos) -> table of {x1,y1,z1,x2,y2,z2}
+    std::optional<sol::protected_function> canAttachAt;        // (pos, face_string) -> bool
+    std::optional<sol::protected_function> isPathfindable;     // (pos, pathtype) -> bool
+
+    // --- Signal/power stubs ---
+    std::optional<sol::protected_function> onPowered;           // (pos, power_level, source_pos)
+    std::optional<sol::protected_function> getComparatorOutput; // (pos) -> int (0-15)
+    std::optional<sol::protected_function> getPushReaction;     // (pos) -> string
+
     /// Quick check: returns a bitmask of which callback categories are set.
-    /// Bit 0 = any placement callback, Bit 1 = any destruction callback, Bit 2 = any interaction callback.
+    /// Bit 0 = placement, Bit 1 = destruction, Bit 2 = interaction, Bit 3 = timer,
+    /// Bit 4 = neighbor, Bit 5 = shape, Bit 6 = signal.
     [[nodiscard]] uint8_t categoryMask() const
     {
         uint8_t mask = 0;
@@ -71,6 +88,19 @@ struct BlockCallbacks
         if (onTimer.has_value())
         {
             mask |= 0x08;
+        }
+        if (onNeighborChanged.has_value() || updateShape.has_value() || canSurvive.has_value())
+        {
+            mask |= 0x10;
+        }
+        if (getCollisionShape.has_value() || getSelectionShape.has_value() || canAttachAt.has_value() ||
+            isPathfindable.has_value())
+        {
+            mask |= 0x20;
+        }
+        if (onPowered.has_value() || getComparatorOutput.has_value() || getPushReaction.has_value())
+        {
+            mask |= 0x40;
         }
         return mask;
     }

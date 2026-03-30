@@ -11,7 +11,8 @@
 namespace voxel::world
 {
 class BlockRegistry;
-}
+class ChunkManager;
+} // namespace voxel::world
 
 namespace voxel::scripting
 {
@@ -54,6 +55,9 @@ public:
 
     /// Bind `voxel.register_lbm` onto the existing `voxel` table.
     static void registerLBMAPI(sol::state& lua, LBMRegistry& lbmRegistry, world::BlockRegistry& blockRegistry);
+
+    /// Bind `voxel.get_neighbor_at` and `voxel.face_to_direction` onto the existing `voxel` table.
+    static void registerNeighborAPI(sol::state& lua, world::ChunkManager& chunkMgr, world::BlockRegistry& registry);
 
     /// Access the item registry (populated by voxel.register_item calls).
     [[nodiscard]] static const std::unordered_map<std::string, ItemDefinition>& getItemRegistry();

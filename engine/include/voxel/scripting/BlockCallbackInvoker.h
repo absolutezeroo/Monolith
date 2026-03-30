@@ -1,11 +1,15 @@
 #pragma once
 
+#include "voxel/math/AABB.h"
+
 #include <sol/forward.hpp>
 
 #include <glm/vec3.hpp>
 
 #include <cstdint>
+#include <optional>
 #include <string>
+#include <vector>
 
 namespace voxel::world
 {
@@ -71,7 +75,29 @@ public:
         float elapsedSeconds,
         const std::string& reason);
 
+    // --- Neighbor change callbacks ---
+    void invokeOnNeighborChanged(
+        const world::BlockDefinition& def,
+        const glm::ivec3& pos,
+        const glm::ivec3& neighborPos,
+        const std::string& neighborNode);
+    [[nodiscard]] std::optional<sol::object> invokeUpdateShape(
+        const world::BlockDefinition& def,
+        const glm::ivec3& pos,
+        const std::string& direction,
+        sol::object neighborState);
+    [[nodiscard]] bool invokeCanSurvive(const world::BlockDefinition& def, const glm::ivec3& pos);
+
+    // --- Shape callbacks ---
+    [[nodiscard]] std::vector<math::AABB> invokeGetCollisionShape(
+        const world::BlockDefinition& def, const glm::ivec3& pos);
+    [[nodiscard]] std::vector<math::AABB> invokeGetSelectionShape(
+        const world::BlockDefinition& def, const glm::ivec3& pos);
+    [[nodiscard]] bool invokeCanAttachAt(
+        const world::BlockDefinition& def, const glm::ivec3& pos, const std::string& face);
+
 private:
+    std::vector<math::AABB> parseBoxList(const sol::table& table);
     sol::state& m_lua;
     world::BlockRegistry& m_registry;
 };

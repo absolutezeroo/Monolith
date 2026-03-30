@@ -1,6 +1,7 @@
 #include "voxel/game/PlayerController.h"
 
 #include "voxel/core/Log.h"
+#include "voxel/scripting/ShapeCache.h"
 #include "voxel/world/Block.h"
 #include "voxel/world/BlockRegistry.h"
 #include "voxel/world/ChunkColumn.h"
@@ -359,8 +360,12 @@ void PlayerController::clampToEdge(
 }
 
 /// Collect all solid block AABBs that overlap the given volume.
+/// When shapeCache is non-null, queries Lua callbacks for custom collision shapes.
 static std::vector<math::AABB> collectSolidBlocks(
-    const math::AABB& volume, world::ChunkManager& world, const world::BlockRegistry& registry)
+    const math::AABB& volume,
+    world::ChunkManager& world,
+    const world::BlockRegistry& registry,
+    scripting::ShapeCache* shapeCache = nullptr)
 {
     std::vector<math::AABB> result;
 
@@ -377,7 +382,8 @@ static std::vector<math::AABB> collectSolidBlocks(
         {
             for (int z = minZ; z <= maxZ; ++z)
             {
-                uint16_t stateId = world.getBlock(glm::ivec3{x, y, z});
+                glm::ivec3 blockPos{x, y, z};
+                uint16_t stateId = world.getBlock(blockPos);
                 if (stateId == world::BLOCK_AIR)
                 {
                     continue;
@@ -387,9 +393,29 @@ static std::vector<math::AABB> collectSolidBlocks(
                 {
                     continue;
                 }
+
+                glm::vec3 worldOffset{static_cast<float>(x), static_cast<float>(y), static_cast<float>(z)};
+
+                // Query ShapeCache for custom collision shapes
+                if (shapeCache)
+                {
+                    auto shapes = shapeCache->getCollisionShape(blockPos, stateId);
+                    if (!shapes.empty())
+                    {
+                        for (const auto& localBox : shapes)
+                        {
+                            result.push_back(math::AABB{
+                                localBox.min + worldOffset,
+                                localBox.max + worldOffset});
+                        }
+                        continue;
+                    }
+                }
+
+                // Default: full-block AABB
                 result.push_back(math::AABB{
-                    math::Vec3{static_cast<float>(x), static_cast<float>(y), static_cast<float>(z)},
-                    math::Vec3{static_cast<float>(x + 1), static_cast<float>(y + 1), static_cast<float>(z + 1)}});
+                    worldOffset,
+                    worldOffset + math::Vec3{1.0f, 1.0f, 1.0f}});
             }
         }
     }
@@ -433,7 +459,7 @@ void PlayerController::resolveAxis(
         sweptVolume.min[axis] += delta;
     }
 
-    auto candidates = collectSolidBlocks(sweptVolume, world, registry);
+    auto candidates = collectSolidBlocks(sweptVolume, world, registry, m_shapeCache);
 
     // Sort candidates by distance along movement direction (closest first)
     if (delta > 0.0f)

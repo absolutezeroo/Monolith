@@ -350,4 +350,169 @@ bool BlockCallbackInvoker::invokeOnInteractCancel(
     return result.get_type() == sol::type::boolean ? result.get<bool>() : true;
 }
 
+// --- Neighbor change callbacks ---
+
+void BlockCallbackInvoker::invokeOnNeighborChanged(
+    const world::BlockDefinition& def,
+    const glm::ivec3& pos,
+    const glm::ivec3& neighborPos,
+    const std::string& neighborNode)
+{
+    if (!def.callbacks || !def.callbacks->onNeighborChanged.has_value())
+    {
+        return;
+    }
+
+    sol::protected_function_result result = (*def.callbacks->onNeighborChanged)(
+        posToTable(m_lua, pos), posToTable(m_lua, neighborPos), neighborNode);
+    if (!result.valid())
+    {
+        sol::error err = result;
+        VX_LOG_WARN("Lua on_neighbor_changed error for '{}': {}", def.stringId, err.what());
+    }
+}
+
+std::optional<sol::object> BlockCallbackInvoker::invokeUpdateShape(
+    const world::BlockDefinition& def,
+    const glm::ivec3& pos,
+    const std::string& direction,
+    sol::object neighborState)
+{
+    if (!def.callbacks || !def.callbacks->updateShape.has_value())
+    {
+        return std::nullopt;
+    }
+
+    sol::protected_function_result result =
+        (*def.callbacks->updateShape)(posToTable(m_lua, pos), direction, neighborState);
+    if (!result.valid())
+    {
+        sol::error err = result;
+        VX_LOG_WARN("Lua update_shape error for '{}': {}", def.stringId, err.what());
+        return std::nullopt;
+    }
+
+    if (result.get_type() == sol::type::lua_nil)
+    {
+        return std::nullopt;
+    }
+
+    return result.get<sol::object>();
+}
+
+bool BlockCallbackInvoker::invokeCanSurvive(const world::BlockDefinition& def, const glm::ivec3& pos)
+{
+    if (!def.callbacks || !def.callbacks->canSurvive.has_value())
+    {
+        return true;
+    }
+
+    sol::protected_function_result result = (*def.callbacks->canSurvive)(posToTable(m_lua, pos));
+    if (!result.valid())
+    {
+        sol::error err = result;
+        VX_LOG_WARN("Lua can_survive error for '{}': {}", def.stringId, err.what());
+        return true;
+    }
+
+    return result.get_type() == sol::type::boolean ? result.get<bool>() : true;
+}
+
+// --- Shape callbacks ---
+
+std::vector<math::AABB> BlockCallbackInvoker::parseBoxList(const sol::table& table)
+{
+    std::vector<math::AABB> boxes;
+    for (auto& [key, value] : table)
+    {
+        if (value.get_type() != sol::type::table)
+        {
+            continue;
+        }
+
+        sol::table box = value.as<sol::table>();
+        if (box.size() < 6)
+        {
+            continue;
+        }
+
+        math::AABB aabb;
+        aabb.min.x = box[1].get_or(0.0f);
+        aabb.min.y = box[2].get_or(0.0f);
+        aabb.min.z = box[3].get_or(0.0f);
+        aabb.max.x = box[4].get_or(1.0f);
+        aabb.max.y = box[5].get_or(1.0f);
+        aabb.max.z = box[6].get_or(1.0f);
+        boxes.push_back(aabb);
+    }
+    return boxes;
+}
+
+std::vector<math::AABB> BlockCallbackInvoker::invokeGetCollisionShape(
+    const world::BlockDefinition& def, const glm::ivec3& pos)
+{
+    if (!def.callbacks || !def.callbacks->getCollisionShape.has_value())
+    {
+        return {};
+    }
+
+    sol::protected_function_result result = (*def.callbacks->getCollisionShape)(posToTable(m_lua, pos));
+    if (!result.valid())
+    {
+        sol::error err = result;
+        VX_LOG_WARN("Lua get_collision_shape error for '{}': {}", def.stringId, err.what());
+        return {};
+    }
+
+    if (result.get_type() != sol::type::table)
+    {
+        return {};
+    }
+
+    return parseBoxList(result.get<sol::table>());
+}
+
+std::vector<math::AABB> BlockCallbackInvoker::invokeGetSelectionShape(
+    const world::BlockDefinition& def, const glm::ivec3& pos)
+{
+    if (!def.callbacks || !def.callbacks->getSelectionShape.has_value())
+    {
+        return {};
+    }
+
+    sol::protected_function_result result = (*def.callbacks->getSelectionShape)(posToTable(m_lua, pos));
+    if (!result.valid())
+    {
+        sol::error err = result;
+        VX_LOG_WARN("Lua get_selection_shape error for '{}': {}", def.stringId, err.what());
+        return {};
+    }
+
+    if (result.get_type() != sol::type::table)
+    {
+        return {};
+    }
+
+    return parseBoxList(result.get<sol::table>());
+}
+
+bool BlockCallbackInvoker::invokeCanAttachAt(
+    const world::BlockDefinition& def, const glm::ivec3& pos, const std::string& face)
+{
+    if (!def.callbacks || !def.callbacks->canAttachAt.has_value())
+    {
+        return def.isSolid;
+    }
+
+    sol::protected_function_result result = (*def.callbacks->canAttachAt)(posToTable(m_lua, pos), face);
+    if (!result.valid())
+    {
+        sol::error err = result;
+        VX_LOG_WARN("Lua can_attach_at error for '{}': {}", def.stringId, err.what());
+        return def.isSolid;
+    }
+
+    return result.get_type() == sol::type::boolean ? result.get<bool>() : def.isSolid;
+}
+
 } // namespace voxel::scripting

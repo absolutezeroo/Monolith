@@ -15,6 +15,11 @@ class ChunkManager;
 class BlockRegistry;
 } // namespace voxel::world
 
+namespace voxel::scripting
+{
+class ShapeCache;
+} // namespace voxel::scripting
+
 namespace voxel::game
 {
 
@@ -119,6 +124,7 @@ public:
     [[nodiscard]] bool isInClimbable() const { return m_isInClimbable; }
     [[nodiscard]] uint8_t getMaxResistance() const { return m_maxResistance; }
     void setPosition(const glm::dvec3& pos) { m_position = pos; }
+    void setShapeCache(scripting::ShapeCache* cache) { m_shapeCache = cache; }
 
     [[nodiscard]] math::AABB getAABB() const;
 
@@ -133,6 +139,7 @@ private:
     float m_damageAccumulator = 0.0f;
     MiningState m_miningState;
     InteractionState m_interactionState;
+    scripting::ShapeCache* m_shapeCache = nullptr;
 
     void scanOverlappingBlocks(float dt, world::ChunkManager& world, const world::BlockRegistry& registry);
     void applyGravity(float dt);

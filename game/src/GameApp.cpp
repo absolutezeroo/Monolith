@@ -9,7 +9,9 @@
 #include "voxel/scripting/BlockTimerManager.h"
 #include "voxel/scripting/LBMRegistry.h"
 #include "voxel/scripting/LuaBindings.h"
+#include "voxel/scripting/NeighborNotifier.h"
 #include "voxel/scripting/ScriptEngine.h"
+#include "voxel/scripting/ShapeCache.h"
 
 #include <GLFW/glfw3.h>
 #include <glm/geometric.hpp>
@@ -61,6 +63,8 @@ GameApp::~GameApp()
     m_jobSystem.shutdown();
 
     // Destroy Lua-dependent managers before script engine (they hold sol2 refs)
+    m_shapeCache.reset();
+    m_neighborNotifier.reset();
     m_lbmRegistry.reset();
     m_abmRegistry.reset();
     m_timerManager.reset();
@@ -156,12 +160,23 @@ voxel::core::Result<void> GameApp::init(const std::string& shaderDir, std::optio
     m_callbackInvoker =
         std::make_unique<voxel::scripting::BlockCallbackInvoker>(m_scriptEngine->getLuaState(), m_blockRegistry);
 
+    // Create neighbor notifier and shape cache
+    m_neighborNotifier = std::make_unique<voxel::scripting::NeighborNotifier>(
+        m_chunkManager, m_blockRegistry, *m_callbackInvoker);
+    m_shapeCache =
+        std::make_unique<voxel::scripting::ShapeCache>(m_blockRegistry, *m_callbackInvoker);
+
+    // Inject shape cache into player controller
+    m_player.setShapeCache(m_shapeCache.get());
+
     // Create tick systems: timers, ABM, LBM
     m_timerManager = std::make_unique<voxel::scripting::BlockTimerManager>(m_chunkManager);
     m_abmRegistry = std::make_unique<voxel::scripting::ABMRegistry>();
     m_lbmRegistry = std::make_unique<voxel::scripting::LBMRegistry>();
 
-    // Bind timer/ABM/LBM Lua APIs
+    // Bind neighbor/timer/ABM/LBM Lua APIs
+    voxel::scripting::LuaBindings::registerNeighborAPI(
+        m_scriptEngine->getLuaState(), m_chunkManager, m_blockRegistry);
     voxel::scripting::LuaBindings::registerTimerAPI(m_scriptEngine->getLuaState(), *m_timerManager);
     voxel::scripting::LuaBindings::registerABMAPI(
         m_scriptEngine->getLuaState(), *m_abmRegistry, m_blockRegistry);
@@ -550,6 +565,16 @@ void GameApp::handleBlockInteraction(float dt)
                 m_callbackInvoker->invokeAfterDig(def, pos, previousId, cmd.playerId);
             }
 
+            // Invalidate shape cache and notify neighbors
+            if (m_shapeCache)
+            {
+                m_shapeCache->invalidate(pos);
+            }
+            if (m_neighborNotifier)
+            {
+                m_neighborNotifier->notifyNeighbors(pos);
+            }
+
             // EventBus fires AFTER all per-block callbacks
             m_eventBus.publish<voxel::game::EventType::BlockBroken>(
                 voxel::game::BlockBrokenEvent{payload.position, previousId});
@@ -604,6 +629,16 @@ void GameApp::handleBlockInteraction(float dt)
             {
                 m_callbackInvoker->invokeOnConstruct(newDef, pos);
                 m_callbackInvoker->invokeAfterPlace(newDef, pos, cmd.playerId);
+            }
+
+            // Invalidate shape cache and notify neighbors
+            if (m_shapeCache)
+            {
+                m_shapeCache->invalidate(pos);
+            }
+            if (m_neighborNotifier)
+            {
+                m_neighborNotifier->notifyNeighbors(pos);
             }
 
             // EventBus fires AFTER all per-block callbacks
@@ -1421,8 +1456,8 @@ void GameApp::render(double /*alpha*/)
         {
             glm::vec3 origin = glm::vec3(m_camera.getPosition()); // dvec3 -> vec3 is fine for 6-block range
             glm::vec3 dir = m_camera.getForward();
-            m_raycastResult =
-                voxel::physics::raycast(origin, dir, voxel::physics::MAX_REACH, m_chunkManager, m_blockRegistry);
+            m_raycastResult = voxel::physics::raycast(
+                origin, dir, voxel::physics::MAX_REACH, m_chunkManager, m_blockRegistry, m_shapeCache.get());
         }
 
         // Render chunk sections via GPU-driven compute culling + indirect draw

@@ -42,6 +42,8 @@ class BlockCallbackInvoker;
 class BlockTimerManager;
 class ABMRegistry;
 class LBMRegistry;
+class NeighborNotifier;
+class ShapeCache;
 }
 
 class GameApp : public voxel::game::GameLoop
@@ -104,6 +106,8 @@ class GameApp : public voxel::game::GameLoop
     std::unique_ptr<voxel::scripting::BlockTimerManager> m_timerManager;
     std::unique_ptr<voxel::scripting::ABMRegistry> m_abmRegistry;
     std::unique_ptr<voxel::scripting::LBMRegistry> m_lbmRegistry;
+    std::unique_ptr<voxel::scripting::NeighborNotifier> m_neighborNotifier;
+    std::unique_ptr<voxel::scripting::ShapeCache> m_shapeCache;
 
     // HUD state
     int m_hotbarSlot = 0;

@@ -56,6 +56,8 @@ add_library(VoxelEngine STATIC
         src/scripting/BlockTimerManager.cpp
         src/scripting/ABMRegistry.cpp
         src/scripting/LBMRegistry.cpp
+        src/scripting/NeighborNotifier.cpp
+        src/scripting/ShapeCache.cpp
 )
 
 target_include_directories(VoxelEngine
@@ -213,6 +215,8 @@ set_source_files_properties(
         src/scripting/BlockTimerManager.cpp
         src/scripting/ABMRegistry.cpp
         src/scripting/LBMRegistry.cpp
+        src/scripting/NeighborNotifier.cpp
+        src/scripting/ShapeCache.cpp
         src/world/Block.cpp
         PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 if (MSVC)
@@ -223,6 +227,8 @@ if (MSVC)
             src/scripting/BlockTimerManager.cpp
             src/scripting/ABMRegistry.cpp
             src/scripting/LBMRegistry.cpp
+            src/scripting/NeighborNotifier.cpp
+            src/scripting/ShapeCache.cpp
             src/world/Block.cpp
             APPEND_STRING PROPERTY COMPILE_FLAGS " /wd4702")
 endif ()

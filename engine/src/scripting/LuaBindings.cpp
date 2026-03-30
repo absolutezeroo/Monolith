@@ -6,6 +6,7 @@
 #include "voxel/scripting/BlockTimerManager.h"
 #include "voxel/scripting/LBMRegistry.h"
 #include "voxel/world/BlockRegistry.h"
+#include "voxel/world/ChunkManager.h"
 
 #include <sol/sol.hpp>
 
@@ -247,6 +248,22 @@ core::Result<world::BlockDefinition> LuaBindings::parseBlockDefinition(const sol
     std::optional<sol::protected_function> cbOnInteractStop;
     std::optional<sol::protected_function> cbOnInteractCancel;
 
+    // Neighbor change callbacks
+    std::optional<sol::protected_function> cbOnNeighborChanged;
+    std::optional<sol::protected_function> cbUpdateShape;
+    std::optional<sol::protected_function> cbCanSurvive;
+
+    // Physics/collision shape callbacks
+    std::optional<sol::protected_function> cbGetCollisionShape;
+    std::optional<sol::protected_function> cbGetSelectionShape;
+    std::optional<sol::protected_function> cbCanAttachAt;
+    std::optional<sol::protected_function> cbIsPathfindable;
+
+    // Signal/power stubs
+    std::optional<sol::protected_function> cbOnPowered;
+    std::optional<sol::protected_function> cbGetComparatorOutput;
+    std::optional<sol::protected_function> cbGetPushReaction;
+
     checkAndStore("can_place", cbCanPlace);
     checkAndStore("get_state_for_placement", cbGetStateForPlacement);
     checkAndStore("on_place", cbOnPlace);
@@ -272,6 +289,16 @@ core::Result<world::BlockDefinition> LuaBindings::parseBlockDefinition(const sol
     checkAndStore("on_interact_step", cbOnInteractStep);
     checkAndStore("on_interact_stop", cbOnInteractStop);
     checkAndStore("on_interact_cancel", cbOnInteractCancel);
+    checkAndStore("on_neighbor_changed", cbOnNeighborChanged);
+    checkAndStore("update_shape", cbUpdateShape);
+    checkAndStore("can_survive", cbCanSurvive);
+    checkAndStore("get_collision_shape", cbGetCollisionShape);
+    checkAndStore("get_selection_shape", cbGetSelectionShape);
+    checkAndStore("can_attach_at", cbCanAttachAt);
+    checkAndStore("is_pathfindable", cbIsPathfindable);
+    checkAndStore("on_powered", cbOnPowered);
+    checkAndStore("get_comparator_output", cbGetComparatorOutput);
+    checkAndStore("get_push_reaction", cbGetPushReaction);
 
     if (hasAnyCallback)
     {
@@ -301,6 +328,16 @@ core::Result<world::BlockDefinition> LuaBindings::parseBlockDefinition(const sol
         cbs->onInteractStep = std::move(cbOnInteractStep);
         cbs->onInteractStop = std::move(cbOnInteractStop);
         cbs->onInteractCancel = std::move(cbOnInteractCancel);
+        cbs->onNeighborChanged = std::move(cbOnNeighborChanged);
+        cbs->updateShape = std::move(cbUpdateShape);
+        cbs->canSurvive = std::move(cbCanSurvive);
+        cbs->getCollisionShape = std::move(cbGetCollisionShape);
+        cbs->getSelectionShape = std::move(cbGetSelectionShape);
+        cbs->canAttachAt = std::move(cbCanAttachAt);
+        cbs->isPathfindable = std::move(cbIsPathfindable);
+        cbs->onPowered = std::move(cbOnPowered);
+        cbs->getComparatorOutput = std::move(cbGetComparatorOutput);
+        cbs->getPushReaction = std::move(cbGetPushReaction);
         def.callbacks = std::move(cbs);
     }
 
@@ -477,6 +514,63 @@ void LuaBindings::registerLBMAPI(sol::state& lua, LBMRegistry& lbmRegistry, worl
         std::string label = def.label;
         lbmRegistry.registerLBM(std::move(def));
         VX_LOG_INFO("Registered LBM: '{}'", label);
+    });
+}
+
+void LuaBindings::registerNeighborAPI(
+    sol::state& lua, world::ChunkManager& chunkMgr, world::BlockRegistry& registry)
+{
+    sol::table voxelTable = lua["voxel"];
+
+    // voxel.get_neighbor_at(pos, face_string) -> {id=string, pos={x,y,z}}
+    voxelTable.set_function(
+        "get_neighbor_at",
+        [&lua, &chunkMgr, &registry](const sol::table& posTable, const std::string& face) -> sol::table {
+            glm::ivec3 pos = tableToPos(posTable);
+
+            static const std::unordered_map<std::string, glm::ivec3> FACE_OFFSETS = {
+                {"east", {1, 0, 0}},
+                {"west", {-1, 0, 0}},
+                {"up", {0, 1, 0}},
+                {"down", {0, -1, 0}},
+                {"south", {0, 0, 1}},
+                {"north", {0, 0, -1}},
+            };
+
+            auto it = FACE_OFFSETS.find(face);
+            if (it == FACE_OFFSETS.end())
+            {
+                VX_LOG_WARN("get_neighbor_at: unknown face '{}'", face);
+                return lua.create_table();
+            }
+
+            glm::ivec3 neighborPos = pos + it->second;
+            uint16_t blockId = chunkMgr.getBlock(neighborPos);
+            const auto& def = registry.getBlockType(blockId);
+
+            sol::table result = lua.create_table();
+            result["id"] = def.stringId;
+            result["pos"] = lua.create_table_with("x", neighborPos.x, "y", neighborPos.y, "z", neighborPos.z);
+            return result;
+        });
+
+    // voxel.face_to_direction(face_string) -> {x, y, z}
+    voxelTable.set_function("face_to_direction", [&lua](const std::string& face) -> sol::table {
+        static const std::unordered_map<std::string, glm::ivec3> FACE_DIRS = {
+            {"east", {1, 0, 0}},
+            {"west", {-1, 0, 0}},
+            {"up", {0, 1, 0}},
+            {"down", {0, -1, 0}},
+            {"south", {0, 0, 1}},
+            {"north", {0, 0, -1}},
+        };
+
+        auto it = FACE_DIRS.find(face);
+        if (it == FACE_DIRS.end())
+        {
+            return lua.create_table_with("x", 0, "y", 0, "z", 0);
+        }
+        return lua.create_table_with("x", it->second.x, "y", it->second.y, "z", it->second.z);
     });
 }
 

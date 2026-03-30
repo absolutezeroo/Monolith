@@ -1,5 +1,6 @@
 #include "voxel/physics/Raycast.h"
 
+#include "voxel/scripting/ShapeCache.h"
 #include "voxel/world/Block.h"
 #include "voxel/world/BlockRegistry.h"
 #include "voxel/world/ChunkColumn.h"
@@ -7,25 +8,55 @@
 
 #include <glm/common.hpp>
 
+#include <algorithm>
 #include <cfloat>
 #include <cmath>
 
 namespace voxel::physics
 {
 
+bool rayIntersectsAABB(
+    const glm::vec3& origin,
+    const glm::vec3& invDir,
+    const math::AABB& box,
+    float& tMin)
+{
+    float t1 = (box.min.x - origin.x) * invDir.x;
+    float t2 = (box.max.x - origin.x) * invDir.x;
+    float t3 = (box.min.y - origin.y) * invDir.y;
+    float t4 = (box.max.y - origin.y) * invDir.y;
+    float t5 = (box.min.z - origin.z) * invDir.z;
+    float t6 = (box.max.z - origin.z) * invDir.z;
+
+    float tNear = std::max({std::min(t1, t2), std::min(t3, t4), std::min(t5, t6)});
+    float tFar = std::min({std::max(t1, t2), std::max(t3, t4), std::max(t5, t6)});
+
+    if (tNear > tFar || tFar < 0.0f)
+    {
+        return false;
+    }
+
+    tMin = tNear >= 0.0f ? tNear : tFar;
+    return true;
+}
+
 RaycastResult raycast(
     const glm::vec3& origin,
     const glm::vec3& direction,
     float maxDistance,
     const world::ChunkManager& world,
-    const world::BlockRegistry& registry)
+    const world::BlockRegistry& registry,
+    scripting::ShapeCache* shapeCache)
 {
     using renderer::BlockFace;
 
+    // Precompute inverse direction for ray-AABB tests
+    glm::vec3 invDir;
+    invDir.x = (direction.x != 0.0f) ? (1.0f / direction.x) : FLT_MAX;
+    invDir.y = (direction.y != 0.0f) ? (1.0f / direction.y) : FLT_MAX;
+    invDir.z = (direction.z != 0.0f) ? (1.0f / direction.z) : FLT_MAX;
+
     // 1. Starting voxel = floor(origin)
-    // NOTE: prevPos starts equal to blockPos. If origin is inside a solid block,
-    // the result will have previousPos == blockPos (distance ≈ 0). Story 7.5
-    // must handle this edge case when using previousPos for block placement.
     glm::ivec3 blockPos = glm::ivec3(glm::floor(origin));
     glm::ivec3 prevPos = blockPos;
 
@@ -73,14 +104,58 @@ RaycastResult raycast(
             const auto& def = registry.getBlockType(blockId);
             if (def.hasCollision)
             {
-                return RaycastResult{true, blockPos, prevPos, face, distance};
+                // Check for custom selection shapes
+                if (shapeCache)
+                {
+                    auto shapes = shapeCache->getSelectionShape(blockPos, blockId);
+                    if (!shapes.empty())
+                    {
+                        // Test ray against each custom selection box
+                        glm::vec3 worldOffset{
+                            static_cast<float>(blockPos.x),
+                            static_cast<float>(blockPos.y),
+                            static_cast<float>(blockPos.z)};
+
+                        float closestT = FLT_MAX;
+                        bool anyHit = false;
+
+                        for (const auto& localBox : shapes)
+                        {
+                            math::AABB worldBox{
+                                localBox.min + worldOffset,
+                                localBox.max + worldOffset};
+
+                            float t = 0.0f;
+                            if (rayIntersectsAABB(origin, invDir, worldBox, t) && t < closestT)
+                            {
+                                closestT = t;
+                                anyHit = true;
+                            }
+                        }
+
+                        if (anyHit)
+                        {
+                            return RaycastResult{true, blockPos, prevPos, face, distance};
+                        }
+                        // Custom shape defined but ray missed all boxes — continue DDA
+                    }
+                    else
+                    {
+                        // No custom shape — use default full-block hit
+                        return RaycastResult{true, blockPos, prevPos, face, distance};
+                    }
+                }
+                else
+                {
+                    // No shape cache — default behavior
+                    return RaycastResult{true, blockPos, prevPos, face, distance};
+                }
             }
         }
 
         prevPos = blockPos;
 
         // Step along axis with smallest tMax
-        // Face entered = OPPOSITE of step direction (we stepped +X -> entered NegX face)
         if (tMax.x < tMax.y && tMax.x < tMax.z)
         {
             distance = tMax.x;
