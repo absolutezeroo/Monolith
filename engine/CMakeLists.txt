@@ -55,6 +55,7 @@ add_library(VoxelEngine STATIC
         src/scripting/BlockCallbackInvoker.cpp
         src/scripting/BlockTimerManager.cpp
         src/scripting/ABMRegistry.cpp
+        src/scripting/EntityHandle.cpp
         src/scripting/LBMRegistry.cpp
         src/scripting/NeighborNotifier.cpp
         src/scripting/ShapeCache.cpp
@@ -214,6 +215,7 @@ set_source_files_properties(
         src/scripting/BlockCallbackInvoker.cpp
         src/scripting/BlockTimerManager.cpp
         src/scripting/ABMRegistry.cpp
+        src/scripting/EntityHandle.cpp
         src/scripting/LBMRegistry.cpp
         src/scripting/NeighborNotifier.cpp
         src/scripting/ShapeCache.cpp
@@ -226,6 +228,7 @@ if (MSVC)
             src/scripting/BlockCallbackInvoker.cpp
             src/scripting/BlockTimerManager.cpp
             src/scripting/ABMRegistry.cpp
+            src/scripting/EntityHandle.cpp
             src/scripting/LBMRegistry.cpp
             src/scripting/NeighborNotifier.cpp
             src/scripting/ShapeCache.cpp

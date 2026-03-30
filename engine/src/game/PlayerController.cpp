@@ -30,6 +30,12 @@ void PlayerController::init(
     m_isInClimbable = false;
     m_maxResistance = 0;
     m_damageAccumulator = 0.0f;
+    m_fallDistance = 0.0f;
+    m_wasOnGround = false;
+    m_justLanded = false;
+    m_frameCollisions.clear();
+    m_frameOverlaps.clear();
+    m_prevCollisionPositions.clear();
     m_miningState.reset();
     ensureNotInsideBlock(world, registry);
 }
@@ -114,6 +120,7 @@ void PlayerController::scanOverlappingBlocks(
 {
     m_isInClimbable = false;
     m_maxResistance = 0;
+    m_frameOverlaps.clear();
     uint32_t frameDamage = 0;
 
     math::AABB playerBox = getAABB();
@@ -144,6 +151,9 @@ void PlayerController::scanOverlappingBlocks(
                 }
                 m_maxResistance = std::max(m_maxResistance, def.moveResistance);
                 frameDamage += def.damagePerSecond;
+
+                // Record overlap for entity-block callbacks
+                m_frameOverlaps.push_back({glm::ivec3{x, y, z}, stateId});
             }
         }
     }
@@ -173,7 +183,10 @@ void PlayerController::tickPhysics(
     world::ChunkManager& world,
     const world::BlockRegistry& registry)
 {
-    // 1. Scan overlapping blocks for physics properties
+    // Clear per-frame collision data
+    m_frameCollisions.clear();
+
+    // 1. Scan overlapping blocks for physics properties (also fills m_frameOverlaps)
     scanOverlappingBlocks(dt, world, registry);
 
     // 2. Update sprint/sneak state (mutually exclusive)
@@ -272,6 +285,32 @@ void PlayerController::tickPhysics(
 
     // Resolve collisions axis by axis: Y first, then X, then Z
     resolveCollisions(dt, world, registry);
+
+    // Detect landing: was airborne, now on ground
+    m_justLanded = (!m_wasOnGround && m_isOnGround);
+
+    // Track fall distance while falling
+    if (!m_isOnGround && m_velocity.y < 0.0f)
+    {
+        m_fallDistance += std::abs(m_velocity.y * dt);
+    }
+
+    // Reset fall distance when on ground and NOT just landed
+    // (justLanded needs the value for one tick)
+    if (m_isOnGround && !m_justLanded)
+    {
+        m_fallDistance = 0.0f;
+    }
+
+    m_wasOnGround = m_isOnGround;
+
+    // Update previous collision positions for isImpact detection next tick
+    m_prevCollisionPositions.clear();
+    m_prevCollisionPositions.reserve(m_frameCollisions.size());
+    for (const auto& col : m_frameCollisions)
+    {
+        m_prevCollisionPositions.push_back(col.blockPos);
+    }
 }
 
 glm::dvec3 PlayerController::getEyePosition() const
@@ -285,6 +324,13 @@ math::AABB PlayerController::getAABB() const
     return math::AABB{
         math::Vec3{pos.x - HALF_EXTENTS.x, pos.y, pos.z - HALF_EXTENTS.z},
         math::Vec3{pos.x + HALF_EXTENTS.x, pos.y + HALF_EXTENTS.y * 2.0f, pos.z + HALF_EXTENTS.z}};
+}
+
+float PlayerController::consumeFallDistance()
+{
+    float dist = m_fallDistance;
+    m_fallDistance = 0.0f;
+    return dist;
 }
 
 void PlayerController::applyGravity(float dt)
@@ -519,6 +565,39 @@ void PlayerController::resolveAxis(
         {
             m_isOnGround = true;
         }
+
+        // Record collision for entity callbacks
+        static constexpr const char* FACE_NAMES[6] = {"east", "up", "south", "west", "down", "north"};
+        int faceIndex = axis + (delta > 0.0f ? 0 : 3);
+        glm::ivec3 collisionBlockPos{0};
+        if (delta > 0.0f)
+        {
+            collisionBlockPos[axis] = static_cast<int>(std::floor(
+                m_position[axis] + (axis == 1 ? HALF_EXTENTS.y * 2.0 : static_cast<double>(HALF_EXTENTS[axis])) +
+                COLLISION_EPSILON));
+        }
+        else
+        {
+            collisionBlockPos[axis] = static_cast<int>(std::floor(
+                m_position[axis] - (axis == 1 ? 0.0 : static_cast<double>(HALF_EXTENTS[axis])) - COLLISION_EPSILON));
+        }
+        int ax1 = (axis + 1) % 3;
+        int ax2 = (axis + 2) % 3;
+        collisionBlockPos[ax1] = static_cast<int>(std::floor(m_position[ax1]));
+        collisionBlockPos[ax2] = static_cast<int>(std::floor(m_position[ax2]));
+
+        uint16_t colBlockId = world.getBlock(collisionBlockPos);
+        bool isImpact = true;
+        for (const auto& prevPos : m_prevCollisionPositions)
+        {
+            if (prevPos == collisionBlockPos)
+            {
+                isImpact = false;
+                break;
+            }
+        }
+        m_frameCollisions.push_back({collisionBlockPos, colBlockId, FACE_NAMES[faceIndex], m_velocity, isImpact});
+
         m_velocity[axis] = 0.0f;
 
         // Try step-up on horizontal axes

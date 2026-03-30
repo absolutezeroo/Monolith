@@ -59,6 +59,9 @@ public:
     /// Bind `voxel.get_neighbor_at` and `voxel.face_to_direction` onto the existing `voxel` table.
     static void registerNeighborAPI(sol::state& lua, world::ChunkManager& chunkMgr, world::BlockRegistry& registry);
 
+    /// Register the EntityHandle usertype so Lua callbacks can interact with entities.
+    static void registerEntityAPI(sol::state& lua);
+
     /// Access the item registry (populated by voxel.register_item calls).
     [[nodiscard]] static const std::unordered_map<std::string, ItemDefinition>& getItemRegistry();
 

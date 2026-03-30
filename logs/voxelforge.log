@@ -1,4 +1,0 @@
-[04:01:09.421] [info] [ScriptEngine.cpp:53] ScriptEngine initialized (sol2 + LuaJIT)
-[04:01:09.422] [debug] [LuaBindings.cpp:38] Registered block 'test:priority_block' (base state ID: 1)
-[04:01:09.422] [debug] [ScriptEngine.cpp:144] Loaded script: C:/Users/Clayton/RiderProjects/Monolith\tests\scripting\test_scripts\interaction_priority.lua
-[04:01:09.423] [info] [ScriptEngine.cpp:68] ScriptEngine shut down

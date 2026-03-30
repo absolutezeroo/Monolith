@@ -6,6 +6,7 @@
 #include "voxel/scripting/ABMRegistry.h"
 #include "voxel/scripting/BlockCallbackInvoker.h"
 #include "voxel/scripting/BlockCallbacks.h"
+#include "voxel/scripting/EntityHandle.h"
 #include "voxel/scripting/BlockTimerManager.h"
 #include "voxel/scripting/LBMRegistry.h"
 #include "voxel/scripting/LuaBindings.h"
@@ -146,6 +147,7 @@ voxel::core::Result<void> GameApp::init(const std::string& shaderDir, std::optio
 
     // Bind Lua block registration API
     voxel::scripting::LuaBindings::registerBlockAPI(m_scriptEngine->getLuaState(), m_blockRegistry);
+    voxel::scripting::LuaBindings::registerEntityAPI(m_scriptEngine->getLuaState());
 
     // Load base block registrations from Lua (replaces blocks.json)
     std::filesystem::path assetsDir(VX_ASSETS_DIR);
@@ -805,6 +807,76 @@ void GameApp::tick(double dt)
             });
 
             m_player.tickPhysics(fdt, moveInput, m_chunkManager, m_blockRegistry);
+
+            // --- Entity-block callback dispatch (after physics, before camera sync) ---
+            if (m_callbackInvoker)
+            {
+                voxel::scripting::EntityHandle entity(m_player);
+
+                // Landing events: fall_on and step_on
+                if (m_player.justLanded())
+                {
+                    float fallDist = m_player.consumeFallDistance();
+
+                    // Block directly below player feet
+                    glm::ivec3 feetPos = glm::ivec3(
+                        static_cast<int>(std::floor(m_player.getPosition().x)),
+                        static_cast<int>(std::floor(m_player.getPosition().y)) - 1,
+                        static_cast<int>(std::floor(m_player.getPosition().z)));
+
+                    uint16_t blockId = m_chunkManager.getBlock(feetPos);
+                    if (blockId != voxel::world::BLOCK_AIR)
+                    {
+                        const auto& def = m_blockRegistry.getBlockType(blockId);
+                        if (def.callbacks)
+                        {
+                            if (def.callbacks->onEntityFallOn.has_value())
+                            {
+                                float damageMul = m_callbackInvoker->invokeOnEntityFallOn(
+                                    def, feetPos, entity, fallDist);
+                                if (fallDist > 3.0f && damageMul > 0.0f)
+                                {
+                                    VX_LOG_INFO(
+                                        "Fall damage: {} blocks * {} = {} HP",
+                                        fallDist,
+                                        damageMul,
+                                        fallDist * damageMul);
+                                }
+                            }
+                            if (def.callbacks->onEntityStepOn.has_value())
+                            {
+                                m_callbackInvoker->invokeOnEntityStepOn(def, feetPos, entity);
+                            }
+                        }
+                    }
+                }
+
+                // Overlap callbacks: on_entity_inside
+                for (const auto& overlap : m_player.getFrameOverlaps())
+                {
+                    const auto& def = m_blockRegistry.getBlockType(overlap.blockId);
+                    if (def.callbacks && def.callbacks->onEntityInside.has_value())
+                    {
+                        m_callbackInvoker->invokeOnEntityInside(def, overlap.blockPos, entity);
+                    }
+                }
+
+                // Collision callbacks: on_entity_collide
+                for (const auto& col : m_player.getFrameCollisions())
+                {
+                    if (col.blockId == voxel::world::BLOCK_AIR)
+                    {
+                        continue;
+                    }
+                    const auto& def = m_blockRegistry.getBlockType(col.blockId);
+                    if (def.callbacks && def.callbacks->onEntityCollide.has_value())
+                    {
+                        m_callbackInvoker->invokeOnEntityCollide(
+                            def, col.blockPos, entity, col.face, col.velocity, col.isImpact);
+                    }
+                }
+            }
+
             m_camera.setPosition(m_player.getEyePosition());
         }
     }

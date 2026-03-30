@@ -5,7 +5,7 @@
 project: VoxelForge
 methodology: BMAD v6 + Game Dev Studio
 created: 2026-03-24
-last_updated: 2026-03-30  # Story 9.5 → done
+last_updated: 2026-03-30  # Story 9.6 → review
 
 # Status values: backlog | ready | in-progress | review | done | blocked
 
@@ -320,7 +320,7 @@ epics:
         assigned_to: dev-agent
       - id: "9.6"
         title: "Entity-Block Interaction Callbacks"
-        status: ready-for-dev
+        status: review
         assigned_to: dev-agent
       - id: "9.7"
         title: "Metadata & Inventory Callbacks"

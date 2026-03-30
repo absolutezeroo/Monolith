@@ -20,6 +20,8 @@ class BlockRegistry;
 namespace voxel::scripting
 {
 
+class EntityHandle;
+
 /// Invokes Lua callbacks on BlockDefinitions in an exception-free manner.
 /// Each invoker checks for null, calls the protected_function, validates the result,
 /// and returns a safe default on error.
@@ -74,6 +76,22 @@ public:
         uint32_t playerId,
         float elapsedSeconds,
         const std::string& reason);
+
+    // --- Entity-block interaction callbacks ---
+    void invokeOnEntityInside(const world::BlockDefinition& def, const glm::ivec3& pos, EntityHandle& entity);
+    void invokeOnEntityStepOn(const world::BlockDefinition& def, const glm::ivec3& pos, EntityHandle& entity);
+    [[nodiscard]] float invokeOnEntityFallOn(
+        const world::BlockDefinition& def,
+        const glm::ivec3& pos,
+        EntityHandle& entity,
+        float fallDistance);
+    void invokeOnEntityCollide(
+        const world::BlockDefinition& def,
+        const glm::ivec3& pos,
+        EntityHandle& entity,
+        const std::string& facing,
+        const glm::vec3& velocity,
+        bool isImpact);
 
     // --- Neighbor change callbacks ---
     void invokeOnNeighborChanged(

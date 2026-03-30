@@ -4,6 +4,7 @@
 #include "voxel/scripting/ABMRegistry.h"
 #include "voxel/scripting/BlockCallbacks.h"
 #include "voxel/scripting/BlockTimerManager.h"
+#include "voxel/scripting/EntityHandle.h"
 #include "voxel/scripting/LBMRegistry.h"
 #include "voxel/world/BlockRegistry.h"
 #include "voxel/world/ChunkManager.h"
@@ -259,6 +260,13 @@ core::Result<world::BlockDefinition> LuaBindings::parseBlockDefinition(const sol
     std::optional<sol::protected_function> cbCanAttachAt;
     std::optional<sol::protected_function> cbIsPathfindable;
 
+    // Entity-block interaction callbacks
+    std::optional<sol::protected_function> cbOnEntityInside;
+    std::optional<sol::protected_function> cbOnEntityStepOn;
+    std::optional<sol::protected_function> cbOnEntityFallOn;
+    std::optional<sol::protected_function> cbOnEntityCollide;
+    std::optional<sol::protected_function> cbOnProjectileHit;
+
     // Signal/power stubs
     std::optional<sol::protected_function> cbOnPowered;
     std::optional<sol::protected_function> cbGetComparatorOutput;
@@ -296,6 +304,11 @@ core::Result<world::BlockDefinition> LuaBindings::parseBlockDefinition(const sol
     checkAndStore("get_selection_shape", cbGetSelectionShape);
     checkAndStore("can_attach_at", cbCanAttachAt);
     checkAndStore("is_pathfindable", cbIsPathfindable);
+    checkAndStore("on_entity_inside", cbOnEntityInside);
+    checkAndStore("on_entity_step_on", cbOnEntityStepOn);
+    checkAndStore("on_entity_fall_on", cbOnEntityFallOn);
+    checkAndStore("on_entity_collide", cbOnEntityCollide);
+    checkAndStore("on_projectile_hit", cbOnProjectileHit);
     checkAndStore("on_powered", cbOnPowered);
     checkAndStore("get_comparator_output", cbGetComparatorOutput);
     checkAndStore("get_push_reaction", cbGetPushReaction);
@@ -335,6 +348,11 @@ core::Result<world::BlockDefinition> LuaBindings::parseBlockDefinition(const sol
         cbs->getSelectionShape = std::move(cbGetSelectionShape);
         cbs->canAttachAt = std::move(cbCanAttachAt);
         cbs->isPathfindable = std::move(cbIsPathfindable);
+        cbs->onEntityInside = std::move(cbOnEntityInside);
+        cbs->onEntityStepOn = std::move(cbOnEntityStepOn);
+        cbs->onEntityFallOn = std::move(cbOnEntityFallOn);
+        cbs->onEntityCollide = std::move(cbOnEntityCollide);
+        cbs->onProjectileHit = std::move(cbOnProjectileHit);
         cbs->onPowered = std::move(cbOnPowered);
         cbs->getComparatorOutput = std::move(cbGetComparatorOutput);
         cbs->getPushReaction = std::move(cbGetPushReaction);
@@ -715,6 +733,41 @@ uint8_t LuaBindings::parseTintIndex(std::string_view str)
     if (str == "water")
         return 3;
     return 0; // "none"
+}
+
+void LuaBindings::registerEntityAPI(sol::state& lua)
+{
+    lua.new_usertype<EntityHandle>(
+        "EntityHandle",
+        "damage",
+        &EntityHandle::damage,
+        "get_velocity",
+        [](EntityHandle& e, sol::this_state s) {
+            sol::state_view luaView(s);
+            auto v = e.getVelocity();
+            sol::table t = luaView.create_table();
+            t["x"] = v.x;
+            t["y"] = v.y;
+            t["z"] = v.z;
+            return t;
+        },
+        "get_position",
+        [](EntityHandle& e, sol::this_state s) {
+            sol::state_view luaView(s);
+            auto p = e.getPosition();
+            sol::table t = luaView.create_table();
+            t["x"] = p.x;
+            t["y"] = p.y;
+            t["z"] = p.z;
+            return t;
+        },
+        "set_velocity",
+        [](EntityHandle& e, const sol::table& t) {
+            float x = t.get_or("x", 0.0f);
+            float y = t.get_or("y", 0.0f);
+            float z = t.get_or("z", 0.0f);
+            e.setVelocity({x, y, z});
+        });
 }
 
 } // namespace voxel::scripting

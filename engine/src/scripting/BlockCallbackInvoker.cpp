@@ -2,6 +2,7 @@
 
 #include "voxel/core/Log.h"
 #include "voxel/scripting/BlockCallbacks.h"
+#include "voxel/scripting/EntityHandle.h"
 #include "voxel/world/Block.h"
 #include "voxel/world/BlockRegistry.h"
 
@@ -348,6 +349,88 @@ bool BlockCallbackInvoker::invokeOnInteractCancel(
     }
 
     return result.get_type() == sol::type::boolean ? result.get<bool>() : true;
+}
+
+// --- Entity-block interaction callbacks ---
+
+void BlockCallbackInvoker::invokeOnEntityInside(
+    const world::BlockDefinition& def, const glm::ivec3& pos, EntityHandle& entity)
+{
+    if (!def.callbacks || !def.callbacks->onEntityInside.has_value())
+    {
+        return;
+    }
+
+    sol::protected_function_result result =
+        (*def.callbacks->onEntityInside)(posToTable(m_lua, pos), std::ref(entity));
+    if (!result.valid())
+    {
+        sol::error err = result;
+        VX_LOG_WARN("Lua on_entity_inside error for '{}': {}", def.stringId, err.what());
+    }
+}
+
+void BlockCallbackInvoker::invokeOnEntityStepOn(
+    const world::BlockDefinition& def, const glm::ivec3& pos, EntityHandle& entity)
+{
+    if (!def.callbacks || !def.callbacks->onEntityStepOn.has_value())
+    {
+        return;
+    }
+
+    sol::protected_function_result result =
+        (*def.callbacks->onEntityStepOn)(posToTable(m_lua, pos), std::ref(entity));
+    if (!result.valid())
+    {
+        sol::error err = result;
+        VX_LOG_WARN("Lua on_entity_step_on error for '{}': {}", def.stringId, err.what());
+    }
+}
+
+float BlockCallbackInvoker::invokeOnEntityFallOn(
+    const world::BlockDefinition& def,
+    const glm::ivec3& pos,
+    EntityHandle& entity,
+    float fallDistance)
+{
+    if (!def.callbacks || !def.callbacks->onEntityFallOn.has_value())
+    {
+        return 1.0f;
+    }
+
+    sol::protected_function_result result =
+        (*def.callbacks->onEntityFallOn)(posToTable(m_lua, pos), std::ref(entity), fallDistance);
+    if (!result.valid())
+    {
+        sol::error err = result;
+        VX_LOG_WARN("Lua on_entity_fall_on error for '{}': {}", def.stringId, err.what());
+        return 1.0f;
+    }
+
+    return result.get_type() == sol::type::number ? result.get<float>() : 1.0f;
+}
+
+void BlockCallbackInvoker::invokeOnEntityCollide(
+    const world::BlockDefinition& def,
+    const glm::ivec3& pos,
+    EntityHandle& entity,
+    const std::string& facing,
+    const glm::vec3& velocity,
+    bool isImpact)
+{
+    if (!def.callbacks || !def.callbacks->onEntityCollide.has_value())
+    {
+        return;
+    }
+
+    auto velTable = m_lua.create_table_with("x", velocity.x, "y", velocity.y, "z", velocity.z);
+    sol::protected_function_result result =
+        (*def.callbacks->onEntityCollide)(posToTable(m_lua, pos), std::ref(entity), facing, velTable, isImpact);
+    if (!result.valid())
+    {
+        sol::error err = result;
+        VX_LOG_WARN("Lua on_entity_collide error for '{}': {}", def.stringId, err.what());
+    }
 }
 
 // --- Neighbor change callbacks ---

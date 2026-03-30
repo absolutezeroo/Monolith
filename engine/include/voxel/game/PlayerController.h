@@ -8,6 +8,8 @@
 #include <glm/vec3.hpp>
 
 #include <cstdint>
+#include <string>
+#include <vector>
 
 namespace voxel::world
 {
@@ -124,9 +126,36 @@ public:
     [[nodiscard]] bool isInClimbable() const { return m_isInClimbable; }
     [[nodiscard]] uint8_t getMaxResistance() const { return m_maxResistance; }
     void setPosition(const glm::dvec3& pos) { m_position = pos; }
+    void setVelocity(const glm::vec3& vel) { m_velocity = vel; }
     void setShapeCache(scripting::ShapeCache* cache) { m_shapeCache = cache; }
 
+    // --- Fall tracking ---
+    [[nodiscard]] float consumeFallDistance();
+    [[nodiscard]] bool justLanded() const { return m_justLanded; }
+
     [[nodiscard]] math::AABB getAABB() const;
+
+    // --- Entity-block collision/overlap data (consumed by GameApp for Lua dispatch) ---
+
+    /// A collision event recorded when the player AABB is clipped against a block.
+    struct EntityBlockCollision
+    {
+        glm::ivec3 blockPos{0};
+        uint16_t blockId = 0;
+        std::string face;
+        glm::vec3 velocity{0.0f};
+        bool isImpact = false;
+    };
+
+    /// An overlap event recorded for each non-air block inside the player AABB.
+    struct EntityBlockOverlap
+    {
+        glm::ivec3 blockPos{0};
+        uint16_t blockId = 0;
+    };
+
+    [[nodiscard]] const std::vector<EntityBlockCollision>& getFrameCollisions() const { return m_frameCollisions; }
+    [[nodiscard]] const std::vector<EntityBlockOverlap>& getFrameOverlaps() const { return m_frameOverlaps; }
 
 private:
     glm::dvec3 m_position{0.0, 80.0, 0.0};
@@ -137,9 +166,19 @@ private:
     bool m_isInClimbable = false;
     uint8_t m_maxResistance = 0;
     float m_damageAccumulator = 0.0f;
+    float m_fallDistance = 0.0f;
+    bool m_wasOnGround = false;
+    bool m_justLanded = false;
     MiningState m_miningState;
     InteractionState m_interactionState;
     scripting::ShapeCache* m_shapeCache = nullptr;
+
+    // Per-frame collision/overlap data for entity callbacks
+    std::vector<EntityBlockCollision> m_frameCollisions;
+    std::vector<EntityBlockOverlap> m_frameOverlaps;
+
+    // Track previous-tick collision positions for isImpact detection
+    std::vector<glm::ivec3> m_prevCollisionPositions;
 
     void scanOverlappingBlocks(float dt, world::ChunkManager& world, const world::BlockRegistry& registry);
     void applyGravity(float dt);

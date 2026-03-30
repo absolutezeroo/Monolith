@@ -57,6 +57,13 @@ struct BlockCallbacks
     std::optional<sol::protected_function> canAttachAt;        // (pos, face_string) -> bool
     std::optional<sol::protected_function> isPathfindable;     // (pos, pathtype) -> bool
 
+    // --- Entity-block interaction callbacks ---
+    std::optional<sol::protected_function> onEntityInside;   // (pos, entity) — fires each tick when AABB overlaps
+    std::optional<sol::protected_function> onEntityStepOn;   // (pos, entity) — fires once on landing
+    std::optional<sol::protected_function> onEntityFallOn;   // (pos, entity, fall_distance) -> float damage multiplier
+    std::optional<sol::protected_function> onEntityCollide;  // (pos, entity, facing, velocity, is_impact)
+    std::optional<sol::protected_function> onProjectileHit;  // (pos, projectile, hit_result) — V1 stub, never invoked
+
     // --- Signal/power stubs ---
     std::optional<sol::protected_function> onPowered;           // (pos, power_level, source_pos)
     std::optional<sol::protected_function> getComparatorOutput; // (pos) -> int (0-15)
@@ -64,7 +71,7 @@ struct BlockCallbacks
 
     /// Quick check: returns a bitmask of which callback categories are set.
     /// Bit 0 = placement, Bit 1 = destruction, Bit 2 = interaction, Bit 3 = timer,
-    /// Bit 4 = neighbor, Bit 5 = shape, Bit 6 = signal.
+    /// Bit 4 = neighbor, Bit 5 = shape, Bit 6 = signal, Bit 7 = entity.
     [[nodiscard]] uint8_t categoryMask() const
     {
         uint8_t mask = 0;
@@ -101,6 +108,11 @@ struct BlockCallbacks
         if (onPowered.has_value() || getComparatorOutput.has_value() || getPushReaction.has_value())
         {
             mask |= 0x40;
+        }
+        if (onEntityInside.has_value() || onEntityStepOn.has_value() || onEntityFallOn.has_value() ||
+            onEntityCollide.has_value() || onProjectileHit.has_value())
+        {
+            mask |= 0x80;
         }
         return mask;
     }
