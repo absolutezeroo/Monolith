@@ -668,4 +668,30 @@ void PlayerController::ensureNotInsideBlock(world::ChunkManager& world, const wo
     }
 }
 
+void PlayerController::startInteraction(const glm::ivec3& pos, uint16_t blockId)
+{
+    m_interactionState.isActive = true;
+    m_interactionState.targetBlockPos = pos;
+    m_interactionState.targetBlockId = blockId;
+    m_interactionState.elapsedTime = 0.0f;
+}
+
+void PlayerController::updateInteraction(float dt)
+{
+    if (m_interactionState.isActive)
+    {
+        m_interactionState.elapsedTime += dt;
+    }
+}
+
+void PlayerController::stopInteraction()
+{
+    m_interactionState.reset();
+}
+
+void PlayerController::cancelInteraction()
+{
+    m_interactionState.reset();
+}
+
 } // namespace voxel::game

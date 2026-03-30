@@ -45,6 +45,7 @@ add_executable(VoxelTests
     physics/TestRaycast.cpp
     scripting/TestScriptEngine.cpp
     scripting/TestLuaBindings.cpp
+    scripting/TestBlockInteraction.cpp
 )
 
 target_link_libraries(VoxelTests

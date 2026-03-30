@@ -172,4 +172,135 @@ void BlockCallbackInvoker::invokeAfterDig(
     }
 }
 
+// --- Interaction callbacks ---
+
+void BlockCallbackInvoker::invokeOnRightclick(
+    const world::BlockDefinition& def, const glm::ivec3& pos, uint16_t blockId, uint32_t playerId)
+{
+    if (!def.callbacks || !def.callbacks->onRightclick.has_value())
+    {
+        return;
+    }
+
+    sol::protected_function_result result =
+        (*def.callbacks->onRightclick)(posToTable(m_lua, pos), blockId, playerId, sol::nil, sol::nil);
+    if (!result.valid())
+    {
+        sol::error err = result;
+        VX_LOG_WARN("Lua on_rightclick error for '{}': {}", def.stringId, err.what());
+    }
+}
+
+void BlockCallbackInvoker::invokeOnPunch(
+    const world::BlockDefinition& def, const glm::ivec3& pos, uint16_t blockId, uint32_t playerId)
+{
+    if (!def.callbacks || !def.callbacks->onPunch.has_value())
+    {
+        return;
+    }
+
+    sol::protected_function_result result =
+        (*def.callbacks->onPunch)(posToTable(m_lua, pos), blockId, playerId, sol::nil);
+    if (!result.valid())
+    {
+        sol::error err = result;
+        VX_LOG_WARN("Lua on_punch error for '{}': {}", def.stringId, err.what());
+    }
+}
+
+void BlockCallbackInvoker::invokeOnSecondaryUse(const world::BlockDefinition& def, uint32_t playerId)
+{
+    if (!def.callbacks || !def.callbacks->onSecondaryUse.has_value())
+    {
+        return;
+    }
+
+    sol::protected_function_result result = (*def.callbacks->onSecondaryUse)(sol::nil, playerId, sol::nil);
+    if (!result.valid())
+    {
+        sol::error err = result;
+        VX_LOG_WARN("Lua on_secondary_use error for '{}': {}", def.stringId, err.what());
+    }
+}
+
+bool BlockCallbackInvoker::invokeOnInteractStart(
+    const world::BlockDefinition& def, const glm::ivec3& pos, uint32_t playerId)
+{
+    if (!def.callbacks || !def.callbacks->onInteractStart.has_value())
+    {
+        return false;
+    }
+
+    sol::protected_function_result result = (*def.callbacks->onInteractStart)(posToTable(m_lua, pos), playerId);
+    if (!result.valid())
+    {
+        sol::error err = result;
+        VX_LOG_WARN("Lua on_interact_start error for '{}': {}", def.stringId, err.what());
+        return false;
+    }
+
+    return result.get_type() == sol::type::boolean ? result.get<bool>() : false;
+}
+
+bool BlockCallbackInvoker::invokeOnInteractStep(
+    const world::BlockDefinition& def, const glm::ivec3& pos, uint32_t playerId, float elapsedSeconds)
+{
+    if (!def.callbacks || !def.callbacks->onInteractStep.has_value())
+    {
+        return false;
+    }
+
+    sol::protected_function_result result =
+        (*def.callbacks->onInteractStep)(posToTable(m_lua, pos), playerId, elapsedSeconds);
+    if (!result.valid())
+    {
+        sol::error err = result;
+        VX_LOG_WARN("Lua on_interact_step error for '{}': {}", def.stringId, err.what());
+        return false;
+    }
+
+    return result.get_type() == sol::type::boolean ? result.get<bool>() : false;
+}
+
+void BlockCallbackInvoker::invokeOnInteractStop(
+    const world::BlockDefinition& def, const glm::ivec3& pos, uint32_t playerId, float elapsedSeconds)
+{
+    if (!def.callbacks || !def.callbacks->onInteractStop.has_value())
+    {
+        return;
+    }
+
+    sol::protected_function_result result =
+        (*def.callbacks->onInteractStop)(posToTable(m_lua, pos), playerId, elapsedSeconds);
+    if (!result.valid())
+    {
+        sol::error err = result;
+        VX_LOG_WARN("Lua on_interact_stop error for '{}': {}", def.stringId, err.what());
+    }
+}
+
+bool BlockCallbackInvoker::invokeOnInteractCancel(
+    const world::BlockDefinition& def,
+    const glm::ivec3& pos,
+    uint32_t playerId,
+    float elapsedSeconds,
+    const std::string& reason)
+{
+    if (!def.callbacks || !def.callbacks->onInteractCancel.has_value())
+    {
+        return true;
+    }
+
+    sol::protected_function_result result =
+        (*def.callbacks->onInteractCancel)(posToTable(m_lua, pos), playerId, elapsedSeconds, reason);
+    if (!result.valid())
+    {
+        sol::error err = result;
+        VX_LOG_WARN("Lua on_interact_cancel error for '{}': {}", def.stringId, err.what());
+        return true;
+    }
+
+    return result.get_type() == sol::type::boolean ? result.get<bool>() : true;
+}
+
 } // namespace voxel::scripting

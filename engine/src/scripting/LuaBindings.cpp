@@ -232,6 +232,15 @@ core::Result<world::BlockDefinition> LuaBindings::parseBlockDefinition(const sol
     std::optional<sol::protected_function> cbGetExperience;
     std::optional<sol::protected_function> cbOnDigProgress;
 
+    // Interaction callbacks
+    std::optional<sol::protected_function> cbOnRightclick;
+    std::optional<sol::protected_function> cbOnPunch;
+    std::optional<sol::protected_function> cbOnSecondaryUse;
+    std::optional<sol::protected_function> cbOnInteractStart;
+    std::optional<sol::protected_function> cbOnInteractStep;
+    std::optional<sol::protected_function> cbOnInteractStop;
+    std::optional<sol::protected_function> cbOnInteractCancel;
+
     checkAndStore("can_place", cbCanPlace);
     checkAndStore("get_state_for_placement", cbGetStateForPlacement);
     checkAndStore("on_place", cbOnPlace);
@@ -249,6 +258,13 @@ core::Result<world::BlockDefinition> LuaBindings::parseBlockDefinition(const sol
     checkAndStore("get_drops", cbGetDrops);
     checkAndStore("get_experience", cbGetExperience);
     checkAndStore("on_dig_progress", cbOnDigProgress);
+    checkAndStore("on_rightclick", cbOnRightclick);
+    checkAndStore("on_punch", cbOnPunch);
+    checkAndStore("on_secondary_use", cbOnSecondaryUse);
+    checkAndStore("on_interact_start", cbOnInteractStart);
+    checkAndStore("on_interact_step", cbOnInteractStep);
+    checkAndStore("on_interact_stop", cbOnInteractStop);
+    checkAndStore("on_interact_cancel", cbOnInteractCancel);
 
     if (hasAnyCallback)
     {
@@ -270,6 +286,13 @@ core::Result<world::BlockDefinition> LuaBindings::parseBlockDefinition(const sol
         cbs->getDrops = std::move(cbGetDrops);
         cbs->getExperience = std::move(cbGetExperience);
         cbs->onDigProgress = std::move(cbOnDigProgress);
+        cbs->onRightclick = std::move(cbOnRightclick);
+        cbs->onPunch = std::move(cbOnPunch);
+        cbs->onSecondaryUse = std::move(cbOnSecondaryUse);
+        cbs->onInteractStart = std::move(cbOnInteractStart);
+        cbs->onInteractStep = std::move(cbOnInteractStep);
+        cbs->onInteractStop = std::move(cbOnInteractStop);
+        cbs->onInteractCancel = std::move(cbOnInteractCancel);
         def.callbacks = std::move(cbs);
     }
 

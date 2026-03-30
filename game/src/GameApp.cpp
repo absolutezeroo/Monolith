@@ -4,6 +4,7 @@
 #include "voxel/game/Window.h"
 #include "voxel/renderer/VulkanContext.h"
 #include "voxel/scripting/BlockCallbackInvoker.h"
+#include "voxel/scripting/BlockCallbacks.h"
 #include "voxel/scripting/LuaBindings.h"
 #include "voxel/scripting/ScriptEngine.h"
 
@@ -243,6 +244,18 @@ void GameApp::handleInputToggles()
     }
     if (m_input->wasKeyPressed(GLFW_KEY_ESCAPE))
     {
+        // Cancel sustained interaction before releasing cursor
+        if (m_player.isInteracting())
+        {
+            const auto& state = m_player.getInteractionState();
+            const auto& def = m_blockRegistry.getBlockType(state.targetBlockId);
+            if (m_callbackInvoker)
+            {
+                (void)m_callbackInvoker->invokeOnInteractCancel(
+                    def, state.targetBlockPos, 0, state.elapsedTime, "menu_opened");
+            }
+            m_player.cancelInteraction();
+        }
         m_input->setCursorCaptured(false);
     }
     if (m_input->wasKeyPressed(GLFW_KEY_F7))
@@ -293,10 +306,100 @@ void GameApp::handleBlockInteraction(float dt)
     if (!m_input->isCursorCaptured())
     {
         m_player.resetMining();
+        if (m_player.isInteracting())
+        {
+            m_player.cancelInteraction();
+        }
         return;
     }
 
-    // Mining: LMB hold
+    // --- Sustained interaction: cancel conditions ---
+    if (m_player.isInteracting())
+    {
+        const auto& state = m_player.getInteractionState();
+        const auto& interactDef = m_blockRegistry.getBlockType(state.targetBlockId);
+
+        // Cancel: player moved >2.5 blocks from target (2 blocks + half-block tolerance)
+        glm::vec3 playerPos = m_flyMode
+            ? glm::vec3(m_camera.getPosition())
+            : glm::vec3(m_player.getPosition());
+        float dist = glm::distance(
+            glm::vec3(state.targetBlockPos) + glm::vec3(0.5f), playerPos);
+        if (dist > 2.5f)
+        {
+            if (m_callbackInvoker)
+            {
+                (void)m_callbackInvoker->invokeOnInteractCancel(
+                    interactDef, state.targetBlockPos, 0, state.elapsedTime, "moved_away");
+            }
+            m_player.cancelInteraction();
+        }
+
+        // TODO: Cancel on player damage when health/damage system is implemented
+
+        // Cancel: target block changed
+        if (m_player.isInteracting())
+        {
+            uint16_t currentId = m_chunkManager.getBlock(state.targetBlockPos);
+            if (currentId != state.targetBlockId)
+            {
+                if (m_callbackInvoker)
+                {
+                    (void)m_callbackInvoker->invokeOnInteractCancel(
+                        interactDef, state.targetBlockPos, 0, state.elapsedTime, "block_changed");
+                }
+                m_player.cancelInteraction();
+            }
+        }
+    }
+
+    // --- Sustained interaction: tick-driven step ---
+    if (m_player.isInteracting())
+    {
+        m_player.updateInteraction(dt);
+        const auto& state = m_player.getInteractionState();
+        const auto& stepDef = m_blockRegistry.getBlockType(state.targetBlockId);
+
+        if (m_callbackInvoker)
+        {
+            bool shouldContinue = m_callbackInvoker->invokeOnInteractStep(
+                stepDef, state.targetBlockPos, 0, state.elapsedTime);
+            if (!shouldContinue)
+            {
+                m_player.stopInteraction();
+            }
+        }
+    }
+
+    // --- Sustained interaction: RMB release → stop ---
+    if (m_player.isInteracting() && m_input->wasMouseButtonReleased(GLFW_MOUSE_BUTTON_RIGHT))
+    {
+        const auto& state = m_player.getInteractionState();
+        const auto& stopDef = m_blockRegistry.getBlockType(state.targetBlockId);
+        if (m_callbackInvoker)
+        {
+            m_callbackInvoker->invokeOnInteractStop(
+                stopDef, state.targetBlockPos, 0, state.elapsedTime);
+        }
+        m_player.stopInteraction();
+    }
+
+    // --- LMB punch: one-shot on press frame (coexists with mining) ---
+    if (m_input->wasMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT) && m_raycastResult.hit)
+    {
+        uint16_t punchTargetId = m_chunkManager.getBlock(m_raycastResult.blockPos);
+        if (punchTargetId != voxel::world::BLOCK_AIR)
+        {
+            const auto& punchDef = m_blockRegistry.getBlockType(punchTargetId);
+            if (m_callbackInvoker)
+            {
+                m_callbackInvoker->invokeOnPunch(
+                    punchDef, m_raycastResult.blockPos, punchTargetId, 0);
+            }
+        }
+    }
+
+    // Mining: LMB hold (independent of punch)
     bool lmbDown = m_input->isMouseButtonDown(GLFW_MOUSE_BUTTON_LEFT);
     bool miningCompleted = m_player.updateMining(dt, m_raycastResult, lmbDown, m_chunkManager, m_blockRegistry);
 
@@ -311,19 +414,59 @@ void GameApp::handleBlockInteraction(float dt)
                     m_raycastResult.blockPos.x, m_raycastResult.blockPos.y, m_raycastResult.blockPos.z}}});
     }
 
-    // Placement: RMB press (one-shot)
-    bool placementAttempted = m_input->wasMouseButtonPressed(GLFW_MOUSE_BUTTON_RIGHT) && m_raycastResult.hit;
-    if (placementAttempted)
+    // --- RMB press: priority chain (interact > rightclick > placement) ---
+    bool placementAttempted = false;
+    if (m_input->wasMouseButtonPressed(GLFW_MOUSE_BUTTON_RIGHT) && !m_player.isInteracting())
     {
-        uint16_t blockId = resolveHotbarBlockId(m_hotbarSlot);
-        if (blockId != voxel::world::BLOCK_AIR)
+        bool handled = false;
+
+        if (m_raycastResult.hit)
         {
-            auto& prev = m_raycastResult.previousPos;
-            m_commandQueue.push(voxel::game::GameCommand{
-                voxel::game::CommandType::PlaceBlock,
-                0,
-                0,
-                voxel::game::PlaceBlockPayload{voxel::math::IVec3{prev.x, prev.y, prev.z}, blockId}});
+            uint16_t targetId = m_chunkManager.getBlock(m_raycastResult.blockPos);
+            const auto& targetDef = m_blockRegistry.getBlockType(targetId);
+
+            // Priority 1: Sustained interaction
+            if (!handled && m_callbackInvoker && targetDef.callbacks &&
+                targetDef.callbacks->onInteractStart.has_value())
+            {
+                bool started = m_callbackInvoker->invokeOnInteractStart(
+                    targetDef, m_raycastResult.blockPos, 0);
+                if (started)
+                {
+                    m_player.startInteraction(m_raycastResult.blockPos, targetId);
+                    handled = true;
+                }
+            }
+
+            // Priority 2: Instant rightclick
+            if (!handled && m_callbackInvoker && targetDef.callbacks &&
+                targetDef.callbacks->onRightclick.has_value())
+            {
+                m_callbackInvoker->invokeOnRightclick(
+                    targetDef, m_raycastResult.blockPos, targetId, 0);
+                handled = true;
+            }
+
+            // Priority 3: Default placement
+            if (!handled)
+            {
+                uint16_t blockId = resolveHotbarBlockId(m_hotbarSlot);
+                if (blockId != voxel::world::BLOCK_AIR)
+                {
+                    auto& prev = m_raycastResult.previousPos;
+                    m_commandQueue.push(voxel::game::GameCommand{
+                        voxel::game::CommandType::PlaceBlock,
+                        0,
+                        0,
+                        voxel::game::PlaceBlockPayload{voxel::math::IVec3{prev.x, prev.y, prev.z}, blockId}});
+                    placementAttempted = true;
+                }
+            }
+        }
+        else
+        {
+            // No block targeted — on_secondary_use stub (items don't have callbacks yet)
+            VX_LOG_TRACE("RMB in air — on_secondary_use not yet available (Story 9.7+)");
         }
     }
 

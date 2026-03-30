@@ -27,6 +27,23 @@ struct MovementInput
     bool sneak = false;
 };
 
+/// Tracks a sustained multi-phase block interaction (hold RMB on interactive block).
+struct InteractionState
+{
+    bool isActive = false;
+    glm::ivec3 targetBlockPos{0};
+    uint16_t targetBlockId = 0;
+    float elapsedTime = 0.0f;
+
+    void reset()
+    {
+        isActive = false;
+        targetBlockPos = glm::ivec3{0};
+        targetBlockId = 0;
+        elapsedTime = 0.0f;
+    }
+};
+
 /**
  * @brief Handles player physics: gravity, swept AABB collision, step-up, ground detection,
  *        jumping, sprinting, sneaking, climbable blocks, move resistance, and damage blocks.
@@ -85,6 +102,14 @@ public:
 
     [[nodiscard]] const MiningState& getMiningState() const { return m_miningState; }
 
+    // --- Sustained interaction ---
+    void startInteraction(const glm::ivec3& pos, uint16_t blockId);
+    void updateInteraction(float dt);
+    void stopInteraction();
+    void cancelInteraction();
+    [[nodiscard]] bool isInteracting() const { return m_interactionState.isActive; }
+    [[nodiscard]] const InteractionState& getInteractionState() const { return m_interactionState; }
+
     [[nodiscard]] glm::dvec3 getPosition() const { return m_position; }
     [[nodiscard]] glm::dvec3 getEyePosition() const;
     [[nodiscard]] glm::vec3 getVelocity() const { return m_velocity; }
@@ -107,6 +132,7 @@ private:
     uint8_t m_maxResistance = 0;
     float m_damageAccumulator = 0.0f;
     MiningState m_miningState;
+    InteractionState m_interactionState;
 
     void scanOverlappingBlocks(float dt, world::ChunkManager& world, const world::BlockRegistry& registry);
     void applyGravity(float dt);

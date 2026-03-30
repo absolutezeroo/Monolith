@@ -5,6 +5,7 @@
 #include <glm/vec3.hpp>
 
 #include <cstdint>
+#include <string>
 
 namespace voxel::world
 {
@@ -37,6 +38,25 @@ public:
     void invokeAfterDestruct(const world::BlockDefinition& def, const glm::ivec3& pos, uint16_t oldBlockId);
     void invokeAfterDig(
         const world::BlockDefinition& def, const glm::ivec3& pos, uint16_t oldBlockId, uint32_t playerId);
+
+    // --- Interaction callbacks ---
+    void invokeOnRightclick(
+        const world::BlockDefinition& def, const glm::ivec3& pos, uint16_t blockId, uint32_t playerId);
+    void invokeOnPunch(
+        const world::BlockDefinition& def, const glm::ivec3& pos, uint16_t blockId, uint32_t playerId);
+    void invokeOnSecondaryUse(const world::BlockDefinition& def, uint32_t playerId);
+    [[nodiscard]] bool invokeOnInteractStart(
+        const world::BlockDefinition& def, const glm::ivec3& pos, uint32_t playerId);
+    [[nodiscard]] bool invokeOnInteractStep(
+        const world::BlockDefinition& def, const glm::ivec3& pos, uint32_t playerId, float elapsedSeconds);
+    void invokeOnInteractStop(
+        const world::BlockDefinition& def, const glm::ivec3& pos, uint32_t playerId, float elapsedSeconds);
+    [[nodiscard]] bool invokeOnInteractCancel(
+        const world::BlockDefinition& def,
+        const glm::ivec3& pos,
+        uint32_t playerId,
+        float elapsedSeconds,
+        const std::string& reason);
 
 private:
     sol::state& m_lua;

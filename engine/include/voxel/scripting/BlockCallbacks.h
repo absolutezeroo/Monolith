@@ -34,8 +34,17 @@ struct BlockCallbacks
     std::optional<sol::protected_function> getExperience;     // (pos, player, tool_groups) -> int
     std::optional<sol::protected_function> onDigProgress;     // (pos, player, progress) -> bool
 
+    // --- Interaction callbacks ---
+    std::optional<sol::protected_function> onRightclick;      // (pos, node, clicker, itemstack, pointed_thing) -> itemstack
+    std::optional<sol::protected_function> onPunch;           // (pos, node, puncher, pointed_thing)
+    std::optional<sol::protected_function> onSecondaryUse;    // (itemstack, user, pointed_thing) -> itemstack
+    std::optional<sol::protected_function> onInteractStart;   // (pos, player) -> bool
+    std::optional<sol::protected_function> onInteractStep;    // (pos, player, elapsed_seconds) -> bool
+    std::optional<sol::protected_function> onInteractStop;    // (pos, player, elapsed_seconds)
+    std::optional<sol::protected_function> onInteractCancel;  // (pos, player, elapsed_seconds, reason) -> bool
+
     /// Quick check: returns a bitmask of which callback categories are set.
-    /// Bit 0 = any placement callback, Bit 1 = any destruction callback.
+    /// Bit 0 = any placement callback, Bit 1 = any destruction callback, Bit 2 = any interaction callback.
     [[nodiscard]] uint8_t categoryMask() const
     {
         uint8_t mask = 0;
@@ -49,6 +58,12 @@ struct BlockCallbacks
             getDrops.has_value() || getExperience.has_value() || onDigProgress.has_value())
         {
             mask |= 0x02;
+        }
+        if (onRightclick.has_value() || onPunch.has_value() || onSecondaryUse.has_value() ||
+            onInteractStart.has_value() || onInteractStep.has_value() || onInteractStop.has_value() ||
+            onInteractCancel.has_value())
+        {
+            mask |= 0x04;
         }
         return mask;
     }
