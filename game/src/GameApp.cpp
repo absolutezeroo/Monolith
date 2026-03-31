@@ -9,6 +9,8 @@
 #include "voxel/scripting/EntityHandle.h"
 #include "voxel/scripting/BlockTimerManager.h"
 #include "voxel/scripting/LBMRegistry.h"
+#include "voxel/renderer/ParticleManager.h"
+#include "voxel/renderer/TextureArray.h"
 #include "voxel/scripting/LuaBindings.h"
 #include "voxel/scripting/NeighborNotifier.h"
 #include "voxel/scripting/ScriptEngine.h"
@@ -52,7 +54,7 @@ static constexpr const char* HOTBAR_BLOCK_IDS[HOTBAR_SLOTS] = {
     "base:cobblestone"};
 
 GameApp::GameApp(voxel::game::Window& window, voxel::renderer::VulkanContext& vulkanContext)
-    : GameLoop(window), m_window(window), m_renderer(vulkanContext)
+    : GameLoop(window), m_window(window), m_vulkanContext(vulkanContext), m_renderer(vulkanContext)
 {
 }
 
@@ -63,6 +65,9 @@ GameApp::~GameApp()
     // so all tasks must complete while those objects are still alive.
     m_chunkManager.shutdown();
     m_jobSystem.shutdown();
+
+    // Destroy particle GPU buffer before VMA is torn down
+    m_particleManager.shutdown(m_vulkanContext.getAllocator());
 
     // Destroy Lua-dependent managers before script engine (they hold sol2 refs)
     m_shapeCache.reset();
@@ -246,6 +251,17 @@ voxel::core::Result<void> GameApp::init(const std::string& shaderDir, std::optio
         *m_renderer.getMutableGigabuffer(),
         *m_renderer.getMutableStagingBuffer(),
         *m_renderer.getMutableChunkRenderInfoBuffer());
+
+    // Initialize particle system
+    m_particleManager.init(m_vulkanContext.getAllocator());
+
+    // Register particle Lua API (needs ParticleManager + TextureArray from Renderer)
+    if (m_renderer.getTextureArray() != nullptr)
+    {
+        voxel::scripting::LuaBindings::registerParticleAPI(
+            m_scriptEngine->getLuaState(), m_particleManager,
+            const_cast<voxel::renderer::TextureArray&>(*m_renderer.getTextureArray()));
+    }
 
     // Subscribe to block events for dynamic light updates
     m_eventBus.subscribe<voxel::game::EventType::BlockBroken>(
@@ -467,6 +483,24 @@ void GameApp::handleBlockInteraction(float dt)
                 m_callbackInvoker->invokeOnPunch(
                     punchDef, m_raycastResult.blockPos, punchTargetId, 0);
             }
+        }
+    }
+
+    // --- MMB: pick block (middle-click) ---
+    if (m_input->wasMouseButtonPressed(GLFW_MOUSE_BUTTON_MIDDLE) && m_raycastResult.hit)
+    {
+        uint16_t pickTargetId = m_chunkManager.getBlock(m_raycastResult.blockPos);
+        if (pickTargetId != voxel::world::BLOCK_AIR)
+        {
+            const auto& pickDef = m_blockRegistry.getBlockType(pickTargetId);
+            std::string pickedItem = pickDef.stringId;
+            if (m_callbackInvoker)
+            {
+                pickedItem = m_callbackInvoker->invokeOnPickBlock(pickDef, m_raycastResult.blockPos);
+            }
+            VX_LOG_DEBUG("Pick block at ({},{},{}): {}", m_raycastResult.blockPos.x,
+                m_raycastResult.blockPos.y, m_raycastResult.blockPos.z, pickedItem);
+            // TODO: Once inventory system exists, place picked item into hotbar
         }
     }
 
@@ -948,6 +982,45 @@ void GameApp::tick(double dt)
     m_timerManager->update(fdt, m_blockRegistry, *m_callbackInvoker);
     m_abmRegistry->update(fdt, m_chunkManager, m_blockRegistry, *m_callbackInvoker);
 
+    // Particle simulation
+    m_particleManager.update(fdt, &m_chunkManager);
+
+    // on_animate_tick dispatch: ~4 Hz (every ~0.25s) for visible blocks with the callback
+    m_animateTickTimer += fdt;
+    if (m_animateTickTimer >= 0.25f && m_callbackInvoker)
+    {
+        m_animateTickTimer -= 0.25f;
+
+        // Build a random function exposed to Lua for on_animate_tick
+        sol::state& lua = m_scriptEngine->getLuaState();
+        sol::object randomFn = lua["math"]["random"];
+
+        // Iterate blocks in a small region around the camera
+        glm::ivec3 center = glm::ivec3(glm::floor(glm::vec3(m_camera.getPosition())));
+        static constexpr int RADIUS = 16;
+
+        for (int dx = -RADIUS; dx <= RADIUS; dx += 4)
+        {
+            for (int dy = -RADIUS; dy <= RADIUS; dy += 4)
+            {
+                for (int dz = -RADIUS; dz <= RADIUS; dz += 4)
+                {
+                    glm::ivec3 pos = center + glm::ivec3(dx, dy, dz);
+                    uint16_t blockId = m_chunkManager.getBlock(pos);
+                    if (blockId == voxel::world::BLOCK_AIR)
+                    {
+                        continue;
+                    }
+                    const auto& def = m_blockRegistry.getBlockType(blockId);
+                    if (def.callbacks && (def.callbacks->categoryMask() & 0x200))
+                    {
+                        m_callbackInvoker->invokeOnAnimateTick(def, pos, randomFn);
+                    }
+                }
+            }
+        }
+    }
+
     // NOTE: mesh uploads moved to render() — must happen AFTER beginFrame()
     // calls StagingBuffer::beginFrame() which resets the pending transfer list.
 
@@ -1036,6 +1109,7 @@ void GameApp::buildDebugOverlay()
                 m_uploadManager->deferredFreeCount());
         }
         ImGui::Text("Draw: indirect  Sections: %u", m_renderer.getLastDrawCount());
+        ImGui::Text("Particles: %u", m_particleManager.getActiveCount());
         ImGui::Text("Seed: %lld", static_cast<long long>(m_config.getSeed()));
 
         ImGui::Separator();
@@ -1559,6 +1633,9 @@ void GameApp::render(double /*alpha*/)
             m_renderer.renderChunksIndirect(vp, frustumPlanes);
         }
 
+        // Upload particle billboard vertices for this frame
+        m_particleManager.uploadVertices(m_camera.getRight(), m_camera.getUp());
+
         // Post-effect tint (head inside water/lava)
         drawPostEffectTint();
 
@@ -1571,6 +1648,6 @@ void GameApp::render(double /*alpha*/)
         }
         drawHotbar();
         drawWieldMesh();
-        m_renderer.endFrame();
+        m_renderer.endFrame(&m_particleManager);
     }
 }

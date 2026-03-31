@@ -1,6 +1,8 @@
 #include "voxel/scripting/LuaBindings.h"
 
 #include "voxel/core/Log.h"
+#include "voxel/renderer/ParticleManager.h"
+#include "voxel/renderer/TextureArray.h"
 #include "voxel/scripting/ABMRegistry.h"
 #include "voxel/scripting/BlockCallbacks.h"
 #include "voxel/scripting/BlockTimerManager.h"
@@ -278,6 +280,11 @@ core::Result<world::BlockDefinition> LuaBindings::parseBlockDefinition(const sol
     std::optional<sol::protected_function> cbOnInventoryTake;
     std::optional<sol::protected_function> cbOnInventoryMove;
 
+    // Visual/client callbacks
+    std::optional<sol::protected_function> cbOnAnimateTick;
+    std::optional<sol::protected_function> cbGetColor;
+    std::optional<sol::protected_function> cbOnPickBlock;
+
     // Signal/power stubs
     std::optional<sol::protected_function> cbOnPowered;
     std::optional<sol::protected_function> cbGetComparatorOutput;
@@ -326,6 +333,9 @@ core::Result<world::BlockDefinition> LuaBindings::parseBlockDefinition(const sol
     checkAndStore("on_inventory_put", cbOnInventoryPut);
     checkAndStore("on_inventory_take", cbOnInventoryTake);
     checkAndStore("on_inventory_move", cbOnInventoryMove);
+    checkAndStore("on_animate_tick", cbOnAnimateTick);
+    checkAndStore("get_color", cbGetColor);
+    checkAndStore("on_pick_block", cbOnPickBlock);
     checkAndStore("on_powered", cbOnPowered);
     checkAndStore("get_comparator_output", cbGetComparatorOutput);
     checkAndStore("get_push_reaction", cbGetPushReaction);
@@ -376,6 +386,9 @@ core::Result<world::BlockDefinition> LuaBindings::parseBlockDefinition(const sol
         cbs->onInventoryPut = std::move(cbOnInventoryPut);
         cbs->onInventoryTake = std::move(cbOnInventoryTake);
         cbs->onInventoryMove = std::move(cbOnInventoryMove);
+        cbs->onAnimateTick = std::move(cbOnAnimateTick);
+        cbs->getColor = std::move(cbGetColor);
+        cbs->onPickBlock = std::move(cbOnPickBlock);
         cbs->onPowered = std::move(cbOnPowered);
         cbs->getComparatorOutput = std::move(cbGetComparatorOutput);
         cbs->getPushReaction = std::move(cbGetPushReaction);
@@ -866,6 +879,96 @@ void LuaBindings::registerEntityAPI(sol::state& lua)
             float y = t.get_or("y", 0.0f);
             float z = t.get_or("z", 0.0f);
             e.setVelocity({x, y, z});
+        });
+}
+
+void LuaBindings::registerParticleAPI(
+    sol::state& lua, renderer::ParticleManager& pm, renderer::TextureArray& texArray)
+{
+    sol::table voxelTable = lua["voxel"];
+
+    voxelTable.set_function(
+        "add_particle", [&pm, &texArray](const sol::table& table) {
+            renderer::Particle p;
+
+            auto posTable = table.get<std::optional<sol::table>>("pos");
+            if (posTable.has_value())
+            {
+                p.pos.x = posTable->get_or("x", 0.0f);
+                p.pos.y = posTable->get_or("y", 0.0f);
+                p.pos.z = posTable->get_or("z", 0.0f);
+            }
+
+            auto velTable = table.get<std::optional<sol::table>>("velocity");
+            if (velTable.has_value())
+            {
+                p.velocity.x = velTable->get_or("x", 0.0f);
+                p.velocity.y = velTable->get_or("y", 0.0f);
+                p.velocity.z = velTable->get_or("z", 0.0f);
+            }
+
+            auto accelTable = table.get<std::optional<sol::table>>("acceleration");
+            if (accelTable.has_value())
+            {
+                p.acceleration.x = accelTable->get_or("x", 0.0f);
+                p.acceleration.y = accelTable->get_or("y", -9.81f);
+                p.acceleration.z = accelTable->get_or("z", 0.0f);
+            }
+
+            p.lifetime = table.get_or("lifetime", 1.0f);
+            p.maxLifetime = p.lifetime;
+            p.size = table.get_or("size", 0.1f);
+            p.collide = table.get_or("collide", false);
+
+            auto texName = table.get<std::optional<std::string>>("texture");
+            if (texName.has_value())
+            {
+                p.textureLayer = texArray.getLayerIndex(*texName);
+            }
+
+            pm.addParticle(p);
+        });
+
+    voxelTable.set_function(
+        "add_particle_spawner", [&pm, &texArray](const sol::table& table) {
+            uint32_t amount = table.get_or("amount", 1u);
+            float lifetime = table.get_or("lifetime", 1.0f);
+            float size = table.get_or("size", 0.1f);
+
+            glm::vec3 minPos{0.0f};
+            glm::vec3 maxPos{0.0f};
+            auto minPosTable = table.get<std::optional<sol::table>>("minpos");
+            if (minPosTable.has_value())
+            {
+                minPos = {minPosTable->get_or("x", 0.0f), minPosTable->get_or("y", 0.0f), minPosTable->get_or("z", 0.0f)};
+            }
+            auto maxPosTable = table.get<std::optional<sol::table>>("maxpos");
+            if (maxPosTable.has_value())
+            {
+                maxPos = {maxPosTable->get_or("x", 0.0f), maxPosTable->get_or("y", 0.0f), maxPosTable->get_or("z", 0.0f)};
+            }
+
+            glm::vec3 minVel{0.0f};
+            glm::vec3 maxVel{0.0f};
+            auto minVelTable = table.get<std::optional<sol::table>>("minvel");
+            if (minVelTable.has_value())
+            {
+                minVel = {minVelTable->get_or("x", 0.0f), minVelTable->get_or("y", 0.0f), minVelTable->get_or("z", 0.0f)};
+            }
+            auto maxVelTable = table.get<std::optional<sol::table>>("maxvel");
+            if (maxVelTable.has_value())
+            {
+                maxVel = {maxVelTable->get_or("x", 0.0f), maxVelTable->get_or("y", 0.0f), maxVelTable->get_or("z", 0.0f)};
+            }
+
+            uint16_t texLayer = 0;
+            auto texName = table.get<std::optional<std::string>>("texture");
+            if (texName.has_value())
+            {
+                texLayer = texArray.getLayerIndex(*texName);
+            }
+
+            pm.addParticleSpawner(amount, minPos, maxPos, minVel, maxVel, texLayer, size, lifetime);
         });
 }
 

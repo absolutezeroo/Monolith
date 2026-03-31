@@ -72,6 +72,11 @@ struct BlockCallbacks
     std::optional<sol::protected_function> onInventoryTake;     // (pos, listname, index, stack, player)
     std::optional<sol::protected_function> onInventoryMove;     // (pos, from_list, from_idx, to_list, to_idx, count, player)
 
+    // --- Visual/client callbacks ---
+    std::optional<sol::protected_function> onAnimateTick;  // (pos, random) — render-loop visual effects
+    std::optional<sol::protected_function> getColor;       // (pos) -> int (0xRRGGBB) — per-block tint override
+    std::optional<sol::protected_function> onPickBlock;    // (pos) -> string — middle-click item ID
+
     // --- Signal/power stubs ---
     std::optional<sol::protected_function> onPowered;           // (pos, power_level, source_pos)
     std::optional<sol::protected_function> getComparatorOutput; // (pos) -> int (0-15)
@@ -79,7 +84,8 @@ struct BlockCallbacks
 
     /// Quick check: returns a bitmask of which callback categories are set.
     /// Bit 0 = placement, Bit 1 = destruction, Bit 2 = interaction, Bit 3 = timer,
-    /// Bit 4 = neighbor, Bit 5 = shape, Bit 6 = signal, Bit 7 = entity, Bit 8 = inventory.
+    /// Bit 4 = neighbor, Bit 5 = shape, Bit 6 = signal, Bit 7 = entity, Bit 8 = inventory,
+    /// Bit 9 = visual.
     [[nodiscard]] uint16_t categoryMask() const
     {
         uint16_t mask = 0;
@@ -126,6 +132,10 @@ struct BlockCallbacks
             onInventoryPut.has_value() || onInventoryTake.has_value() || onInventoryMove.has_value())
         {
             mask |= 0x100;
+        }
+        if (onAnimateTick.has_value() || getColor.has_value() || onPickBlock.has_value())
+        {
+            mask |= 0x200;
         }
         return mask;
     }

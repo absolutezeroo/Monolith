@@ -8,6 +8,12 @@
 #include <string>
 #include <unordered_map>
 
+namespace voxel::renderer
+{
+class ParticleManager;
+class TextureArray;
+} // namespace voxel::renderer
+
 namespace voxel::world
 {
 class BlockRegistry;
@@ -64,6 +70,10 @@ public:
 
     /// Register ItemStack, MetaDataRef, InvRef usertypes and voxel.get_meta / voxel.get_inventory.
     static void registerMetadataAPI(sol::state& lua, world::ChunkManager& chunkManager);
+
+    /// Bind `voxel.add_particle` and `voxel.add_particle_spawner` onto the existing `voxel` table.
+    static void registerParticleAPI(
+        sol::state& lua, renderer::ParticleManager& pm, renderer::TextureArray& texArray);
 
     /// Access the item registry (populated by voxel.register_item calls).
     [[nodiscard]] static const std::unordered_map<std::string, ItemDefinition>& getItemRegistry();

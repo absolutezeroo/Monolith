@@ -155,6 +155,13 @@ public:
         int count,
         uint32_t playerId);
 
+    // --- Visual/client callbacks ---
+    void invokeOnAnimateTick(const world::BlockDefinition& def, const glm::ivec3& pos, sol::object randomFn);
+    [[nodiscard]] std::optional<uint32_t> invokeGetColor(
+        const world::BlockDefinition& def, const glm::ivec3& pos);
+    [[nodiscard]] std::string invokeOnPickBlock(
+        const world::BlockDefinition& def, const glm::ivec3& pos);
+
     // --- Shape callbacks ---
     [[nodiscard]] std::vector<math::AABB> invokeGetCollisionShape(
         const world::BlockDefinition& def, const glm::ivec3& pos);

@@ -32,6 +32,7 @@ class ImGuiBackend;
 class IndirectDrawBuffer;
 class ModelIndirectDrawBuffer;
 class QuadIndexBuffer;
+class ParticleManager;
 class StagingBuffer;
 class TextureArray;
 class VulkanContext;
@@ -58,6 +59,13 @@ struct LightingPushConstants
     float timeOfDay;          // 4 bytes
 };
 static_assert(sizeof(LightingPushConstants) == 24);
+
+/// Push constants for particle rendering: just VP matrix.
+struct ParticlePushConstants
+{
+    glm::mat4 viewProjection; // 64 bytes
+};
+static_assert(sizeof(ParticlePushConstants) == 64);
 
 /// Push constants for the compute culling shader (cull.comp).
 struct CullPushConstants
@@ -126,8 +134,10 @@ class Renderer
      * @brief Ends the frame: renders ImGui, submits commands, presents.
      *
      * Must only be called after beginFrame() returned true.
+     * @param particleMgr Optional particle manager — if non-null and has particles,
+     *        renders them after the translucent pass and before ImGui.
      */
-    void endFrame();
+    void endFrame(ParticleManager* particleMgr = nullptr);
 
     /// Waits for GPU idle and destroys all owned resources.
     void shutdown();
@@ -143,6 +153,10 @@ class Renderer
      * @param frustumPlanes The 6 frustum planes for culling (Gribb-Hartmann extraction).
      */
     void renderChunksIndirect(const glm::mat4& viewProjection, const std::array<glm::vec4, 6>& frustumPlanes);
+
+    /// Renders particles as forward-blended billboard quads.
+    /// Must be called between beginFrame/endFrame, after renderChunksIndirect.
+    void renderParticles(ParticleManager& pm, const glm::mat4& vp);
 
     /// Returns the number of draw calls issued in the last renderChunks() call.
     [[nodiscard]] uint32_t getLastDrawCount() const { return m_lastDrawCount; }
@@ -260,6 +274,9 @@ class Renderer
     VkPipeline m_cullModelPipeline = VK_NULL_HANDLE;
     std::unique_ptr<ModelIndirectDrawBuffer> m_modelIndirectDrawBuffer;
     VkDescriptorSet m_modelDescriptorSet = VK_NULL_HANDLE;
+
+    VkPipelineLayout m_particlePipelineLayout = VK_NULL_HANDLE;
+    VkPipeline m_particlePipeline = VK_NULL_HANDLE;
 
     VkDescriptorSetLayout m_lightingDescriptorSetLayout = VK_NULL_HANDLE;
     VkDescriptorSet m_lightingDescriptorSet = VK_NULL_HANDLE;

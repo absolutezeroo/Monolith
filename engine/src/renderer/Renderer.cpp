@@ -4,6 +4,7 @@
 #include "voxel/core/Log.h"
 #include "voxel/game/Window.h"
 #include "voxel/renderer/Camera.h"
+#include "voxel/renderer/ParticleManager.h"
 #include "voxel/renderer/ChunkRenderInfoBuffer.h"
 #include "voxel/renderer/DescriptorAllocator.h"
 #include "voxel/renderer/GBuffer.h"
@@ -220,6 +221,185 @@ core::Result<void> Renderer::init(const std::string& shaderDir, const std::strin
         }
         m_translucentPipeline = transResult.value();
         VX_LOG_INFO("Translucent pipeline created");
+    }
+
+    // ── Particle pipeline: forward-blended billboards with vertex input ────────
+    {
+        // Particle pipeline layout: same descriptor set (for texture), but smaller push constants
+        VkPushConstantRange particlePushRange{};
+        particlePushRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+        particlePushRange.offset = 0;
+        particlePushRange.size = sizeof(ParticlePushConstants);
+
+        VkPipelineLayoutCreateInfo particleLayoutInfo{};
+        particleLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+        particleLayoutInfo.setLayoutCount = 1;
+        particleLayoutInfo.pSetLayouts = &m_chunkDescriptorSetLayout;
+        particleLayoutInfo.pushConstantRangeCount = 1;
+        particleLayoutInfo.pPushConstantRanges = &particlePushRange;
+
+        VkResult particleLayoutResult =
+            vkCreatePipelineLayout(device, &particleLayoutInfo, nullptr, &m_particlePipelineLayout);
+        if (particleLayoutResult != VK_SUCCESS)
+        {
+            VX_LOG_ERROR("Failed to create particle pipeline layout: {}", static_cast<int>(particleLayoutResult));
+            return std::unexpected(core::EngineError::vulkan(
+                static_cast<int32_t>(particleLayoutResult), "Failed to create particle pipeline layout"));
+        }
+
+        // Vertex input: ParticleVertex has pos(vec3), uv(vec2 as 2 floats), texLayer(float), alpha(float), pad(float)
+        VkVertexInputBindingDescription binding{};
+        binding.binding = 0;
+        binding.stride = 32; // sizeof(ParticleVertex)
+        binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+        std::array<VkVertexInputAttributeDescription, 4> attrs{};
+        // location 0: inPos (vec3) at offset 0
+        attrs[0].location = 0;
+        attrs[0].binding = 0;
+        attrs[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+        attrs[0].offset = 0;
+        // location 1: inUV (vec2) at offset 12
+        attrs[1].location = 1;
+        attrs[1].binding = 0;
+        attrs[1].format = VK_FORMAT_R32G32_SFLOAT;
+        attrs[1].offset = 12;
+        // location 2: inTexLayer (float) at offset 20
+        attrs[2].location = 2;
+        attrs[2].binding = 0;
+        attrs[2].format = VK_FORMAT_R32_SFLOAT;
+        attrs[2].offset = 20;
+        // location 3: inAlpha (float) at offset 24
+        attrs[3].location = 3;
+        attrs[3].binding = 0;
+        attrs[3].format = VK_FORMAT_R32_SFLOAT;
+        attrs[3].offset = 24;
+
+        std::string particleVertPath = shaderDir + "/particle.vert.spv";
+        std::string particleFragPath = shaderDir + "/particle.frag.spv";
+
+        auto pvResult = loadShaderModule(particleVertPath);
+        auto pfResult = loadShaderModule(particleFragPath);
+        if (!pvResult.has_value() || !pfResult.has_value())
+        {
+            if (pvResult.has_value())
+                vkDestroyShaderModule(device, pvResult.value(), nullptr);
+            if (pfResult.has_value())
+                vkDestroyShaderModule(device, pfResult.value(), nullptr);
+            VX_LOG_WARN("Particle shader loading failed — particle rendering disabled");
+        }
+        else
+        {
+            VkShaderModule vertModule = pvResult.value();
+            VkShaderModule fragModule = pfResult.value();
+
+            VkPipelineShaderStageCreateInfo vertStage{};
+            vertStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+            vertStage.stage = VK_SHADER_STAGE_VERTEX_BIT;
+            vertStage.module = vertModule;
+            vertStage.pName = "main";
+
+            VkPipelineShaderStageCreateInfo fragStage{};
+            fragStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+            fragStage.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+            fragStage.module = fragModule;
+            fragStage.pName = "main";
+
+            std::array<VkPipelineShaderStageCreateInfo, 2> stages = {vertStage, fragStage};
+
+            VkPipelineVertexInputStateCreateInfo vertexInput{};
+            vertexInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+            vertexInput.vertexBindingDescriptionCount = 1;
+            vertexInput.pVertexBindingDescriptions = &binding;
+            vertexInput.vertexAttributeDescriptionCount = static_cast<uint32_t>(attrs.size());
+            vertexInput.pVertexAttributeDescriptions = attrs.data();
+
+            VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
+            inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+            inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+
+            std::array<VkDynamicState, 2> dynStates = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+            VkPipelineDynamicStateCreateInfo dynState{};
+            dynState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+            dynState.dynamicStateCount = static_cast<uint32_t>(dynStates.size());
+            dynState.pDynamicStates = dynStates.data();
+
+            VkPipelineViewportStateCreateInfo viewportState{};
+            viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+            viewportState.viewportCount = 1;
+            viewportState.scissorCount = 1;
+
+            VkPipelineRasterizationStateCreateInfo raster{};
+            raster.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+            raster.polygonMode = VK_POLYGON_MODE_FILL;
+            raster.cullMode = VK_CULL_MODE_NONE; // billboards are double-sided
+            raster.frontFace = VK_FRONT_FACE_CLOCKWISE;
+            raster.lineWidth = 1.0f;
+
+            VkPipelineMultisampleStateCreateInfo msaa{};
+            msaa.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+            msaa.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+            VkPipelineColorBlendAttachmentState blend{};
+            blend.colorWriteMask =
+                VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+            blend.blendEnable = VK_TRUE;
+            blend.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+            blend.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+            blend.colorBlendOp = VK_BLEND_OP_ADD;
+            blend.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+            blend.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+            blend.alphaBlendOp = VK_BLEND_OP_ADD;
+
+            VkPipelineColorBlendStateCreateInfo blendState{};
+            blendState.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+            blendState.attachmentCount = 1;
+            blendState.pAttachments = &blend;
+
+            VkPipelineDepthStencilStateCreateInfo depthStencil{};
+            depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+            depthStencil.depthTestEnable = VK_TRUE;
+            depthStencil.depthWriteEnable = VK_FALSE; // read-only depth
+            depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
+
+            VkFormat colorFormat = m_vulkanContext.getSwapchainFormat();
+            VkPipelineRenderingCreateInfo rendering{};
+            rendering.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+            rendering.colorAttachmentCount = 1;
+            rendering.pColorAttachmentFormats = &colorFormat;
+            rendering.depthAttachmentFormat = GBUFFER_DEPTH_FORMAT;
+
+            VkGraphicsPipelineCreateInfo pipelineInfo{};
+            pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+            pipelineInfo.pNext = &rendering;
+            pipelineInfo.stageCount = static_cast<uint32_t>(stages.size());
+            pipelineInfo.pStages = stages.data();
+            pipelineInfo.pVertexInputState = &vertexInput;
+            pipelineInfo.pInputAssemblyState = &inputAssembly;
+            pipelineInfo.pViewportState = &viewportState;
+            pipelineInfo.pRasterizationState = &raster;
+            pipelineInfo.pMultisampleState = &msaa;
+            pipelineInfo.pColorBlendState = &blendState;
+            pipelineInfo.pDepthStencilState = &depthStencil;
+            pipelineInfo.pDynamicState = &dynState;
+            pipelineInfo.layout = m_particlePipelineLayout;
+
+            VkResult pipeResult =
+                vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_particlePipeline);
+
+            vkDestroyShaderModule(device, vertModule, nullptr);
+            vkDestroyShaderModule(device, fragModule, nullptr);
+
+            if (pipeResult != VK_SUCCESS)
+            {
+                VX_LOG_WARN("Failed to create particle pipeline: {} — particle rendering disabled",
+                    static_cast<int>(pipeResult));
+            }
+            else
+            {
+                VX_LOG_INFO("Particle pipeline created");
+            }
+        }
     }
 
     // Create compute pipeline layout — same descriptor set layout, but with compute push constants
@@ -1600,7 +1780,7 @@ void Renderer::renderChunksIndirect(
     m_lastQuadCount = 0;            // unknown without readback
 }
 
-void Renderer::endFrame()
+void Renderer::endFrame(ParticleManager* particleMgr)
 {
     if (!m_frameActive)
     {
@@ -1769,6 +1949,12 @@ void Renderer::endFrame()
 
     vkCmdEndRendering(cmd);
 
+    // ── Particle pass (after translucent, before ImGui) ─────────────────────
+    if (particleMgr != nullptr)
+    {
+        renderParticles(*particleMgr, m_lastViewProjection);
+    }
+
     // ── Begin final swapchain pass for ImGui ────────────────────────────────
     VkRenderingAttachmentInfo imguiAttach{};
     imguiAttach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
@@ -1896,6 +2082,78 @@ void Renderer::updateTintPalette(const TintPalette& palette)
     }
 }
 
+void Renderer::renderParticles(ParticleManager& pm, const glm::mat4& vp)
+{
+    if (m_particlePipeline == VK_NULL_HANDLE || pm.getActiveCount() == 0)
+    {
+        return;
+    }
+
+    auto& frame = m_frames[m_frameIndex];
+    VkCommandBuffer cmd = frame.commandBuffer;
+    VkExtent2D extent = m_vulkanContext.getSwapchainExtent();
+
+    // Particle pass renders into swapchain color with depth read-only
+    // Depth is already in DEPTH_READ_ONLY_OPTIMAL from the translucent pass
+    VkRenderingAttachmentInfo colorAttach{};
+    colorAttach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+    colorAttach.imageView = m_vulkanContext.getSwapchainImageViews()[m_currentImageIndex];
+    colorAttach.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    colorAttach.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+    colorAttach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+
+    VkRenderingAttachmentInfo depthAttach{};
+    depthAttach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+    depthAttach.imageView = m_swapchainResources.depthImageView;
+    depthAttach.imageLayout = VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL;
+    depthAttach.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+    depthAttach.storeOp = VK_ATTACHMENT_STORE_OP_NONE;
+
+    VkRenderingInfo renderInfo{};
+    renderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+    renderInfo.renderArea.offset = {0, 0};
+    renderInfo.renderArea.extent = extent;
+    renderInfo.layerCount = 1;
+    renderInfo.colorAttachmentCount = 1;
+    renderInfo.pColorAttachments = &colorAttach;
+    renderInfo.pDepthAttachment = &depthAttach;
+
+    vkCmdBeginRendering(cmd, &renderInfo);
+
+    VkViewport viewport{};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = static_cast<float>(extent.width);
+    viewport.height = static_cast<float>(extent.height);
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    vkCmdSetViewport(cmd, 0, 1, &viewport);
+
+    VkRect2D scissor{};
+    scissor.offset = {0, 0};
+    scissor.extent = extent;
+    vkCmdSetScissor(cmd, 0, 1, &scissor);
+
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_particlePipeline);
+    vkCmdBindDescriptorSets(
+        cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_particlePipelineLayout, 0, 1, &m_chunkDescriptorSet, 0, nullptr);
+
+    ParticlePushConstants pc{};
+    pc.viewProjection = vp;
+    vkCmdPushConstants(
+        cmd, m_particlePipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(ParticlePushConstants), &pc);
+
+    VkBuffer vertBuf = pm.getVertexBuffer();
+    VkDeviceSize offset = 0;
+    vkCmdBindVertexBuffers(cmd, 0, 1, &vertBuf, &offset);
+    m_quadIndexBuffer->bind(cmd);
+
+    uint32_t indexCount = pm.getActiveCount() * 6;
+    vkCmdDrawIndexed(cmd, indexCount, 1, 0, 0, 0);
+
+    vkCmdEndRendering(cmd);
+}
+
 void Renderer::shutdown()
 {
     if (!m_isInitialized)
@@ -1974,6 +2232,17 @@ void Renderer::shutdown()
     {
         vkDestroyPipeline(device, m_translucentPipeline, nullptr);
         m_translucentPipeline = VK_NULL_HANDLE;
+    }
+
+    if (m_particlePipeline != VK_NULL_HANDLE)
+    {
+        vkDestroyPipeline(device, m_particlePipeline, nullptr);
+        m_particlePipeline = VK_NULL_HANDLE;
+    }
+    if (m_particlePipelineLayout != VK_NULL_HANDLE)
+    {
+        vkDestroyPipelineLayout(device, m_particlePipelineLayout, nullptr);
+        m_particlePipelineLayout = VK_NULL_HANDLE;
     }
 
     if (m_lightingPipeline != VK_NULL_HANDLE)

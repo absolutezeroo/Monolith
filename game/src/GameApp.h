@@ -13,6 +13,7 @@
 #include "voxel/renderer/Camera.h"
 #include "voxel/renderer/ChunkUploadManager.h"
 #include "voxel/renderer/MeshBuilder.h"
+#include "voxel/renderer/ParticleManager.h"
 #include "voxel/renderer/Renderer.h"
 #include "voxel/renderer/WieldMeshRenderer.h"
 #include "voxel/world/BlockRegistry.h"
@@ -74,6 +75,7 @@ class GameApp : public voxel::game::GameLoop
     void captureScreenshot();
 
     voxel::game::Window& m_window;
+    voxel::renderer::VulkanContext& m_vulkanContext;
     voxel::renderer::Renderer m_renderer;
     std::unique_ptr<voxel::renderer::ChunkUploadManager> m_uploadManager; // destroyed before Renderer
     voxel::renderer::Camera m_camera;
@@ -110,6 +112,10 @@ class GameApp : public voxel::game::GameLoop
     std::unique_ptr<voxel::scripting::NeighborNotifier> m_neighborNotifier;
     std::unique_ptr<voxel::scripting::ShapeCache> m_shapeCache;
     voxel::scripting::RateLimiter m_rateLimiter;
+
+    // Particle system
+    voxel::renderer::ParticleManager m_particleManager;
+    float m_animateTickTimer = 0.0f;
 
     // HUD state
     int m_hotbarSlot = 0;

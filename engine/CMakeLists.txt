@@ -44,6 +44,7 @@ add_library(VoxelEngine STATIC
         src/renderer/ModelMesher.cpp
         src/renderer/ModelRegistry.cpp
         src/renderer/TintPalette.cpp
+        src/renderer/ParticleManager.cpp
         src/world/BlockLightPropagator.cpp
         src/world/DynamicLightUpdater.cpp
         src/world/SkyLightPropagator.cpp

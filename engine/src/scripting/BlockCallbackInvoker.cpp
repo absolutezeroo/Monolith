@@ -580,6 +580,70 @@ void BlockCallbackInvoker::invokeOnInventoryMove(
     }
 }
 
+// --- Visual/client callbacks ---
+
+void BlockCallbackInvoker::invokeOnAnimateTick(
+    const world::BlockDefinition& def, const glm::ivec3& pos, sol::object randomFn)
+{
+    if (!def.callbacks || !def.callbacks->onAnimateTick.has_value())
+    {
+        return;
+    }
+
+    sol::protected_function_result result = (*def.callbacks->onAnimateTick)(posToTable(m_lua, pos), randomFn);
+    if (!result.valid())
+    {
+        sol::error err = result;
+        VX_LOG_WARN("Lua on_animate_tick error for '{}': {}", def.stringId, err.what());
+    }
+}
+
+std::optional<uint32_t> BlockCallbackInvoker::invokeGetColor(
+    const world::BlockDefinition& def, const glm::ivec3& pos)
+{
+    if (!def.callbacks || !def.callbacks->getColor.has_value())
+    {
+        return std::nullopt;
+    }
+
+    sol::protected_function_result result = (*def.callbacks->getColor)(posToTable(m_lua, pos));
+    if (!result.valid())
+    {
+        sol::error err = result;
+        VX_LOG_WARN("Lua get_color error for '{}': {}", def.stringId, err.what());
+        return std::nullopt;
+    }
+
+    if (result.get_type() == sol::type::number)
+    {
+        return static_cast<uint32_t>(result.get<int>());
+    }
+    return std::nullopt;
+}
+
+std::string BlockCallbackInvoker::invokeOnPickBlock(
+    const world::BlockDefinition& def, const glm::ivec3& pos)
+{
+    if (!def.callbacks || !def.callbacks->onPickBlock.has_value())
+    {
+        return def.stringId;
+    }
+
+    sol::protected_function_result result = (*def.callbacks->onPickBlock)(posToTable(m_lua, pos));
+    if (!result.valid())
+    {
+        sol::error err = result;
+        VX_LOG_WARN("Lua on_pick_block error for '{}': {}", def.stringId, err.what());
+        return def.stringId;
+    }
+
+    if (result.get_type() == sol::type::string)
+    {
+        return result.get<std::string>();
+    }
+    return def.stringId;
+}
+
 // --- Neighbor change callbacks ---
 
 void BlockCallbackInvoker::invokeOnNeighborChanged(
