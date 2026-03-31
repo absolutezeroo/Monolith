@@ -3,6 +3,7 @@
 #include "voxel/core/Log.h"
 #include "voxel/scripting/BlockCallbackInvoker.h"
 #include "voxel/scripting/BlockCallbacks.h"
+#include "voxel/scripting/GlobalEventRegistry.h"
 #include "voxel/world/Block.h"
 #include "voxel/world/BlockRegistry.h"
 #include "voxel/world/ChunkColumn.h"
@@ -69,6 +70,16 @@ void NeighborNotifier::notifySingleNeighbor(
 
     // Fire on_neighbor_changed
     m_invoker.invokeOnNeighborChanged(neighborDef, neighborPos, changedPos, changedBlockString);
+
+    // Fire global block_neighbor_changed event (9.10)
+    if (m_globalEvents)
+    {
+        m_globalEvents->fireEvent(
+            "block_neighbor_changed",
+            neighborPos.x, neighborPos.y, neighborPos.z,
+            changedPos.x, changedPos.y, changedPos.z,
+            changedBlockString);
+    }
 
     // Fire update_shape if defined
     if (neighborDef.callbacks && neighborDef.callbacks->updateShape.has_value())

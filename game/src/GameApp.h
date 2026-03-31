@@ -46,6 +46,9 @@ class ABMRegistry;
 class LBMRegistry;
 class NeighborNotifier;
 class ShapeCache;
+class GlobalEventRegistry;
+class InputEventTracker;
+class ComboDetector;
 }
 
 class GameApp : public voxel::game::GameLoop
@@ -103,6 +106,12 @@ class GameApp : public voxel::game::GameLoop
     bool m_flyMode = true; // Start in fly mode — toggled with F7
     bool m_isSprinting = false; // Persistent sprint toggle state
 
+    // Tracking state for global movement events (9.10)
+    glm::dvec3 m_prevPlayerPos{0.0};
+    bool m_prevSprinting = false;
+    bool m_prevSneaking = false;
+    float m_gameTime = 0.0f; // Accumulated game time for combo detector
+
     // Scripting
     std::unique_ptr<voxel::scripting::ScriptEngine> m_scriptEngine;
     std::unique_ptr<voxel::scripting::BlockCallbackInvoker> m_callbackInvoker;
@@ -111,6 +120,9 @@ class GameApp : public voxel::game::GameLoop
     std::unique_ptr<voxel::scripting::LBMRegistry> m_lbmRegistry;
     std::unique_ptr<voxel::scripting::NeighborNotifier> m_neighborNotifier;
     std::unique_ptr<voxel::scripting::ShapeCache> m_shapeCache;
+    std::unique_ptr<voxel::scripting::GlobalEventRegistry> m_globalEvents;
+    std::unique_ptr<voxel::scripting::InputEventTracker> m_inputEventTracker;
+    std::unique_ptr<voxel::scripting::ComboDetector> m_comboDetector;
     voxel::scripting::RateLimiter m_rateLimiter;
 
     // Particle system

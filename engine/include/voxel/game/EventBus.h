@@ -16,7 +16,10 @@ enum class EventType : core::uint8
 {
     BlockPlaced,
     BlockBroken,
-    ChunkLoaded
+    BlockChanged,
+    ChunkLoaded,
+    ChunkUnloaded,
+    ChunkGenerated
 };
 
 struct BlockPlacedEvent
@@ -31,7 +34,25 @@ struct BlockBrokenEvent
     core::uint16 previousBlockId;
 };
 
+struct BlockChangedEvent
+{
+    math::IVec3 position;
+    core::uint16 previousBlockId;
+    core::uint16 newBlockId;
+};
+
 struct ChunkLoadedEvent
+{
+    math::IVec2 coord;
+    bool fromDisk; ///< true if loaded from disk, false if freshly generated.
+};
+
+struct ChunkUnloadedEvent
+{
+    math::IVec2 coord;
+};
+
+struct ChunkGeneratedEvent
 {
     math::IVec2 coord;
 };
@@ -54,9 +75,27 @@ struct EventTypeTraits<EventType::BlockBroken>
 };
 
 template <>
+struct EventTypeTraits<EventType::BlockChanged>
+{
+    using Type = BlockChangedEvent;
+};
+
+template <>
 struct EventTypeTraits<EventType::ChunkLoaded>
 {
     using Type = ChunkLoadedEvent;
+};
+
+template <>
+struct EventTypeTraits<EventType::ChunkUnloaded>
+{
+    using Type = ChunkUnloadedEvent;
+};
+
+template <>
+struct EventTypeTraits<EventType::ChunkGenerated>
+{
+    using Type = ChunkGeneratedEvent;
 };
 
 /// Opaque handle returned by subscribe(), used for unsubscribe().

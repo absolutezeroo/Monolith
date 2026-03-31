@@ -15,6 +15,7 @@ namespace voxel::scripting
 {
 
 class BlockCallbackInvoker;
+class GlobalEventRegistry;
 
 /// Notifies adjacent blocks when a block changes, handling cascade destruction
 /// (e.g., torches losing support) with a depth limit to prevent infinite recursion.
@@ -43,6 +44,9 @@ public:
 
     static const std::array<std::string, 6>& directionNames();
 
+    /// Inject GlobalEventRegistry for block_neighbor_changed events (optional, nullable).
+    void setGlobalEvents(GlobalEventRegistry* registry) { m_globalEvents = registry; }
+
 private:
     void notifySingleNeighbor(
         const glm::ivec3& neighborPos,
@@ -54,6 +58,7 @@ private:
     world::ChunkManager& m_chunkManager;
     world::BlockRegistry& m_registry;
     BlockCallbackInvoker& m_invoker;
+    GlobalEventRegistry* m_globalEvents = nullptr;
 };
 
 } // namespace voxel::scripting

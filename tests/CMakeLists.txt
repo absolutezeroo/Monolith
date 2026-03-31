@@ -53,6 +53,7 @@ add_executable(VoxelTests
     scripting/TestMetadataInventoryCallbacks.cpp
     scripting/TestWorldQueryAPI.cpp
     scripting/TestVisualCallbacks.cpp
+    scripting/TestGlobalEventHooks.cpp
 )
 
 target_link_libraries(VoxelTests

@@ -64,6 +64,9 @@ add_library(VoxelEngine STATIC
         src/scripting/NeighborNotifier.cpp
         src/scripting/ShapeCache.cpp
         src/scripting/WorldQueryAPI.cpp
+        src/scripting/GlobalEventRegistry.cpp
+        src/scripting/InputEventTracker.cpp
+        src/scripting/ComboDetector.cpp
 )
 
 target_include_directories(VoxelEngine
@@ -225,6 +228,9 @@ set_source_files_properties(
         src/scripting/NeighborNotifier.cpp
         src/scripting/ShapeCache.cpp
         src/scripting/WorldQueryAPI.cpp
+        src/scripting/GlobalEventRegistry.cpp
+        src/scripting/InputEventTracker.cpp
+        src/scripting/ComboDetector.cpp
         src/world/Block.cpp
         PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 if (MSVC)
@@ -239,6 +245,9 @@ if (MSVC)
             src/scripting/NeighborNotifier.cpp
             src/scripting/ShapeCache.cpp
             src/scripting/WorldQueryAPI.cpp
+            src/scripting/GlobalEventRegistry.cpp
+            src/scripting/InputEventTracker.cpp
+            src/scripting/ComboDetector.cpp
             src/world/Block.cpp
             APPEND_STRING PROPERTY COMPILE_FLAGS " /wd4702")
 endif ()

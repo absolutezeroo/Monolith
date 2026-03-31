@@ -49,12 +49,12 @@ TEST_CASE("EventBus: unsubscribe prevents future callbacks", "[game][event]")
 
     auto id = bus.subscribe<EventType::ChunkLoaded>([&callCount](const ChunkLoadedEvent&) { callCount++; });
 
-    bus.publish<EventType::ChunkLoaded>(ChunkLoadedEvent{{0, 0}});
+    bus.publish<EventType::ChunkLoaded>(ChunkLoadedEvent{{0, 0}, false});
     REQUIRE(callCount == 1);
 
     bus.unsubscribe(EventType::ChunkLoaded, id);
 
-    bus.publish<EventType::ChunkLoaded>(ChunkLoadedEvent{{1, 1}});
+    bus.publish<EventType::ChunkLoaded>(ChunkLoadedEvent{{1, 1}, false});
     REQUIRE(callCount == 1); // Not incremented
 }
 
@@ -113,6 +113,6 @@ TEST_CASE("EventBus: publish with no subscribers is a no-op", "[game][event]")
 {
     EventBus bus;
     // Should not crash or throw
-    bus.publish<EventType::ChunkLoaded>(ChunkLoadedEvent{{5, 5}});
+    bus.publish<EventType::ChunkLoaded>(ChunkLoadedEvent{{5, 5}, false});
     REQUIRE(bus.subscriberCount(EventType::ChunkLoaded) == 0);
 }

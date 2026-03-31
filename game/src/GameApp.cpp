@@ -16,10 +16,14 @@
 #include "voxel/scripting/ScriptEngine.h"
 #include "voxel/scripting/ShapeCache.h"
 #include "voxel/scripting/WorldQueryAPI.h"
+#include "voxel/scripting/GlobalEventRegistry.h"
+#include "voxel/scripting/InputEventTracker.h"
+#include "voxel/scripting/ComboDetector.h"
 
 #include <GLFW/glfw3.h>
 #include <glm/geometric.hpp>
 #include <imgui.h>
+#include <sol/sol.hpp>
 
 #include <algorithm>
 #include <chrono>
@@ -69,7 +73,17 @@ GameApp::~GameApp()
     // Destroy particle GPU buffer before VMA is torn down
     m_particleManager.shutdown(m_vulkanContext.getAllocator());
 
+    // Fire shutdown event before tearing down Lua systems
+    if (m_globalEvents)
+    {
+        m_globalEvents->fireEvent("player_leave", 0);
+        m_globalEvents->fireEvent("shutdown");
+    }
+
     // Destroy Lua-dependent managers before script engine (they hold sol2 refs)
+    m_comboDetector.reset();
+    m_inputEventTracker.reset();
+    m_globalEvents.reset();
     m_shapeCache.reset();
     m_neighborNotifier.reset();
     m_lbmRegistry.reset();
@@ -171,14 +185,25 @@ voxel::core::Result<void> GameApp::init(const std::string& shaderDir, std::optio
     // Create neighbor notifier and shape cache
     m_neighborNotifier = std::make_unique<voxel::scripting::NeighborNotifier>(
         m_chunkManager, m_blockRegistry, *m_callbackInvoker);
+    m_neighborNotifier->setGlobalEvents(m_globalEvents.get());
     m_shapeCache =
         std::make_unique<voxel::scripting::ShapeCache>(m_blockRegistry, *m_callbackInvoker);
 
     // Inject shape cache into player controller
     m_player.setShapeCache(m_shapeCache.get());
 
+    // Create global event systems (9.10)
+    m_globalEvents = std::make_unique<voxel::scripting::GlobalEventRegistry>();
+    m_inputEventTracker = std::make_unique<voxel::scripting::InputEventTracker>();
+    m_comboDetector = std::make_unique<voxel::scripting::ComboDetector>();
+
+    // Bind global event Lua API
+    voxel::scripting::LuaBindings::registerGlobalEventAPI(
+        m_scriptEngine->getLuaState(), *m_globalEvents, *m_comboDetector);
+
     // Create tick systems: timers, ABM, LBM
     m_timerManager = std::make_unique<voxel::scripting::BlockTimerManager>(m_chunkManager);
+    m_timerManager->setGlobalEvents(m_globalEvents.get());
     m_abmRegistry = std::make_unique<voxel::scripting::ABMRegistry>();
     m_lbmRegistry = std::make_unique<voxel::scripting::LBMRegistry>();
 
@@ -297,12 +322,68 @@ voxel::core::Result<void> GameApp::init(const std::string& shaderDir, std::optio
             m_lbmRegistry->onChunkLoaded(coord, m_chunkManager, m_blockRegistry, *m_callbackInvoker);
         });
 
+    // Bridge C++ EventBus events → Lua global events (9.10)
+    m_eventBus.subscribe<voxel::game::EventType::ChunkLoaded>(
+        [this](const voxel::game::ChunkLoadedEvent& e) {
+            if (m_globalEvents)
+            {
+                auto& lua = m_scriptEngine->getLuaState();
+                sol::table coordTable = lua.create_table_with("x", e.coord.x, "z", e.coord.y);
+                m_globalEvents->fireEvent("chunk_loaded", coordTable, e.fromDisk);
+            }
+        });
+    m_eventBus.subscribe<voxel::game::EventType::ChunkUnloaded>(
+        [this](const voxel::game::ChunkUnloadedEvent& e) {
+            if (m_globalEvents)
+            {
+                auto& lua = m_scriptEngine->getLuaState();
+                sol::table coordTable = lua.create_table_with("x", e.coord.x, "z", e.coord.y);
+                m_globalEvents->fireEvent("chunk_unloaded", coordTable);
+            }
+        });
+    m_eventBus.subscribe<voxel::game::EventType::ChunkGenerated>(
+        [this](const voxel::game::ChunkGeneratedEvent& e) {
+            if (m_globalEvents)
+            {
+                auto& lua = m_scriptEngine->getLuaState();
+                sol::table coordTable = lua.create_table_with("x", e.coord.x, "z", e.coord.y);
+                m_globalEvents->fireEvent("chunk_generated", coordTable);
+            }
+        });
+    m_eventBus.subscribe<voxel::game::EventType::BlockPlaced>(
+        [this](const voxel::game::BlockPlacedEvent& e) {
+            if (m_globalEvents)
+            {
+                auto& lua = m_scriptEngine->getLuaState();
+                glm::ivec3 pos{e.position.x, e.position.y, e.position.z};
+                sol::table posTable = lua.create_table_with("x", pos.x, "y", pos.y, "z", pos.z);
+                const auto& def = m_blockRegistry.getBlockType(e.blockId);
+                m_globalEvents->fireEvent("block_placed", posTable, def.stringId);
+            }
+        });
+    m_eventBus.subscribe<voxel::game::EventType::BlockBroken>(
+        [this](const voxel::game::BlockBrokenEvent& e) {
+            if (m_globalEvents)
+            {
+                auto& lua = m_scriptEngine->getLuaState();
+                glm::ivec3 pos{e.position.x, e.position.y, e.position.z};
+                sol::table posTable = lua.create_table_with("x", pos.x, "y", pos.y, "z", pos.z);
+                const auto& def = m_blockRegistry.getBlockType(e.previousBlockId);
+                m_globalEvents->fireEvent("block_broken", posTable, def.stringId);
+            }
+        });
+
     // Start with cursor captured for FPS camera
     m_input->setCursorCaptured(true);
     if (glfwRawMouseMotionSupported())
     {
         glfwSetInputMode(m_window.getHandle(), GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
     }
+
+    // Fire lifecycle events after all systems are initialized
+    m_globalEvents->fireEvent("all_mods_loaded");
+    m_globalEvents->fireEvent("player_join", 0);
+    m_prevPlayerPos = m_flyMode ? m_camera.getPosition() : m_player.getPosition();
 
     return {};
 }
@@ -362,6 +443,7 @@ void GameApp::handleInputToggles()
     }
 
     // Hotbar: number keys 1-9
+    int prevSlot = m_hotbarSlot;
     for (int i = 0; i < HOTBAR_SLOTS; ++i)
     {
         if (m_input->wasKeyPressed(GLFW_KEY_1 + i))
@@ -375,6 +457,12 @@ void GameApp::handleInputToggles()
     if (scroll != 0.0f && m_input->isCursorCaptured())
     {
         m_hotbarSlot = (m_hotbarSlot - static_cast<int>(scroll) + HOTBAR_SLOTS) % HOTBAR_SLOTS;
+    }
+
+    // Fire player_hotbar_changed global event (9.10)
+    if (m_hotbarSlot != prevSlot && m_globalEvents)
+    {
+        m_globalEvents->fireEvent("player_hotbar_changed", 0, m_hotbarSlot + 1, prevSlot + 1);
     }
 }
 
@@ -477,11 +565,35 @@ void GameApp::handleBlockInteraction(float dt)
         uint16_t punchTargetId = m_chunkManager.getBlock(m_raycastResult.blockPos);
         if (punchTargetId != voxel::world::BLOCK_AIR)
         {
-            const auto& punchDef = m_blockRegistry.getBlockType(punchTargetId);
-            if (m_callbackInvoker)
+            bool interactCancelled = false;
+
+            // Global cancelable player_interact for "break" action (AC: 7)
+            if (m_globalEvents)
             {
-                m_callbackInvoker->invokeOnPunch(
-                    punchDef, m_raycastResult.blockPos, punchTargetId, 0);
+                auto& lua = m_scriptEngine->getLuaState();
+                sol::table posTable = lua.create_table_with(
+                    "x", m_raycastResult.blockPos.x,
+                    "y", m_raycastResult.blockPos.y,
+                    "z", m_raycastResult.blockPos.z);
+                const auto& targetDef = m_blockRegistry.getBlockType(punchTargetId);
+                interactCancelled = m_globalEvents->fireCancelableEvent(
+                    "player_interact", 0, std::string("break"), posTable, targetDef.stringId);
+
+                if (!interactCancelled)
+                {
+                    interactCancelled = m_globalEvents->fireCancelableEvent(
+                        "block_dig_start", 0, posTable, targetDef.stringId);
+                }
+            }
+
+            if (!interactCancelled)
+            {
+                const auto& punchDef = m_blockRegistry.getBlockType(punchTargetId);
+                if (m_callbackInvoker)
+                {
+                    m_callbackInvoker->invokeOnPunch(
+                        punchDef, m_raycastResult.blockPos, punchTargetId, 0);
+                }
             }
         }
     }
@@ -738,9 +850,23 @@ void GameApp::handleBlockInteraction(float dt)
 void GameApp::tick(double dt)
 {
     auto fdt = static_cast<float>(dt);
+    m_gameTime += fdt;
 
     // Read edge flags set by GLFW callbacks (fired during pollEvents, before tick)
     handleInputToggles();
+
+    // Fire global tick event with timing check (AC: 5)
+    if (m_globalEvents)
+    {
+        auto tickStart = std::chrono::steady_clock::now();
+        m_globalEvents->fireEvent("tick", fdt);
+        auto tickElapsed = std::chrono::steady_clock::now() - tickStart;
+        double tickMs = std::chrono::duration<double, std::milli>(tickElapsed).count();
+        if (tickMs > 2.0)
+        {
+            VX_LOG_WARN("Global 'tick' callbacks took {:.2f}ms (threshold: 2ms)", tickMs);
+        }
+    }
 
     ImGuiIO& io = ImGui::GetIO();
 
@@ -859,6 +985,45 @@ void GameApp::tick(double dt)
 
             m_player.tickPhysics(fdt, moveInput, m_chunkManager, m_blockRegistry);
 
+            // --- Global movement events (9.10) ---
+            if (m_globalEvents)
+            {
+                voxel::scripting::EntityHandle moveEntity(m_player);
+
+                // player_move: throttled to tick rate (fires only if position changed)
+                glm::dvec3 currentPos = m_player.getPosition();
+                if (currentPos != m_prevPlayerPos)
+                {
+                    auto& lua = m_scriptEngine->getLuaState();
+                    sol::table posTable = lua.create_table_with(
+                        "x", currentPos.x, "y", currentPos.y, "z", currentPos.z);
+                    m_globalEvents->fireEvent("player_move", std::ref(moveEntity), posTable);
+                    m_prevPlayerPos = currentPos;
+                }
+
+                // player_jump: when jump command processed and player was on ground
+                if (jump && m_player.isOnGround())
+                {
+                    m_globalEvents->fireEvent("player_jump", std::ref(moveEntity));
+                }
+
+                // player_sprint_toggle: when sprint state changes
+                bool currentSprint = m_player.isSprinting();
+                if (currentSprint != m_prevSprinting)
+                {
+                    m_globalEvents->fireEvent("player_sprint_toggle", std::ref(moveEntity), currentSprint);
+                    m_prevSprinting = currentSprint;
+                }
+
+                // player_sneak_toggle: when sneak state changes
+                bool currentSneak = m_player.isSneaking();
+                if (currentSneak != m_prevSneaking)
+                {
+                    m_globalEvents->fireEvent("player_sneak_toggle", std::ref(moveEntity), currentSneak);
+                    m_prevSneaking = currentSneak;
+                }
+            }
+
             // --- Entity-block callback dispatch (after physics, before camera sync) ---
             if (m_callbackInvoker)
             {
@@ -868,6 +1033,12 @@ void GameApp::tick(double dt)
                 if (m_player.justLanded())
                 {
                     float fallDist = m_player.consumeFallDistance();
+
+                    // Global player_land event (9.10)
+                    if (m_globalEvents)
+                    {
+                        m_globalEvents->fireEvent("player_land", std::ref(entity), fallDist);
+                    }
 
                     // Block directly below player feet
                     glm::ivec3 feetPos = glm::ivec3(
@@ -1023,6 +1194,26 @@ void GameApp::tick(double dt)
 
     // NOTE: mesh uploads moved to render() — must happen AFTER beginFrame()
     // calls StagingBuffer::beginFrame() which resets the pending transfer list.
+
+    // Input events: fire Lua callbacks for key/mouse/scroll (9.10)
+    if (m_globalEvents && m_inputEventTracker && !m_flyMode)
+    {
+        voxel::scripting::EntityHandle inputEntity(m_player);
+        m_inputEventTracker->update(*m_input, *m_globalEvents, inputEntity);
+
+        // Feed pressed keys to combo detector
+        if (m_comboDetector)
+        {
+            for (int k = 0; k < 512; ++k)
+            {
+                if (m_input->wasKeyPressed(k))
+                {
+                    auto kn = voxel::scripting::InputEventTracker::keyName(k);
+                    m_comboDetector->onKeyPress(std::string(kn), m_gameTime, sol::make_object(m_scriptEngine->getLuaState(), std::ref(inputEntity)));
+                }
+            }
+        }
+    }
 
     // Clear edge flags and update hold timers at end of tick.
     // Edge flags were set by pollEvents callbacks, read above, and now cleared

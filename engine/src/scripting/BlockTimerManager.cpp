@@ -2,9 +2,12 @@
 
 #include "voxel/core/Log.h"
 #include "voxel/scripting/BlockCallbackInvoker.h"
+#include "voxel/scripting/GlobalEventRegistry.h"
 #include "voxel/world/Block.h"
 #include "voxel/world/BlockRegistry.h"
 #include "voxel/world/ChunkManager.h"
+
+#include <sol/sol.hpp>
 
 #include <algorithm>
 
@@ -71,6 +74,13 @@ void BlockTimerManager::update(float dt, world::BlockRegistry& registry, BlockCa
             const auto& def = registry.getBlockType(entry.blockId);
 
             bool restart = invoker.invokeOnTimer(def, pos, elapsed);
+
+            // Fire global block_timer_fired event (9.10)
+            if (m_globalEvents)
+            {
+                m_globalEvents->fireEvent("block_timer_fired", pos.x, pos.y, pos.z, def.stringId, elapsed);
+            }
+
             if (restart)
             {
                 entry.remaining = entry.interval; // reset timer

@@ -6,6 +6,8 @@
 #include "voxel/scripting/ABMRegistry.h"
 #include "voxel/scripting/BlockCallbacks.h"
 #include "voxel/scripting/BlockTimerManager.h"
+#include "voxel/scripting/ComboDetector.h"
+#include "voxel/scripting/GlobalEventRegistry.h"
 #include "voxel/scripting/EntityHandle.h"
 #include "voxel/scripting/LBMRegistry.h"
 #include "voxel/world/BlockInventory.h"
@@ -969,6 +971,30 @@ void LuaBindings::registerParticleAPI(
             }
 
             pm.addParticleSpawner(amount, minPos, maxPos, minVel, maxVel, texLayer, size, lifetime);
+        });
+}
+
+void LuaBindings::registerGlobalEventAPI(
+    sol::state& lua, GlobalEventRegistry& registry, ComboDetector& comboDetector)
+{
+    sol::table voxelTable = lua["voxel"];
+
+    // voxel.on(event_name, callback)
+    voxelTable.set_function("on", [&registry](const std::string& eventName, sol::protected_function callback) {
+        registry.registerCallback(eventName, std::move(callback));
+    });
+
+    // voxel.register_combo(name, keys, window, callback)
+    voxelTable.set_function(
+        "register_combo",
+        [&comboDetector](
+            const std::string& name, const sol::table& keysTable, float window, sol::protected_function callback) {
+            std::vector<std::string> keys;
+            for (size_t i = 1; i <= keysTable.size(); ++i)
+            {
+                keys.push_back(keysTable.get<std::string>(i));
+            }
+            comboDetector.registerCombo(name, std::move(keys), window, std::move(callback));
         });
 }
 

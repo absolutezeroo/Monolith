@@ -25,6 +25,8 @@ namespace voxel::scripting
 class BlockTimerManager;
 class ABMRegistry;
 class LBMRegistry;
+class GlobalEventRegistry;
+class ComboDetector;
 }
 
 namespace voxel::scripting
@@ -74,6 +76,10 @@ public:
     /// Bind `voxel.add_particle` and `voxel.add_particle_spawner` onto the existing `voxel` table.
     static void registerParticleAPI(
         sol::state& lua, renderer::ParticleManager& pm, renderer::TextureArray& texArray);
+
+    /// Bind `voxel.on()` and `voxel.register_combo()` onto the existing `voxel` table.
+    static void registerGlobalEventAPI(
+        sol::state& lua, GlobalEventRegistry& registry, ComboDetector& comboDetector);
 
     /// Access the item registry (populated by voxel.register_item calls).
     [[nodiscard]] static const std::unordered_map<std::string, ItemDefinition>& getItemRegistry();

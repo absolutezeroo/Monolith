@@ -19,6 +19,7 @@ class BlockRegistry;
 namespace voxel::scripting
 {
 class BlockCallbackInvoker;
+class GlobalEventRegistry;
 
 struct TimerEntry
 {
@@ -60,11 +61,15 @@ public:
     /// Pause or resume the wall-clock timer at pos without resetting it.
     void setTimerActive(const glm::ivec3& pos, bool active);
 
+    /// Inject GlobalEventRegistry for block_timer_fired events (optional, nullable).
+    void setGlobalEvents(GlobalEventRegistry* registry) { m_globalEvents = registry; }
+
     [[nodiscard]] size_t activeTimerCount() const { return m_timers.size(); }
     [[nodiscard]] size_t scheduledTickCount() const { return m_scheduledTicks.size(); }
 
 private:
     world::ChunkManager& m_chunkManager;
+    GlobalEventRegistry* m_globalEvents = nullptr;
     std::unordered_map<glm::ivec3, TimerEntry, math::IVec3Hash> m_timers;
 
     // Pending timers set during update iteration (from inside on_timer callbacks)
